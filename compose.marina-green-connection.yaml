@@ -1,0 +1,10 @@
+# Apply only to a private per-hotel fleet, never to the shared public demo.
+# Load credentials from that hotel's protected host env file, not from browser code.
+services:
+  api:
+    environment:
+      ENABLE_GREEN_API_CONNECTION: "true"
+      GREEN_API_PROPERTY_CODE: ${MARINA_FLEET_PROPERTY_CODE:?Select the private hotel env file}
+      GREEN_API_URL: ${GREEN_API_URL:?Use apiUrl from the GREEN-API instance}
+      GREEN_API_ID_INSTANCE: ${GREEN_API_ID_INSTANCE:?Use idInstance from the GREEN-API instance}
+      GREEN_API_TOKEN_INSTANCE: ${GREEN_API_TOKEN_INSTANCE:?Use apiTokenInstance from the GREEN-API instance}

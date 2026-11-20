@@ -5,31 +5,69 @@ from typing import Any, Literal
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .dining_coordination import active_session_for_table, live_table_status, lock_dining_tables
+from .kitchen_recipes import read_recipe
 from .guest_os import GUEST_COOKIE
 from .guest_requests import authorized_context
 
 admin_router = APIRouter(prefix="/api/v1/kitchen", tags=["kitchen"])
 guest_router = APIRouter(prefix="/api/v1/guest-os", tags=["guest-kitchen"])
-kitchen_access = require_roles("OWNER", "MANAGER", "DINING_STAFF")
+_kitchen_ops_base = require_roles("OWNER", "MANAGER", "COOK")
+_kitchen_status_base = require_roles("OWNER", "MANAGER", "COOK", "WAITER")
+_kitchen_management_base = require_roles("OWNER", "MANAGER")
+
+async def kitchen_operations_access(user: dict[str, Any] = Depends(_kitchen_ops_base)):
+    # A custom DINING module grant is not a COOK/management role promotion.
+    if user["role"] not in {"OWNER", "MANAGER", "COOK"}:
+        raise HTTPException(status_code=403, detail="Kitchen operations role required")
+    return user
+
+async def kitchen_status_access(user: dict[str, Any] = Depends(_kitchen_status_base)):
+    if user["role"] not in {"OWNER", "MANAGER", "COOK", "WAITER"}:
+        raise HTTPException(status_code=403, detail="Kitchen status role required")
+    return user
+
+async def kitchen_management_access(user: dict[str, Any] = Depends(_kitchen_management_base)):
+    if user["role"] not in {"OWNER", "MANAGER"}:
+        raise HTTPException(status_code=403, detail="Kitchen management role required")
+    return user
+_waiter_menu_base = require_roles("OWNER", "MANAGER", "COOK", "WAITER")
+_waiter_table_base = require_roles("OWNER", "MANAGER", "WAITER")
+_waiter_order_base = require_roles("OWNER", "MANAGER", "COOK", "WAITER")
+
+async def waiter_menu_access(user: dict[str, Any] = Depends(_waiter_menu_base)):
+    if user["role"] not in {"OWNER", "MANAGER", "COOK", "WAITER"}:
+        raise HTTPException(status_code=403, detail="Dining menu role required")
+    return user
+
+async def waiter_table_creation_access(user: dict[str, Any] = Depends(_waiter_table_base)):
+    if user["role"] not in {"OWNER", "MANAGER", "WAITER"}:
+        raise HTTPException(status_code=403, detail="Dining table creation role required")
+    return user
+
+async def waiter_order_creation_access(user: dict[str, Any] = Depends(_waiter_order_base)):
+    if user["role"] not in {"OWNER", "MANAGER", "COOK", "WAITER"}:
+        raise HTTPException(status_code=403, detail="Dining order role required")
+    return user
+# Legacy DINING_STAFF is intentionally not accepted: cook and waiter are server-separated.
 
 DRAFT_MENU = [
-    ("SYRNIKI", "BREAKFAST", "Сырники со сметаной", "Каймак кошулган сырник", "Syrniki with sour cream", 280, 10),
-    ("OMELET", "BREAKFAST", "Омлет с овощами", "Жашылча кошулган омлет", "Vegetable omelette", 250, 20),
-    ("PORRIDGE", "BREAKFAST", "Овсяная каша с фруктами", "Мөмөлүү сулу боткосу", "Oatmeal with fruit", 190, 30),
-    ("SHORPO", "SOUP", "Шорпо", "Шорпо", "Shorpo soup", 340, 100),
-    ("LENTIL_SOUP", "SOUP", "Чечевичный крем-суп", "Жасмык крем-шорпосу", "Lentil cream soup", 270, 110),
-    ("FRESH_SALAD", "SALAD", "Свежий салат", "Жаңы жашылча салаты", "Fresh vegetable salad", 230, 200),
-    ("CAESAR_CHICKEN", "SALAD", "Цезарь с курицей", "Тоок эти менен Цезарь", "Chicken Caesar salad", 390, 210),
-    ("PLOV", "MAIN", "Плов", "Палоо", "Plov", 390, 300),
-    ("KUURDAK", "MAIN", "Куурдак", "Куурдак", "Kuurdak", 490, 310),
-    ("CHICKEN_CUTLET", "MAIN", "Куриная котлета с пюре", "Пюре менен тоок котлети", "Chicken cutlet with mashed potato", 360, 320),
-    ("GRILLED_TROUT", "MAIN", "Форель на гриле", "Гриль форель", "Grilled trout", 650, 330),
-    ("FRIES", "SIDE", "Картофель фри", "Фри картошка", "French fries", 220, 400),
-    ("CHEESECAKE", "DESSERT", "Чизкейк", "Чизкейк", "Cheesecake", 290, 500),
-    ("TEA_POT", "DRINK", "Чайник чая", "Чайнек чай", "Pot of tea", 150, 600),
-    ("COFFEE", "DRINK", "Кофе", "Кофе", "Coffee", 180, 610),
+    ("SYRNIKI", "BREAKFAST", "Сырники со сметаной", "Каймак кошулган сырник", "Қаймақ қосылған сырниктер", "Syrniki with sour cream", 280, 10),
+    ("OMELET", "BREAKFAST", "Омлет с овощами", "Жашылча кошулган омлет", "Көкөністі омлет", "Vegetable omelette", 250, 20),
+    ("PORRIDGE", "BREAKFAST", "Овсяная каша с фруктами", "Мөмөлүү сулу боткосу", "Жеміс қосылған сұлы ботқасы", "Oatmeal with fruit", 190, 30),
+    ("SHORPO", "SOUP", "Шорпо", "Шорпо", "Шорпо", "Shorpo soup", 340, 100),
+    ("LENTIL_SOUP", "SOUP", "Чечевичный крем-суп", "Жасмык крем-шорпосу", "Жасымық крем-сорпасы", "Lentil cream soup", 270, 110),
+    ("FRESH_SALAD", "SALAD", "Свежий салат", "Жаңы жашылча салаты", "Жаңа көкөніс салаты", "Fresh vegetable salad", 230, 200),
+    ("CAESAR_CHICKEN", "SALAD", "Цезарь с курицей", "Тоок эти менен Цезарь", "Тауық еті қосылған «Цезарь»", "Chicken Caesar salad", 390, 210),
+    ("PLOV", "MAIN", "Плов", "Палоо", "Палау", "Plov", 390, 300),
+    ("KUURDAK", "MAIN", "Куурдак", "Куурдак", "Қуырдақ", "Kuurdak", 490, 310),
+    ("CHICKEN_CUTLET", "MAIN", "Куриная котлета с пюре", "Пюре менен тоок котлети", "Картоп езбесі қосылған тауық котлеті", "Chicken cutlet with mashed potato", 360, 320),
+    ("GRILLED_TROUT", "MAIN", "Форель на гриле", "Гриль форель", "Грильдегі форель", "Grilled trout", 650, 330),
+    ("FRIES", "SIDE", "Картофель фри", "Фри картошка", "Фри картобы", "French fries", 220, 400),
+    ("CHEESECAKE", "DESSERT", "Чизкейк", "Чизкейк", "Чизкейк", "Cheesecake", 290, 500),
+    ("TEA_POT", "DRINK", "Чайник чая", "Чайнек чай", "Шәйнек шай", "Pot of tea", 150, 600),
+    ("COFFEE", "DRINK", "Кофе", "Кофе", "Кофе", "Coffee", 180, 610),
 ]
 
 ORDER_TRANSITIONS: dict[str, set[str]] = {
@@ -46,6 +84,7 @@ class MenuPatch(BaseModel):
     category: str | None = None
     name_ru: str | None = Field(default=None, min_length=1, max_length=160)
     name_kg: str | None = Field(default=None, min_length=1, max_length=160)
+    name_kz: str | None = Field(default=None, min_length=1, max_length=160)
     name_en: str | None = Field(default=None, min_length=1, max_length=160)
     price_kgs: int | None = Field(default=None, ge=0, le=100_000)
     is_active: bool | None = None
@@ -96,17 +135,14 @@ class OrderStatusPatch(BaseModel):
     status: Literal["ACCEPTED", "COOKING", "READY", "SERVED", "CANCELLED"]
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 def menu_item(row) -> dict[str, Any]:
     return {
         "id": str(row["id"]), "code": row["code"], "category": row["category"],
-        "name_ru": row["nameRu"], "name_kg": row["nameKg"], "name_en": row["nameEn"],
+        "name_ru": row["nameRu"], "name_kg": row["nameKg"], "name_kz": row["nameKz"], "name_en": row["nameEn"],
         "price_kgs": row["priceKgs"], "is_active": row["isActive"], "is_draft": row["isDraft"],
         "sort_order": row["sortOrder"],
     }
@@ -188,50 +224,66 @@ async def audit(conn, pid, actor_type: str, actor_id: str | None, action: str, r
 
 
 @admin_router.post("/menu/bootstrap-draft")
-async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def bootstrap_draft_menu(request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     created = 0
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
-            for code, category, ru, kg, en, price, sort_order in DRAFT_MENU:
+            pid = await property_id(conn, user)
+            for code, category, ru, kg, kz, en, price, sort_order in DRAFT_MENU:
                 result = await conn.execute(
                     '''INSERT INTO kitchen_menu_items (
-                         id,"propertyId",code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder","createdAt","updatedAt"
-                       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,true,$9,now(),now())
+                         id,"propertyId",code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder","createdAt","updatedAt"
+                       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,true,$10,now(),now())
                        ON CONFLICT ("propertyId",code) DO NOTHING''',
-                    uuid.uuid4(), pid, code, category, ru, kg, en, price, sort_order,
+                    uuid.uuid4(), pid, code, category, ru, kg, kz, en, price, sort_order,
                 )
                 created += int(result.endswith("1"))
     return {"created": created, "draft": True, "truth": "Draft menu is replaceable from Kitchen Admin."}
 
 
 @admin_router.get("/menu")
-async def list_menu(request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def list_menu(request: Request, user: dict[str, Any] = Depends(waiter_menu_access)):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
-            '''SELECT id,code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder"
-               FROM kitchen_menu_items WHERE "propertyId"=$1 ORDER BY "sortOrder",category,"nameRu"''', pid,
+            '''SELECT id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder",recipe
+               FROM kitchen_menu_items WHERE "propertyId"=$1
+                 AND ($2::boolean OR ("isDraft"=true AND "isActive"=false))
+                 AND ($3::boolean OR ("isActive"=true AND "isDraft"=false))
+               ORDER BY "sortOrder",category,"nameRu"''', pid, user["role"] != "COOK", user["role"] != "WAITER",
         )
-    return {"items": [menu_item(row) for row in rows]}
+    return {"items": [menu_item(row) if user["role"] == "WAITER" else {**menu_item(row), "recipe": read_recipe(row["recipe"])} for row in rows]}
 
 
 @admin_router.patch("/menu/{item_id}")
-async def patch_menu(item_id: uuid.UUID, payload: MenuPatch, request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def patch_menu(item_id: uuid.UUID, payload: MenuPatch, request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     allowed_categories = {"BREAKFAST", "SOUP", "SALAD", "MAIN", "SIDE", "DESSERT", "DRINK"}
     if payload.category is not None and payload.category not in allowed_categories:
         raise HTTPException(status_code=422, detail="Unknown menu category")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
+            current = await conn.fetchrow(
+                '''SELECT "nameKz" FROM kitchen_menu_items WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                item_id, pid,
+            )
+            if not current:
+                raise HTTPException(status_code=404, detail="Menu item not found")
+            next_name_kz = payload.name_kz if payload.name_kz is not None else current["nameKz"]
+            publishing = payload.is_draft is False or payload.is_active is True
+            if publishing and not str(next_name_kz or "").strip():
+                raise HTTPException(
+                    status_code=409,
+                    detail={"code": "KITCHEN_MENU_TRANSLATIONS_INCOMPLETE", "missing": ["name_kz"]},
+                )
             row = await conn.fetchrow(
                 '''UPDATE kitchen_menu_items SET
                      category=COALESCE($3,category),"nameRu"=COALESCE($4,"nameRu"),"nameKg"=COALESCE($5,"nameKg"),
-                     "nameEn"=COALESCE($6,"nameEn"),"priceKgs"=COALESCE($7,"priceKgs"),"isActive"=COALESCE($8,"isActive"),
-                     "isDraft"=COALESCE($9,"isDraft"),"sortOrder"=COALESCE($10,"sortOrder"),"updatedAt"=now()
+                     "nameKz"=COALESCE($6,"nameKz"),"nameEn"=COALESCE($7,"nameEn"),"priceKgs"=COALESCE($8,"priceKgs"),"isActive"=COALESCE($9,"isActive"),
+                     "isDraft"=COALESCE($10,"isDraft"),"sortOrder"=COALESCE($11,"sortOrder"),"updatedAt"=now()
                    WHERE id=$1 AND "propertyId"=$2
-                   RETURNING id,code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder"''',
-                item_id, pid, payload.category, payload.name_ru, payload.name_kg, payload.name_en,
+                   RETURNING id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder"''',
+                item_id, pid, payload.category, payload.name_ru, payload.name_kg, payload.name_kz, payload.name_en,
                 payload.price_kgs, payload.is_active, payload.is_draft, payload.sort_order,
             )
             if not row:
@@ -240,9 +292,9 @@ async def patch_menu(item_id: uuid.UUID, payload: MenuPatch, request: Request, u
 
 
 @admin_router.get("/tables")
-async def list_tables(request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def list_tables(request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             '''SELECT id,code,name,seats,status,"isActive",notes FROM kitchen_tables
                WHERE "propertyId"=$1 ORDER BY code''', pid,
@@ -251,10 +303,10 @@ async def list_tables(request: Request, user: dict[str, Any] = Depends(kitchen_a
 
 
 @admin_router.post("/tables", status_code=status.HTTP_201_CREATED)
-async def create_table(payload: TableCreate, request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def create_table(payload: TableCreate, request: Request, user: dict[str, Any] = Depends(waiter_table_creation_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             try:
                 row = await conn.fetchrow(
                     '''INSERT INTO kitchen_tables (id,"propertyId",code,name,seats,status,"isActive",notes,"createdAt","updatedAt")
@@ -270,10 +322,10 @@ async def create_table(payload: TableCreate, request: Request, user: dict[str, A
 
 
 @admin_router.patch("/tables/{table_id}")
-async def patch_table(table_id: uuid.UUID, payload: TablePatch, request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def patch_table(table_id: uuid.UUID, payload: TablePatch, request: Request, user: dict[str, Any] = Depends(kitchen_management_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             row = await conn.fetchrow(
                 '''UPDATE kitchen_tables SET name=COALESCE($3,name),seats=COALESCE($4,seats),status=COALESCE($5,status),
                      "isActive"=COALESCE($6,"isActive"),notes=COALESCE($7,notes),"updatedAt"=now()
@@ -289,7 +341,7 @@ ORDER_SELECT = '''
 SELECT o.id,o."orderNumber",o.status,o.source,o."guestCount",o."mealType",o.notes,o."totalKgs",o."openedAt",o."completedAt",
        t.code AS table_code,t.name AS table_name,r.code AS room_code,
        COALESCE(jsonb_agg(jsonb_build_object(
-         'id',i.id::text,'menu_item_id',m.id::text,'name_ru',m."nameRu",'name_kg',m."nameKg",'name_en',m."nameEn",
+         'id',i.id::text,'menu_item_id',m.id::text,'name_ru',m."nameRu",'name_kg',m."nameKg",'name_kz',m."nameKz",'name_en',m."nameEn",
          'quantity',i.quantity,'unit_price_kgs',i."unitPriceKgs",'line_total_kgs',i."lineTotalKgs",'status',i.status,'notes',i.notes
        ) ORDER BY i."createdAt") FILTER (WHERE i.id IS NOT NULL),'[]'::jsonb) AS items
 FROM kitchen_orders o
@@ -313,11 +365,11 @@ def order_json(row) -> dict[str, Any]:
 
 
 @admin_router.get("/orders")
-async def list_orders(request: Request, order_status: str = Query(default="ACTIVE", alias="status"), user: dict[str, Any] = Depends(kitchen_access)):
+async def list_orders(request: Request, order_status: str = Query(default="ACTIVE", alias="status"), user: dict[str, Any] = Depends(kitchen_operations_access)):
     if order_status not in {"ACTIVE", "ALL", "NEW", "ACCEPTED", "COOKING", "READY", "SERVED", "CANCELLED"}:
         raise HTTPException(status_code=422, detail="Unknown order status")
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             ORDER_SELECT + ''' WHERE o."propertyId"=$1 AND ($2='ALL' OR ($2='ACTIVE' AND o.status IN ('NEW','ACCEPTED','COOKING','READY')) OR o.status=$2)
               GROUP BY o.id,t.code,t.name,r.code ORDER BY o."openedAt" ASC LIMIT 300''', pid, order_status,
@@ -326,19 +378,33 @@ async def list_orders(request: Request, order_status: str = Query(default="ACTIV
 
 
 @admin_router.post("/orders", status_code=status.HTTP_201_CREATED)
-async def create_staff_order(payload: StaffOrderCreate, request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def create_staff_order(payload: StaffOrderCreate, request: Request, user: dict[str, Any] = Depends(waiter_order_creation_access)):
+    # WAITER cannot submit management or room orders or inject guest identity.
+    if user["role"] == "WAITER" and (
+        payload.source != "TABLE" or payload.table_id is None
+        or payload.stay_id is not None or payload.room_code is not None
+    ):
+        raise HTTPException(status_code=403, detail={"code": "WAITER_TABLE_ORDER_ONLY"})
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             table_id = payload.table_id
             live_session = None
             if table_id:
                 await lock_dining_tables(conn, table_id)
-                exists = await conn.fetchval('SELECT 1 FROM kitchen_tables WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true', table_id, pid)
-                if not exists:
+                table = await conn.fetchrow(
+                    'SELECT id,status FROM kitchen_tables WHERE id=$1 AND "propertyId"=$2 AND "isActive"=true',
+                    table_id, pid,
+                )
+                if not table:
                     raise HTTPException(status_code=422, detail="Active table not found")
                 if payload.source == "TABLE":
                     live_session = await active_session_for_table(conn, table_id)
+                if user["role"] == "WAITER":
+                    if live_session and live_session["waiterId"] not in (None, uuid.UUID(user["id"])):
+                        raise HTTPException(status_code=403, detail={"code": "WAITER_TABLE_NOT_ASSIGNED"})
+                    if not live_session and table["status"] != "AVAILABLE":
+                        raise HTTPException(status_code=409, detail={"code": "WAITER_TABLE_NOT_AVAILABLE"})
 
             stay_id = payload.stay_id
             if live_session:
@@ -368,11 +434,24 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
 
             guest_count = int(live_session["partySize"]) if live_session else payload.guest_count
             meal_type = payload.meal_type if payload.meal_type is not None else (live_session["mealType"] if live_session else None)
+            if user["role"] == "WAITER":
+                # A known draft ID must not bypass the approved-menu response.
+                draft_ids = await conn.fetch(
+                    'SELECT id FROM kitchen_menu_items WHERE "propertyId"=$1 AND id=ANY($2::uuid[]) AND "isDraft"=true',
+                    pid, [item.menu_item_id for item in payload.items],
+                )
+                if draft_ids:
+                    raise HTTPException(status_code=409, detail={"code": "WAITER_MENU_DRAFT_NOT_ORDERABLE"})
             order_id, order_number, total = await insert_order(
                 conn, pid=pid, source=payload.source, table_id=table_id, stay_id=stay_id, reservation_id=reservation_id,
                 room_id=room_id, guest_task_id=None, guest_count=guest_count, meal_type=meal_type,
                 notes=payload.notes, opened_by_id=uuid.UUID(user["id"]), items=payload.items,
             )
+            if user["role"] == "WAITER":
+                await conn.execute(
+                    'UPDATE kitchen_orders SET "waiterId"=$2 WHERE id=$1 AND "propertyId"=$3',
+                    order_id, uuid.UUID(user["id"]), pid,
+                )
             await audit(
                 conn, pid, "STAFF", user["id"], "CREATE_KITCHEN_ORDER", str(order_id),
                 {
@@ -388,18 +467,39 @@ async def create_staff_order(payload: StaffOrderCreate, request: Request, user: 
     return {"id": str(order_id), "order_number": order_number, "status": "NEW", "total_kgs": total, "financial_posting": "NONE_AUTOMATIC"}
 
 
+def enforce_waiter_service_request(user: dict[str, Any], target_status: str) -> None:
+    """WAITER may serve only an assigned READY order in canonical hotel mode.
+
+    Property, assigned waiter and READY -> SERVED transition are checked in
+    the same locked transaction by patch_order_status. The separate shared
+    staging preview admission middleware remains unchanged.
+    """
+    if user["role"] != "WAITER":
+        return
+    if target_status != "SERVED":
+        raise HTTPException(status_code=403, detail={"code": "WAITER_ONLY_SERVES"})
+
+
+def enforce_waiter_order_assignment(user: dict[str, Any], assigned_waiter_id: uuid.UUID | None) -> None:
+    if user["role"] == "WAITER" and str(assigned_waiter_id or "") != str(user["id"]):
+        raise HTTPException(status_code=403, detail={"code": "WAITER_ORDER_NOT_ASSIGNED"})
+
+
 @admin_router.patch("/orders/{order_id}/status")
-async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, request: Request, user: dict[str, Any] = Depends(kitchen_access)):
+async def patch_order_status(order_id: uuid.UUID, payload: OrderStatusPatch, request: Request, user: dict[str, Any] = Depends(kitchen_status_access)):
+    enforce_waiter_service_request(user, payload.status)
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             row = await conn.fetchrow(
-                '''SELECT id,status,"tableId","guestTaskId","orderNumber","folioChargeId"
+                '''SELECT id,status,"tableId","guestTaskId","orderNumber","folioChargeId","waiterId"
                    FROM kitchen_orders WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
                 order_id, pid,
             )
             if not row:
                 raise HTTPException(status_code=404, detail="Kitchen order not found")
+            if user["role"] == "WAITER":
+                enforce_waiter_order_assignment(user, row["waiterId"])
             if row["tableId"]:
                 await lock_dining_tables(conn, row["tableId"])
             if payload.status not in ORDER_TRANSITIONS[row["status"]]:
@@ -480,7 +580,7 @@ async def guest_menu(token: str, request: Request, tc_guest_session: str | None 
     async with request.app.state.db.acquire() as conn:
         qr, _, _ = await authorized_context(conn, token, tc_guest_session)
         rows = await conn.fetch(
-            '''SELECT id,code,category,"nameRu","nameKg","nameEn","priceKgs","isActive","isDraft","sortOrder"
+            '''SELECT id,code,category,"nameRu","nameKg","nameKz","nameEn","priceKgs","isActive","isDraft","sortOrder"
                FROM kitchen_menu_items WHERE "propertyId"=$1 AND "isActive"=true ORDER BY "sortOrder",category,"nameRu"''', qr["propertyId"],
         )
     return {"items": [menu_item(row) for row in rows], "currency": "KGS"}

@@ -1,0 +1,123 @@
+name: marina-shared-https-staging
+
+x-api-image: &api-image
+  image: marina-shared-staging-api:${MARINA_STAGING_SHA:?Set the reviewed Git SHA}
+  build:
+    context: .
+    dockerfile: deploy/marina-test-api.Dockerfile
+
+x-shared-env: &shared-env
+  APP_ENV: staging
+  PROPERTY_CODE: MARINA_BROWSER_CI
+  RATE_PLAN_CODE: MARINA_BROWSER_CI
+  MARINA_TENANT_CONTEXT_ENABLED: "true"
+  MARINA_SHARED_AUTH_PREVIEW_ENABLED: "true"
+  MARINA_SHARED_DINING_P0_ENABLED: ${MARINA_SHARED_DINING_P0_ENABLED:-false}
+  MARINA_SHARED_DINING_P0_CONFIRM: ${MARINA_SHARED_DINING_P0_CONFIRM:-}
+  MARINA_SHARED_RECEPTION_CASH_P0_ENABLED: ${MARINA_SHARED_RECEPTION_CASH_P0_ENABLED:-false}
+  MARINA_SHARED_RECEPTION_CASH_P0_CONFIRM: ${MARINA_SHARED_RECEPTION_CASH_P0_CONFIRM:-}
+  COOKIE_SECURE: "true"
+  COOKIE_DOMAIN: ""
+  AUTH_TRUST_PROXY_HEADERS: "false"
+  ENABLE_PAYMENT_OPERATIONS: "false"
+  ENABLE_MKASSA: "false"
+  ENABLE_SERVICE_POINT_QR: "false"
+  REQUIRE_AUTOMATION_SERVICE: "false"
+
+services:
+  postgres:
+    image: postgres:16.15-alpine
+    environment:
+      POSTGRES_DB: marina_shared_browser_ci
+      POSTGRES_USER: marina_ci
+      POSTGRES_PASSWORD: ${MARINA_STAGING_DB_PASSWORD:?Set a dedicated DB password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD, pg_isready, -U, marina_ci, -d, marina_shared_browser_ci]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  seed:
+    <<: *api-image
+    profiles: [seed]
+    network_mode: service:postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *shared-env
+      DATABASE_URL: postgresql://marina_ci:${MARINA_STAGING_DB_PASSWORD:?Set a dedicated DB password}@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
+      MARINA_SHARED_BROWSER_CI_PASSWORD: ${MARINA_STAGING_FIXTURE_PASSWORD:?Set a dedicated synthetic fixture password}
+    command:
+      - sh
+      - -ec
+      - |
+        cd /app/packages/database
+        npx --no-install prisma validate
+        npx --no-install prisma migrate deploy
+        cd /app
+        python scripts/marina_shared_live_browser_db.py seed
+
+  dining-seed:
+    <<: *api-image
+    profiles: [dining-ci]
+    network_mode: service:postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *shared-env
+      DATABASE_URL: postgresql://marina_ci:${MARINA_STAGING_DB_PASSWORD:?Set a dedicated DB password}@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
+      MARINA_SHARED_BROWSER_CI_PASSWORD: ${MARINA_STAGING_FIXTURE_PASSWORD:?Set a dedicated synthetic fixture password}
+      MARINA_SHARED_DINING_P0_SEED_CONFIRM: ISOLATED_DINING_CI_ONLY
+    command: [python, scripts/marina_shared_dining_p0_seed.py]
+
+  agent-seed:
+    <<: *api-image
+    profiles: [agent-ci]
+    network_mode: service:postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      <<: *shared-env
+      DATABASE_URL: postgresql://marina_ci:${MARINA_STAGING_DB_PASSWORD:?Set a dedicated DB password}@127.0.0.1:5432/marina_shared_browser_ci?schema=public
+      MARINA_SHARED_BROWSER_CI_CONFIRM: DISPOSABLE_TWO_HOTEL_BROWSER_CI
+      MARINA_SHARED_BROWSER_CI_PASSWORD: ${MARINA_STAGING_FIXTURE_PASSWORD:?Set a dedicated synthetic fixture password}
+      MARINA_SHARED_AGENT_P0_SEED_CONFIRM: ISOLATED_AGENT_CI_ONLY
+    command: [python, scripts/marina_shared_agent_p0_seed.py]
+
+  api:
+    <<: *api-image
+    environment:
+      <<: *shared-env
+      DATABASE_URL: postgresql://marina_ci:${MARINA_STAGING_DB_PASSWORD:?Set a dedicated DB password}@postgres:5432/marina_shared_browser_ci?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: [python, -m, uvicorn, app.app_entry:app, --app-dir, services/api, --host, 0.0.0.0, --port, "8000", --no-proxy-headers]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 20
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        CORE_API_URL: http://api:8000
+        RELEASE_SHA: ${MARINA_STAGING_SHA:?Set the reviewed Git SHA}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:13201:3001"
+
+volumes:
+  pgdata:

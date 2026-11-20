@@ -33,6 +33,8 @@ jobs:
         run: python -m py_compile services/api/app/guest_pin_admin.py services/api/app/app_entry.py
       - name: Run adversarial admin experience contract
         run: python scripts/admin_experience_contract_test.py
+      - name: Guard Admin and Staff locale residuals
+        run: python scripts/marina_admin_i18n_residual_guard.py
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

@@ -1,0 +1,38 @@
+name: MARINA FL2 Final Visual Delta Checks
+on:
+  push:
+    branches:
+      - design/marina-fl2-final-verified-delta-20261116
+permissions:
+  contents: read
+jobs:
+  design-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate unchanged design system, role set and functionality
+        run: |
+          npm run design:validate
+          npm run design:fl2:audit
+          npm run design:fl2:brand
+          npm run design:fl2:accessibility
+          npm run design:fl2:components
+          npm run design:fl2:owner
+      - name: Require approved brand files and source-only UX modifications
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s apps/staff/public/icon-192.png
+          test -s apps/staff/public/icon-512.png
+          test -s apps/staff/public/icon-maskable-512.png
+          test -s apps/mobile/assets/marina-smart-adaptive-foreground.png
+          grep -q 'FL2_OWNER_PHRASES' apps/admin/components/AdminExperienceRuntime.tsx
+          grep -q 'pms-sheet-retry' apps/mobile/src/components/PmsBookingSheet.tsx
+          grep -q 'marina-smart-staff-fl2-approved-brand-v2' apps/staff/public/sw.js
+          grep -q 'fl2-current-section { display: none; }' apps/admin/app/fl2-shell.css
+          ! grep -q '/icon.svg' apps/staff/app/manifest.ts
+          echo 'MARINA_FL2_FINAL_DELTA_CONTRACT_PASS'

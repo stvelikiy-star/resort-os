@@ -156,7 +156,7 @@ export default function OwnerControlV2() {
         <div>
           <p className="eyebrow">OWNER CONTROL V2 · FORWARD VIEW</p>
           <h2>Что впереди и что требует решения</h2>
-          <p>{brief.property.local_date} · подтверждённые данные Resort Core · без выдуманного прогноза спроса</p>
+          <p>{brief.property.local_date} · подтверждённые данные MARINA SMART · без выдуманного прогноза спроса</p>
         </div>
         <div className="owner-v2-actions">
           <button className="btn" onClick={capture} disabled={capturing}>{capturing ? "Сохраняю…" : "Контрольный снимок"}</button>
@@ -203,7 +203,7 @@ export default function OwnerControlV2() {
 
       <article className="owner-v2-panel owner-forward-chart-panel">
         <div className="owner-panel-title"><div><span>30 дней</span><h3>Загрузка на книге по дням</h3></div><small>on-books occupancy</small></div>
-        <div className="owner-forward-chart">
+        <div className="owner-forward-chart" tabIndex={0} role="region" aria-label="Загрузка по дням">
           {brief.forward.daily.slice(0, 30).map((day) => (
             <div className="owner-forward-day" key={day.date} title={`${day.date}: ${day.occupancy_on_books_percent}% · ${day.booked_rooms}/${day.available_rooms} · ${money(day.allocated_booked_value_kgs)}`}>
               <div className="owner-forward-bar"><i style={{ height: `${Math.max(2, Math.min(100, day.occupancy_on_books_percent))}%` }} /></div>

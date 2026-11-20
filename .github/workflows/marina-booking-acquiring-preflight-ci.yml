@@ -1,0 +1,30 @@
+name: MARINA Booking Acquiring Preflight CI
+on:
+  pull_request:
+    paths:
+      - "services/api/app/reservation_payments.py"
+      - "apps/admin/components/ReservationFolioPanel.tsx"
+      - "scripts/test_marina_booking_acquiring_readiness.py"
+      - ".github/workflows/marina-booking-acquiring-preflight-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  quote-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m py_compile services/api/app/reservation_payments.py
+          python scripts/test_marina_booking_acquiring_readiness.py -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/admin/package-lock.json
+      - run: npm ci --prefix apps/admin
+      - run: npm run typecheck --prefix apps/admin

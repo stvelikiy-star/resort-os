@@ -1,11 +1,15 @@
 import uuid
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
+from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED
+from . import auth as auth_module
+from .section_permissions import user_has_section
 from .payment_idempotency import (
     ensure_same_payment_payload,
     lock_payment_identity,
@@ -14,7 +18,32 @@ from .payment_idempotency import (
 )
 
 router = APIRouter(prefix="/api/v1/admin/booking", tags=["admin-reservation-payments"])
-payment_access = require_roles("OWNER", "MANAGER")
+payment_access = require_roles("OWNER", "MANAGER", module_grant=False)
+# Strictly separate reception cash intake from finance-review and refunds.
+# Do not broaden the old management-only cancellation/readiness access.
+reception_cash_access = require_roles("OWNER", "MANAGER", "RECEPTION", module_grant=False)
+
+
+def enforce_reception_cash_scope(user: dict[str, Any], *,
+                                 method: str | None = None,
+                                 paid_at: datetime | None = None) -> None:
+    if user["role"] != "RECEPTION":
+        return
+    if (not MARINA_SHARED_AUTH_PREVIEW_ENABLED
+            or os.environ.get("APP_ENV") != "staging"
+            or os.environ.get("MARINA_SHARED_RECEPTION_CASH_P0_ENABLED") != "true"
+            or os.environ.get("MARINA_SHARED_RECEPTION_CASH_P0_CONFIRM")
+                != "REVIEWED_RECEPTION_CASH_STAGING_ONLY"):
+        raise HTTPException(status_code=403,
+                            detail={"code": "RECEPTION_CASH_STAGING_DISABLED"})
+    auth_module.shared_auth_preview_guard()
+    if not user_has_section(user, "RESERVATIONS"):
+        raise HTTPException(status_code=403,
+                            detail={"code": "RECEPTION_RESERVATIONS_GRANT_REQUIRED"})
+    if method is not None and (method != "CASH" or paid_at is not None):
+        raise HTTPException(status_code=403,
+                            detail={"code": "RECEPTION_CASH_ONLY"})
+
 
 
 class ReservationPaymentPayload(BaseModel):
@@ -78,14 +107,122 @@ async def _totals(conn, reservation_id: uuid.UUID):
     }
 
 
+@router.get("/reservations/{reservation_id}/acquiring-readiness")
+async def reservation_acquiring_readiness(
+    reservation_id: uuid.UUID,
+    request: Request,
+    user: dict[str, Any] = Depends(reception_cash_access),
+):
+    """Server-side payment readiness without claiming that a bank is connected.
+
+    Reuses canonical reservation payments; never creates a charge, payment,
+    external provider link or confirmed booking.
+    """
+    enforce_reception_cash_scope(user)
+    async with request.app.state.db.acquire() as conn:
+        pid = await trusted_property_id(conn, user)
+        row = await conn.fetchrow(
+            '''SELECT id,"bookingNumber",status::text AS status,"totalKgs"
+               FROM reservations WHERE id=$1 AND "propertyId"=$2''',
+            reservation_id, pid,
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Reservation not found")
+        totals = await _totals(conn, reservation_id)
+    closed = row["status"] in {"CANCELLED", "NO_SHOW"}
+    remaining = 0 if closed else totals["remaining_kgs"]
+    return {
+        "reservation_id": str(reservation_id),
+        "booking_number": row["bookingNumber"],
+        "status": row["status"],
+        "currency": "KGS",
+        "total_kgs": totals["total_kgs"],
+        "paid_kgs": totals["paid_kgs"],
+        "remaining_kgs": remaining,
+        "remaining_tyiyn": remaining * 100,
+        "overpaid_kgs": totals["overpaid_kgs"],
+        "payment_collection_eligible": remaining > 0 and not closed,
+        "provider_connected": False,
+        "payment_link": None,
+        "provider_code": None,
+        "acquiring_status": "NOT_CONFIGURED",
+        "message": "No bank merchant integration configured. Amount is based on existing PMS payment records; no payment was initiated.",
+    }
+
+
+@router.get("/reservations/{reservation_id}/cancellation-finance-review")
+async def cancellation_finance_review(
+    reservation_id: uuid.UUID,
+    request: Request,
+    user: dict[str, Any] = Depends(payment_access),
+):
+    """Read-only decision support. Not a refund instruction or cancellation."""
+    async with request.app.state.db.acquire() as conn:
+        pid = await trusted_property_id(conn, user)
+        reservation = await conn.fetchrow(
+            """SELECT id,"bookingNumber",status::text AS status,"totalKgs"
+               FROM reservations WHERE id=$1 AND "propertyId"=$2""",
+            reservation_id, pid,
+        )
+        if not reservation:
+            raise HTTPException(status_code=404, detail="Reservation not found")
+        rows = await conn.fetch(
+            """SELECT status::text AS status,"amountKgs",provider,method
+               FROM payments WHERE "reservationId"=$1""", reservation_id,
+        )
+        stays = await conn.fetchval(
+            'SELECT count(*) FROM stays WHERE "reservationId"=$1', reservation_id,
+        )
+        charges = await conn.fetchrow(
+            """SELECT count(*) FILTER (WHERE status NOT IN ('WAIVED','VOID'))::int AS open_count,
+                      COALESCE(sum("amountKgs") FILTER (WHERE status NOT IN ('WAIVED','VOID')),0)::bigint AS open_kgs
+               FROM guest_folio_charges WHERE "propertyId"=$1 AND "reservationId"=$2""",
+            pid, reservation_id,
+        )
+    received = sum(int(p["amountKgs"]) for p in rows if p["status"] == "RECEIVED")
+    refunded = sum(int(p["amountKgs"]) for p in rows if p["status"] == "REFUNDED")
+    pending = sum(int(p["amountKgs"]) for p in rows if p["status"] == "PENDING")
+    has_payment_history = bool(rows)
+    has_stay = bool(stays)
+    has_open_charges = bool(charges["open_count"])
+    source_payment_methods = sorted({p["method"] for p in rows})
+    return {
+        "reservation_id": str(reservation_id),
+        "booking_number": reservation["bookingNumber"],
+        "status": reservation["status"],
+        "currency": "KGS",
+        "accommodation_original_kgs": int(reservation["totalKgs"]),
+        "received_kgs": received,
+        "already_refunded_kgs": refunded,
+        "pending_kgs": pending,
+        "payment_count": len(rows),
+        "payment_methods": source_payment_methods,
+        "open_folio_charge_count": int(charges["open_count"]),
+        "open_folio_charge_kgs": int(charges["open_kgs"]),
+        "has_stay_history": has_stay,
+        "requires_manual_review": has_payment_history or has_stay or has_open_charges,
+        "unpaid_cancel_path_eligible": (
+            reservation["status"] == "GUARANTEED"
+            and not has_payment_history and not has_stay and not has_open_charges
+        ),
+        "refund_executed": False,
+        "refund_available": False,
+        "next_action": "MANUAL_FINANCE_REVIEW" if has_payment_history or has_stay or has_open_charges else "CHECK_CANCELLATION_ELIGIBILITY",
+        "truth": "Read-only stored payment and folio facts; refunded status is not independent bank settlement proof. No external refund or cancellation was executed.",
+    }
+
+
 @router.post("/reservations/{reservation_id}/payments", status_code=status.HTTP_201_CREATED)
 async def record_reservation_payment(
     reservation_id: uuid.UUID,
     payload: ReservationPaymentPayload,
     request: Request,
-    user: dict[str, Any] = Depends(payment_access),
+    user: dict[str, Any] = Depends(reception_cash_access),
 ):
     method = normalize_required_text(payload.method)
+    enforce_reception_cash_scope(user, method=method, paid_at=payload.paid_at)
+    if method not in {"CASH", "CARD", "CARD_POS", "BANK_TRANSFER", "OTHER"}:
+        raise HTTPException(status_code=422, detail={"code": "PAYMENT_METHOD_NOT_ALLOWED", "message": "Only non-QR manual payments may be recorded."})
     external_ref = normalize_optional_text(payload.external_ref)
     note = normalize_optional_text(payload.note)
     paid_at = utc_aware(payload.paid_at)
@@ -97,12 +234,7 @@ async def record_reservation_payment(
         async with conn.transaction():
             await lock_payment_identity(conn, payload.idempotency_key, external_ref)
 
-            pid = await conn.fetchval(
-                "SELECT id FROM properties WHERE code=$1",
-                user["property_code"],
-            )
-            if not pid:
-                raise HTTPException(status_code=503, detail="Property not loaded")
+            pid = await trusted_property_id(conn, user)
 
             reservation = await conn.fetchrow(
                 '''
@@ -161,6 +293,45 @@ async def record_reservation_payment(
                     },
                     "finance": totals,
                 }
+
+            if reservation["status"] in {"CANCELLED", "NO_SHOW"}:
+                raise HTTPException(status_code=409, detail={
+                    "code": "PAYMENT_REQUIRES_CLOSED_BOOKING_REVIEW",
+                    "message": "New payments cannot be recorded against cancelled or no-show reservations. Review historical payments separately.",
+                })
+
+            if MARINA_SHARED_AUTH_PREVIEW_ENABLED or os.environ.get('MARINA_ENFORCE_PAYMENT_BALANCE', '').lower() in {'1', 'true', 'yes'}:
+                # Enforce the actual outstanding balance while the reservation row is locked.
+                # Charge totals and previously received payments are read in one transaction.
+                balance = await conn.fetchrow(
+                    """
+                    SELECT
+                        r."totalKgs"::bigint
+                          + COALESCE((
+                            SELECT SUM(c."amountKgs")
+                            FROM guest_folio_charges c
+                            WHERE c."reservationId" = r.id
+                              AND c."propertyId" = r."propertyId"
+                              AND c.status NOT IN ('WAIVED', 'VOID')
+                          ), 0)::bigint AS due_kgs,
+                        COALESCE((
+                            SELECT SUM(p."amountKgs")
+                            FROM payments p
+                            WHERE p."reservationId" = r.id AND p.status = 'RECEIVED'
+                        ), 0)::bigint AS paid_kgs
+                    FROM reservations r
+                    WHERE r.id = $1 AND r."propertyId" = $2
+                    """,
+                    reservation_id, pid,
+                )
+                outstanding = max(0, int(balance["due_kgs"]) - int(balance["paid_kgs"]))
+                if payload.amount_kgs > outstanding:
+                    raise HTTPException(status_code=409, detail={
+                        "code": "PAYMENT_EXCEEDS_BALANCE",
+                        "message": "Payment exceeds the remaining reservation balance.",
+                        "remaining_kgs": outstanding,
+                        "attempted_kgs": payload.amount_kgs,
+                    })
 
             if external_ref:
                 reference_payment = await conn.fetchrow(

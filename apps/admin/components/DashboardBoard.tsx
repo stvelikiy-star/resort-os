@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import OwnerControlV2 from "./OwnerControlV2";
 import OwnerExecutivePack from "./OwnerExecutivePack";
 import OwnerOperationsPerformance from "./OwnerOperationsPerformance";
+import OwnerCommandCenter, { OwnerCommandCenterError, OwnerCommandCenterSkeleton } from "./fl2/OwnerCommandCenter";
 
 type StayItem = {
   id: string;
@@ -26,7 +27,7 @@ type AttentionTask = {
   created_at: string;
 };
 
-type Dashboard = {
+export type Dashboard = {
   property: { name: string; code: string; timezone: string; currency: string; local_date: string };
   rooms: { total: number; clean: number; dirty: number; in_inspection: number; tech_block: number; unknown: number };
   stays: { arrivals_today: number; departures_today: number; in_house: number; guaranteed: number; occupied_rooms: number; occupancy_percent: number };
@@ -38,7 +39,7 @@ type Dashboard = {
   attention_tasks: AttentionTask[];
 };
 
-type DashboardDestination = "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "OPS" | "INBOX";
+export type DashboardDestination = "PMS" | "REQUESTS" | "RESERVATIONS" | "FINANCE" | "OPS" | "INBOX" | "WHATSAPP";
 
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(value)} сом`;
 const taskType: Record<string, string> = { HOUSEKEEPING: "Уборка", MAINTENANCE: "Ремонт", GUEST_REQUEST: "Запрос гостя" };
@@ -57,7 +58,9 @@ function Drill({ children, to, onNavigate }: { children: React.ReactNode; to: Da
   return <button className="command-drill" onClick={() => onNavigate(to)}>{children}<span aria-hidden="true">→</span></button>;
 }
 
-export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: DashboardDestination) => void }) {
+export default function DashboardBoard({ onNavigate, isOwner = false, fl2 = false }: { onNavigate?: (tab: DashboardDestination) => void; isOwner?: boolean; fl2?: boolean }) {
+  // Future Luxury 2.0 OWNER composition; Legacy mode and every non-owner role keep the original layout below.
+  const fl2Owner = isOwner && fl2;
   const [data, setData] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,27 +82,40 @@ export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: Dash
 
   useEffect(() => { void load(); }, [load]);
 
+  if (fl2Owner && loading && !data) return <OwnerCommandCenterSkeleton />;
+  if (fl2Owner && error && !data) return <OwnerCommandCenterError message={error} onRetry={load} />;
+  if (fl2Owner && data) return <OwnerCommandCenter data={data} onNavigate={onNavigate} onRefresh={load}>
+    <OwnerExecutivePack />
+    <OwnerControlV2 />
+    <OwnerOperationsPerformance />
+  </OwnerCommandCenter>;
   if (loading) return <main className="work-shell"><div className="loading">Загрузка Command Center…</div></main>;
   if (error) return <main className="work-shell"><div className="error-box">{error}</div><button className="btn" onClick={load}>Повторить</button></main>;
   if (!data) return null;
 
   const roomReady = data.rooms.clean;
   const roomNeedsWork = data.rooms.dirty + data.rooms.in_inspection + data.rooms.tech_block;
+  // Presentation-only ring uses the existing server occupancy; no synthetic trend.
+  const occupancyVisual = Number.isFinite(data.stays.occupancy_percent)
+    ? Math.max(0, Math.min(100, data.stays.occupancy_percent)) : 0;
 
   return (
-    <main className="work-shell dashboard-shell">
+    <main className="work-shell dashboard-shell" data-fl2-owner={isOwner ? "true" : undefined}>
       <div className="work-head">
         <div>
-          <p className="eyebrow">Три Короны · управление</p>
+          <p className="eyebrow">MARINA SMART · управление</p>
           <h1>Command Center</h1>
-          <p className="subtitle">{data.property.local_date} · данные Resort Core · {data.property.timezone}</p>
+          <p className="subtitle">{data.property.local_date} · данные MARINA SMART · {data.property.timezone}</p>
         </div>
         <button className="btn" onClick={load}>Обновить</button>
       </div>
 
-      <OwnerExecutivePack />
-      <OwnerControlV2 />
-      <OwnerOperationsPerformance />
+      {isOwner && <section className="command-panel" aria-label="Диалоги WhatsApp">
+        <div className="command-panel-head">
+          <div><h2>WhatsApp / AI</h2></div>
+          <Drill to="WHATSAPP" onNavigate={onNavigate}>Открыть</Drill>
+        </div>
+      </section>}
 
       <section className="command-kpis">
         <article><span>Загрузка сейчас</span><strong>{data.stays.occupancy_percent}%</strong><small>{data.stays.occupied_rooms} из {data.rooms.total} номеров</small></article>
@@ -114,12 +130,19 @@ export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: Dash
       <section className="command-grid">
         <article className="command-panel">
           <div className="command-panel-head"><div><p className="eyebrow">Номерной фонд</p><h2>{data.rooms.total} номеров · состояние</h2></div><Drill to="PMS" onNavigate={onNavigate}>Открыть шахматку</Drill></div>
+          <div className="fl2-room-state-visual">
+            <div className="fl2-real-occupancy-ring"
+              role="img" aria-labelledby="fl2-owner-occupancy-caption fl2-owner-occupancy-value"
+              style={{ background: `conic-gradient(#25d7d9 0% ${occupancyVisual}%, #244b5f ${occupancyVisual}% 100%)` }}>
+              <div><strong id="fl2-owner-occupancy-value">{occupancyVisual}%</strong><span id="fl2-owner-occupancy-caption">Загрузка</span></div>
+            </div>
           <div className="room-state-grid">
             <div className="state-clean"><strong>{data.rooms.clean}</strong><span>Готовы</span></div>
             <div className="state-dirty"><strong>{data.rooms.dirty}</strong><span>Нужна уборка</span></div>
             <div className="state-inspection"><strong>{data.rooms.in_inspection}</strong><span>На проверке</span></div>
             <div className="state-tech"><strong>{data.rooms.tech_block}</strong><span>TECH_BLOCK</span></div>
             <div><strong>{data.rooms.unknown}</strong><span>Не указан статус</span></div>
+          </div>
           </div>
           <p className="command-note">Готовы сейчас: {roomReady}. Физическое состояние номера не подменяет коммерческую занятость.</p>
         </article>
@@ -142,7 +165,7 @@ export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: Dash
             <div><span>Нужен ответ</span><strong>{data.communications.needs_reply}</strong></div>
             <div><span>Самое долгое ожидание</span><strong>{waitingLabel(data.communications.oldest_waiting_seconds)}</strong></div>
           </div>
-          <p className="command-note">Клиентские каналы V1 ведёт n8n. Resort OS хранит только доступные факты/аудит; SLA-порог не выдумывается.</p>
+          <p className="command-note">Клиентские каналы V1 ведёт n8n. Hotel OS хранит только доступные факты/аудит; SLA-порог не выдумывается.</p>
         </article>
 
         <article className="command-panel">
@@ -188,6 +211,12 @@ export default function DashboardBoard({ onNavigate }: { onNavigate?: (tab: Dash
           </div>)}
         </div>}
       </section>
+
+      {/* Existing Owner executive/forecast/operations components are preserved;
+          placed after the immediate operational summary for a denser first viewport. */}
+      <OwnerExecutivePack />
+      <OwnerControlV2 />
+      <OwnerOperationsPerformance />
     </main>
   );
 }

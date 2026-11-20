@@ -1,0 +1,252 @@
+/* MARINA SMART Future Luxury 2.0 — FOUNDATION (tokens + core components), Dark and Light.
+   Opt-in only: every rule is scoped to html[data-marina-ui="future-luxury"], exactly like fl2-ui-kit.css.
+   Namespace --mx-* / .mx-* is new and does not collide with the older per-section --fl2-* families.
+   Loaded LAST in layout.tsx so it needs no !important and no global table/modal/auth overrides.
+   Motion: opacity/transform only, 120-320 ms, never on first paint of data, off under reduced motion. */
+
+html[data-marina-ui="future-luxury"] {
+  /* ---- DARK (default) ---- */
+  --mx-surface: #1e293b;
+  --mx-bg: #0b1f2a;
+  --mx-glass: rgba(30, 41, 59, .76);
+  --mx-glass-strong: rgba(30, 41, 59, .94);
+  --mx-edge: rgba(148, 163, 184, .24);
+  --mx-edge-strong: rgba(20, 184, 166, .55);
+  --mx-ink: #f8fafc;
+  --mx-muted: #b8cad5;
+  --mx-accent: #14b8a6;
+  --mx-accent-ink: #0b1f2a;
+  --mx-accent-soft: rgba(20, 184, 166, .14);
+  --mx-gold: #e6bd70;
+  --mx-success: #61dfb7;
+  --mx-warning: #f4cc7b;
+  --mx-danger: #ff9ca4;
+  --mx-info: #0ea5e9;
+  --mx-track: rgba(184, 202, 213, .18);
+  --mx-chart-line: #14b8a6;
+  --mx-chart-fill-a: rgba(20, 184, 166, .38);
+  --mx-chart-fill-b: rgba(20, 184, 166, 0);
+  --mx-shadow: 0 14px 36px rgba(3, 16, 24, .34);
+  --mx-glow: 0 0 0 1px rgba(20, 184, 166, .08), 0 10px 40px rgba(20, 184, 166, .08);
+  --mx-focus: #14b8a6;
+  --mx-radius: 18px;
+  --mx-radius-sm: 12px;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] {
+  /* ---- LIGHT: same semantics, AA contrast on white/frost surfaces ---- */
+  --mx-surface: #ffffff;
+  --mx-bg: #f1f7f8;
+  --mx-glass: rgba(255, 255, 255, .88);
+  --mx-glass-strong: #ffffff;
+  --mx-edge: rgba(11, 31, 42, .18);
+  --mx-edge-strong: rgba(15, 118, 110, .55);
+  --mx-ink: #0b1f2a;
+  --mx-muted: #46606d;
+  --mx-accent: #0f766e;
+  --mx-accent-ink: #ffffff;
+  --mx-accent-soft: rgba(15, 118, 110, .1);
+  --mx-gold: #8a5a00;
+  --mx-success: #0b7d5b;
+  --mx-warning: #8a5a00;
+  --mx-danger: #b3261e;
+  --mx-info: #0369a1;
+  --mx-track: rgba(11, 31, 42, .12);
+  --mx-chart-line: #0f766e;
+  --mx-chart-fill-a: rgba(15, 118, 110, .28);
+  --mx-chart-fill-b: rgba(15, 118, 110, 0);
+  --mx-shadow: 0 10px 28px rgba(11, 31, 42, .1);
+  --mx-glow: 0 0 0 1px rgba(15, 118, 110, .05), 0 8px 28px rgba(15, 118, 110, .06);
+  --mx-focus: #0f766e;
+}
+
+/* ---------- Layout ---------- */
+html[data-marina-ui="future-luxury"] .mx-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(12px, 1.4vw, 20px); min-width: 0; color: var(--mx-ink); }
+html[data-marina-ui="future-luxury"] .mx-page > * { min-width: 0; }
+html[data-marina-ui="future-luxury"] .mx-page *, html[data-marina-ui="future-luxury"] .mx-page *::before, html[data-marina-ui="future-luxury"] .mx-page *::after { box-sizing: border-box; }
+html[data-marina-ui="future-luxury"] .mx-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: clamp(12px, 1.4vw, 20px); }
+html[data-marina-ui="future-luxury"] .mx-span-3 { grid-column: span 3; }
+html[data-marina-ui="future-luxury"] .mx-span-4 { grid-column: span 4; }
+html[data-marina-ui="future-luxury"] .mx-span-6 { grid-column: span 6; }
+html[data-marina-ui="future-luxury"] .mx-span-8 { grid-column: span 8; }
+html[data-marina-ui="future-luxury"] .mx-span-12 { grid-column: span 12; }
+@media (max-width: 1199px) {
+  html[data-marina-ui="future-luxury"] .mx-span-3,
+  html[data-marina-ui="future-luxury"] .mx-span-4 { grid-column: span 6; }
+  html[data-marina-ui="future-luxury"] .mx-span-8 { grid-column: span 12; }
+}
+@media (max-width: 719px) {
+  html[data-marina-ui="future-luxury"] .mx-span-3,
+  html[data-marina-ui="future-luxury"] .mx-span-4,
+  html[data-marina-ui="future-luxury"] .mx-span-6 { grid-column: span 12; }
+  /* Phone: KPI tiles pair up (2 columns) so the first screen shows the state of the property, not one number. */
+  html[data-marina-ui="future-luxury"] .mx-kpi-card.mx-span-3,
+  html[data-marina-ui="future-luxury"] .mx-kpi-card.mx-span-4 { grid-column: span 6; }
+  html[data-marina-ui="future-luxury"] .mx-kpi-card.mx-kpi-card--full { grid-column: span 12; }
+  html[data-marina-ui="future-luxury"] .mx-kpi-card:not(.mx-kpi-card--full) .mx-kpi { grid-template-columns: minmax(0, 1fr); }
+  html[data-marina-ui="future-luxury"] .mx-kpi-card:not(.mx-kpi-card--full) .mx-kpi__icon { grid-row: auto; width: 36px; height: 36px; }
+  html[data-marina-ui="future-luxury"] .mx-hero .mx-btn { width: 100%; }
+}
+
+/* ---------- Card (glass) ---------- */
+html[data-marina-ui="future-luxury"] .mx-card {
+  position: relative;
+  min-width: 0;
+  padding: clamp(14px, 1.4vw, 20px);
+  color: var(--mx-ink);
+  background: var(--mx-glass);
+  border: 1px solid var(--mx-edge);
+  border-radius: var(--mx-radius);
+  box-shadow: var(--mx-shadow), var(--mx-glow);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+}
+html[data-marina-ui="future-luxury"] .mx-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+html[data-marina-ui="future-luxury"] .mx-card__title { margin: 0; font-size: 1.05rem; font-weight: 750; letter-spacing: -.01em; line-height: 1.25; color: var(--mx-ink); }
+html[data-marina-ui="future-luxury"] .mx-eyebrow { margin: 0 0 3px; font-size: .72rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; color: var(--mx-gold); }
+html[data-marina-ui="future-luxury"] .mx-note { margin: 12px 0 0; font-size: .8rem; line-height: 1.5; color: var(--mx-muted); }
+html[data-marina-ui="future-luxury"] .mx-muted { color: var(--mx-muted); }
+html[data-marina-ui="future-luxury"] .mx-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* ---------- Hero ---------- */
+html[data-marina-ui="future-luxury"] .mx-hero {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px;
+  padding: clamp(14px, 1.6vw, 22px) clamp(16px, 1.8vw, 26px);
+  background: linear-gradient(120deg, var(--mx-glass-strong), var(--mx-glass) 55%, var(--mx-accent-soft));
+  border: 1px solid var(--mx-edge); border-radius: var(--mx-radius); box-shadow: var(--mx-shadow), var(--mx-glow);
+}
+html[data-marina-ui="future-luxury"] .mx-hero h1 { margin: 0; font-size: clamp(1.45rem, 2.6vw, 2.1rem); letter-spacing: -.03em; color: var(--mx-ink); }
+html[data-marina-ui="future-luxury"] .mx-hero p { margin: 4px 0 0; font-size: .9rem; color: var(--mx-muted); }
+
+/* ---------- KPI ---------- */
+html[data-marina-ui="future-luxury"] .mx-kpi { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; align-items: center; }
+html[data-marina-ui="future-luxury"] .mx-kpi__icon { grid-row: span 3; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; color: var(--mx-accent); background: var(--mx-accent-soft); border: 1px solid var(--mx-edge); }
+html[data-marina-ui="future-luxury"] .mx-kpi[data-tone="success"] .mx-kpi__icon { color: var(--mx-success); }
+html[data-marina-ui="future-luxury"] .mx-kpi[data-tone="warning"] .mx-kpi__icon { color: var(--mx-warning); }
+html[data-marina-ui="future-luxury"] .mx-kpi[data-tone="danger"] .mx-kpi__icon { color: var(--mx-danger); }
+html[data-marina-ui="future-luxury"] .mx-kpi__label { font-size: .8rem; font-weight: 650; color: var(--mx-muted); line-height: 1.3; }
+html[data-marina-ui="future-luxury"] .mx-kpi__value { font-size: clamp(1.5rem, 2.2vw, 2rem); font-weight: 800; letter-spacing: -.03em; line-height: 1.1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+html[data-marina-ui="future-luxury"] .mx-kpi__hint { font-size: .78rem; color: var(--mx-muted); line-height: 1.35; }
+html[data-marina-ui="future-luxury"] .mx-kpi--wide { grid-template-columns: auto minmax(0, 1fr); }
+
+/* ---------- Badge / Buttons ---------- */
+html[data-marina-ui="future-luxury"] .mx-badge { display: inline-flex; align-items: center; gap: .4em; max-width: 100%; padding: .28em .7em; border: 1px solid currentColor; border-radius: 999px; font-size: .74rem; font-weight: 700; line-height: 1.35; color: var(--mx-muted); background: transparent; }
+html[data-marina-ui="future-luxury"] .mx-badge[data-tone="success"] { color: var(--mx-success); }
+html[data-marina-ui="future-luxury"] .mx-badge[data-tone="warning"] { color: var(--mx-warning); }
+html[data-marina-ui="future-luxury"] .mx-badge[data-tone="danger"] { color: var(--mx-danger); }
+html[data-marina-ui="future-luxury"] .mx-badge[data-tone="info"] { color: var(--mx-info); }
+html[data-marina-ui="future-luxury"] .mx-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .55em; min-height: 44px; padding: .55em 1.05em;
+  font: inherit; font-weight: 700; font-size: .9rem; color: var(--mx-ink); text-decoration: none; cursor: pointer;
+  background: transparent; border: 1px solid var(--mx-edge); border-radius: var(--mx-radius-sm);
+  transition: border-color 150ms ease, background-color 150ms ease, transform 150ms ease;
+}
+html[data-marina-ui="future-luxury"] .mx-btn:hover { border-color: var(--mx-edge-strong); background: var(--mx-accent-soft); }
+html[data-marina-ui="future-luxury"] .mx-btn:active { transform: scale(.98); }
+html[data-marina-ui="future-luxury"] .mx-btn--primary { background: var(--mx-accent); border-color: var(--mx-accent); color: var(--mx-accent-ink); }
+html[data-marina-ui="future-luxury"] .mx-btn--primary:hover { filter: brightness(1.08); background: var(--mx-accent); }
+html[data-marina-ui="future-luxury"] .mx-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+html[data-marina-ui="future-luxury"] .mx-btn:focus-visible,
+html[data-marina-ui="future-luxury"] .mx-link:focus-visible,
+html[data-marina-ui="future-luxury"] .mx-tile:focus-visible { outline: 3px solid var(--mx-focus); outline-offset: 3px; }
+html[data-marina-ui="future-luxury"] .mx-link { display: inline-flex; align-items: center; gap: .35em; min-height: 44px; padding: 0 .35em; font: inherit; font-size: .84rem; font-weight: 700; color: var(--mx-accent); background: none; border: 0; border-radius: 8px; cursor: pointer; }
+html[data-marina-ui="future-luxury"] .mx-link:hover { text-decoration: underline; }
+
+/* ---------- Meter, ring, stacked bar ---------- */
+html[data-marina-ui="future-luxury"] .mx-meter { height: 8px; border-radius: 999px; background: var(--mx-track); overflow: hidden; }
+html[data-marina-ui="future-luxury"] .mx-meter > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--mx-accent), var(--mx-success)); transform-origin: left center; transform: scaleX(var(--p, 0)); }
+html[data-marina-ui="future-luxury"] .mx-ring { position: relative; width: 132px; height: 132px; flex: none; }
+html[data-marina-ui="future-luxury"] .mx-ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+html[data-marina-ui="future-luxury"] .mx-ring circle { fill: none; stroke-width: 11; }
+html[data-marina-ui="future-luxury"] .mx-ring__track { stroke: var(--mx-track); }
+html[data-marina-ui="future-luxury"] .mx-ring__value { stroke: var(--mx-accent); stroke-linecap: round; }
+html[data-marina-ui="future-luxury"] .mx-ring__label { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+html[data-marina-ui="future-luxury"] .mx-ring__label strong { font-size: 1.6rem; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+html[data-marina-ui="future-luxury"] .mx-ring__label span { font-size: .72rem; color: var(--mx-muted); }
+html[data-marina-ui="future-luxury"] .mx-stack { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: var(--mx-track); gap: 2px; }
+html[data-marina-ui="future-luxury"] .mx-stack > span { min-width: 3px; transform-origin: left center; transform: scaleX(var(--p, 0)); }
+html[data-marina-ui="future-luxury"] .mx-dot { display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 50%; background: var(--c, var(--mx-muted)); flex: none; }
+html[data-marina-ui="future-luxury"] .mx-legend { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+html[data-marina-ui="future-luxury"] .mx-legend li { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: .88rem; }
+html[data-marina-ui="future-luxury"] .mx-legend b { font-variant-numeric: tabular-nums; }
+
+/* ---------- Rows / lists ---------- */
+html[data-marina-ui="future-luxury"] .mx-rows { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+html[data-marina-ui="future-luxury"] .mx-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; min-width: 0; border: 1px solid var(--mx-edge); border-radius: var(--mx-radius-sm); background: color-mix(in srgb, var(--mx-glass-strong) 55%, transparent); }
+html[data-marina-ui="future-luxury"] .mx-row > div { min-width: 0; }
+html[data-marina-ui="future-luxury"] .mx-row strong { display: block; font-size: .92rem; overflow-wrap: anywhere; }
+html[data-marina-ui="future-luxury"] .mx-row small, html[data-marina-ui="future-luxury"] .mx-row span.mx-sub { display: block; font-size: .78rem; color: var(--mx-muted); overflow-wrap: anywhere; }
+html[data-marina-ui="future-luxury"] .mx-row b { font-variant-numeric: tabular-nums; font-size: 1.05rem; white-space: nowrap; }
+html[data-marina-ui="future-luxury"] .mx-empty { padding: 18px 12px; text-align: center; font-size: .88rem; color: var(--mx-muted); border: 1px dashed var(--mx-edge); border-radius: var(--mx-radius-sm); }
+
+/* ---------- Quick actions (navigation only) ---------- */
+html[data-marina-ui="future-luxury"] .mx-quick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+html[data-marina-ui="future-luxury"] .mx-tile { display: grid; justify-items: start; gap: 8px; min-height: 76px; padding: 12px; font: inherit; font-size: .84rem; font-weight: 700; text-align: left; color: var(--mx-ink); cursor: pointer; background: color-mix(in srgb, var(--mx-glass-strong) 55%, transparent); border: 1px solid var(--mx-edge); border-radius: var(--mx-radius-sm); transition: border-color 150ms ease, transform 150ms ease, background-color 150ms ease; }
+html[data-marina-ui="future-luxury"] .mx-tile svg { color: var(--mx-accent); }
+html[data-marina-ui="future-luxury"] .mx-tile:hover { border-color: var(--mx-edge-strong); background: var(--mx-accent-soft); transform: translateY(-2px); }
+html[data-marina-ui="future-luxury"] .mx-tile:active { transform: scale(.98); }
+
+/* ---------- Chart ---------- */
+html[data-marina-ui="future-luxury"] .mx-chart { position: relative; width: 100%; touch-action: pan-y; }
+html[data-marina-ui="future-luxury"] .mx-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+html[data-marina-ui="future-luxury"] .mx-chart__grid { stroke: var(--mx-track); stroke-width: 1; }
+html[data-marina-ui="future-luxury"] .mx-chart__axis { fill: var(--mx-muted); font-size: 11px; }
+html[data-marina-ui="future-luxury"] .mx-chart__line { fill: none; stroke: var(--mx-chart-line); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+html[data-marina-ui="future-luxury"] .mx-chart__dot { fill: var(--mx-chart-line); stroke: var(--mx-glass-strong); stroke-width: 2; }
+html[data-marina-ui="future-luxury"] .mx-chart__readout { font-variant-numeric: tabular-nums; font-size: .84rem; color: var(--mx-muted); }
+html[data-marina-ui="future-luxury"] .mx-chart__readout b { color: var(--mx-ink); font-size: 1.05rem; }
+
+/* ---------- Skeleton ---------- */
+html[data-marina-ui="future-luxury"] .mx-skel { min-height: 92px; border-radius: var(--mx-radius); border: 1px solid var(--mx-edge); background: linear-gradient(100deg, var(--mx-glass) 30%, var(--mx-accent-soft) 50%, var(--mx-glass) 70%); background-size: 220% 100%; }
+html[data-marina-ui="future-luxury"] .mx-error { padding: 14px 16px; border-radius: var(--mx-radius-sm); border: 1px solid var(--mx-danger); color: var(--mx-danger); background: color-mix(in srgb, var(--mx-danger) 10%, transparent); }
+
+/* ---------- Motion (only transform/opacity; reduced-motion aware) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-marina-ui="future-luxury"] .mx-reveal { animation: mx-rise 320ms cubic-bezier(.22, .61, .36, 1) both; animation-delay: calc(var(--i, 0) * 55ms); }
+  html[data-marina-ui="future-luxury"] .mx-meter > span,
+  html[data-marina-ui="future-luxury"] .mx-stack > span { transition: transform 700ms cubic-bezier(.22, .61, .36, 1); }
+  html[data-marina-ui="future-luxury"] .mx-ring__value { transition: stroke-dashoffset 800ms cubic-bezier(.22, .61, .36, 1); }
+  html[data-marina-ui="future-luxury"] .mx-skel { animation: mx-shimmer 1.4s ease-in-out 4; }
+  html[data-marina-ui="future-luxury"] .mx-card--interactive { transition: transform 180ms ease, border-color 180ms ease; }
+  html[data-marina-ui="future-luxury"] .mx-card--interactive:hover { transform: translateY(-2px); border-color: var(--mx-edge-strong); }
+}
+@keyframes mx-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes mx-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-marina-ui="future-luxury"] .mx-reveal, html[data-marina-ui="future-luxury"] .mx-skel { animation: none; }
+  html[data-marina-ui="future-luxury"] .mx-btn, html[data-marina-ui="future-luxury"] .mx-tile { transition: none; }
+}
+
+/* ---------- Chart reveal (SVG origin = viewBox 0 0) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-marina-ui="future-luxury"] .mx-chart__reveal { transform-origin: 0 0; transform: scaleX(var(--p, 1)); transition: transform 900ms cubic-bezier(.22, .61, .36, 1); }
+}
+
+/* REFERENCE_BRIDGE — approved navy/teal palette, shared by existing Web primitives.
+ * Light uses a darker teal for readable text and white button labels.
+ * No component structure, data, role gates or motion is changed here. */
+html[data-marina-ui="future-luxury"][data-fl2-theme] {
+  --fl2-bg:var(--mx-bg);--fl2-surface:var(--mx-surface);--fl2-surface-raised:var(--mx-glass-strong);
+  --fl2-edge:var(--mx-edge);--fl2-ink:var(--mx-ink);--fl2-muted:var(--mx-muted);
+  --fl2-accent:var(--mx-accent);--fl2-champagne:var(--mx-gold);
+  --fl2-night:var(--mx-bg);--fl2-abyss:var(--mx-bg);--fl2-panel:var(--mx-glass-strong);--fl2-tile:var(--mx-surface);
+  --fl2-cyan:var(--mx-accent);--fl2-cyan-bright:var(--mx-accent);--fl2-warm:var(--mx-gold);
+  --fl2-feedback-surface:var(--mx-glass-strong);--fl2-feedback-edge:var(--mx-edge);
+  --fl2-feedback-text:var(--mx-ink);--fl2-feedback-muted:var(--mx-muted);--fl2-feedback-ring:var(--mx-focus);
+  background:var(--mx-bg);color:var(--mx-ink);color-scheme:dark;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] { color-scheme:light; }
+html[data-marina-ui="future-luxury"][data-fl2-theme] body {
+  background:radial-gradient(ellipse at 85% 0%,var(--mx-accent-soft),transparent 38%),var(--mx-bg);
+  color:var(--mx-ink);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .owner-pms-stack {
+  --fl2p-surface:var(--mx-bg);--fl2p-raised:var(--mx-glass-strong);--fl2p-line:var(--mx-edge);
+  --fl2p-ink:var(--mx-ink);--fl2p-muted:var(--mx-muted);--fl2p-turquoise:var(--mx-accent);--fl2p-champagne:var(--mx-gold);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .fl2-button { color:var(--mx-accent-ink); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .fl2-card:has(> a:hover),
+html[data-marina-ui="future-luxury"][data-fl2-theme] .fl2-card:has(> button:hover) { border-color:var(--mx-edge-strong); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .fl2-badge[data-tone="success"] { color:var(--mx-success); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .fl2-badge[data-tone="warning"] { color:var(--mx-warning); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .fl2-badge[data-tone="danger"] { color:var(--mx-danger); }
+html[data-marina-ui="future-luxury"][data-fl2-theme] .fl2-badge[data-tone="info"] { color:var(--mx-info); }

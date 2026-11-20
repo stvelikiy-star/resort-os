@@ -6,7 +6,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 from .guest_os import GUEST_COOKIE
 from .guest_requests import REQUEST_LABELS, authorized_context
 
@@ -22,12 +22,15 @@ class CampaignWrite(BaseModel):
     code: str = Field(min_length=2, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
     title_ru: str = Field(min_length=2, max_length=180)
     title_kg: str = Field(min_length=2, max_length=180)
+    title_kz: str = Field(min_length=2, max_length=180)
     title_en: str = Field(min_length=2, max_length=180)
     hook_ru: str = Field(min_length=2, max_length=800)
     hook_kg: str = Field(min_length=2, max_length=800)
+    hook_kz: str = Field(min_length=2, max_length=800)
     hook_en: str = Field(min_length=2, max_length=800)
     cta_ru: str = Field(default="Хочу", min_length=1, max_length=80)
     cta_kg: str = Field(default="Каалайм", min_length=1, max_length=80)
+    cta_kz: str = Field(default="Сұрау", min_length=1, max_length=80)
     cta_en: str = Field(default="Request", min_length=1, max_length=80)
     image_url: str | None = Field(default=None, max_length=1000)
     action_type: Literal["GUEST_REQUEST", "EXTERNAL_URL", "AI_PROMPT"]
@@ -81,11 +84,8 @@ class GuestOfferEvent(BaseModel):
     event_type: Literal["CLICK", "REQUEST", "EXTERNAL_OPEN", "AI_PROMPT"]
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 def serialize_campaign(row, *, include_analytics: bool = False) -> dict[str, Any]:
@@ -94,12 +94,15 @@ def serialize_campaign(row, *, include_analytics: bool = False) -> dict[str, Any
         "code": row["code"],
         "title_ru": row["titleRu"],
         "title_kg": row["titleKg"],
+        "title_kz": row["titleKz"],
         "title_en": row["titleEn"],
         "hook_ru": row["hookRu"],
         "hook_kg": row["hookKg"],
+        "hook_kz": row["hookKz"],
         "hook_en": row["hookEn"],
         "cta_ru": row["ctaRu"],
         "cta_kg": row["ctaKg"],
+        "cta_kz": row["ctaKz"],
         "cta_en": row["ctaEn"],
         "image_url": row["imageUrl"],
         "action_type": row["actionType"],
@@ -141,7 +144,7 @@ async def audit(conn, pid: uuid.UUID, user: dict[str, Any], action: str, campaig
 @admin_router.get("")
 async def list_campaigns(request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         rows = await conn.fetch(
             '''SELECT c.*,
                  count(e.id) FILTER (WHERE e."eventType"='CLICK')::int AS clicks,
@@ -162,17 +165,18 @@ async def list_campaigns(request: Request, user: dict[str, Any] = Depends(manage
 async def create_campaign(payload: CampaignWrite, request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             campaign_id = uuid.uuid4()
             try:
                 await conn.execute(
                     '''INSERT INTO guest_offer_campaigns (
-                         id,"propertyId",code,"titleRu","titleKg","titleEn","hookRu","hookKg","hookEn","ctaRu","ctaKg","ctaEn",
+                         id,"propertyId",code,"titleRu","titleKg","titleKz","titleEn","hookRu","hookKg","hookKz","hookEn","ctaRu","ctaKg","ctaKz","ctaEn",
                          "imageUrl","actionType","requestCode","externalUrl","aiPrompt","activeFrom","activeTo","minAdults","minChildren",
                          "minStayNights","maxStayNights",priority,"sortOrder","isActive","createdById","createdAt","updatedAt"
-                       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,now(),now())''',
-                    campaign_id, pid, payload.code, payload.title_ru, payload.title_kg, payload.title_en,
-                    payload.hook_ru, payload.hook_kg, payload.hook_en, payload.cta_ru, payload.cta_kg, payload.cta_en,
+                       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,now(),now())''',
+                    campaign_id, pid, payload.code, payload.title_ru, payload.title_kg, payload.title_kz, payload.title_en,
+                    payload.hook_ru, payload.hook_kg, payload.hook_kz, payload.hook_en,
+                    payload.cta_ru, payload.cta_kg, payload.cta_kz, payload.cta_en,
                     payload.image_url, payload.action_type, payload.request_code, payload.external_url, payload.ai_prompt,
                     payload.active_from, payload.active_to, payload.min_adults, payload.min_children,
                     payload.min_stay_nights, payload.max_stay_nights, payload.priority, payload.sort_order,
@@ -191,17 +195,18 @@ async def create_campaign(payload: CampaignWrite, request: Request, user: dict[s
 async def replace_campaign(campaign_id: uuid.UUID, payload: CampaignWrite, request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             try:
                 row = await conn.fetchrow(
                     '''UPDATE guest_offer_campaigns SET
-                         code=$3,"titleRu"=$4,"titleKg"=$5,"titleEn"=$6,"hookRu"=$7,"hookKg"=$8,"hookEn"=$9,
-                         "ctaRu"=$10,"ctaKg"=$11,"ctaEn"=$12,"imageUrl"=$13,"actionType"=$14,"requestCode"=$15,
-                         "externalUrl"=$16,"aiPrompt"=$17,"activeFrom"=$18,"activeTo"=$19,"minAdults"=$20,"minChildren"=$21,
-                         "minStayNights"=$22,"maxStayNights"=$23,priority=$24,"sortOrder"=$25,"isActive"=$26,"updatedAt"=now()
+                         code=$3,"titleRu"=$4,"titleKg"=$5,"titleKz"=$6,"titleEn"=$7,"hookRu"=$8,"hookKg"=$9,"hookKz"=$10,"hookEn"=$11,
+                         "ctaRu"=$12,"ctaKg"=$13,"ctaKz"=$14,"ctaEn"=$15,"imageUrl"=$16,"actionType"=$17,"requestCode"=$18,
+                         "externalUrl"=$19,"aiPrompt"=$20,"activeFrom"=$21,"activeTo"=$22,"minAdults"=$23,"minChildren"=$24,
+                         "minStayNights"=$25,"maxStayNights"=$26,priority=$27,"sortOrder"=$28,"isActive"=$29,"updatedAt"=now()
                        WHERE id=$1 AND "propertyId"=$2 RETURNING *''',
-                    campaign_id, pid, payload.code, payload.title_ru, payload.title_kg, payload.title_en,
-                    payload.hook_ru, payload.hook_kg, payload.hook_en, payload.cta_ru, payload.cta_kg, payload.cta_en,
+                    campaign_id, pid, payload.code, payload.title_ru, payload.title_kg, payload.title_kz, payload.title_en,
+                    payload.hook_ru, payload.hook_kg, payload.hook_kz, payload.hook_en,
+                    payload.cta_ru, payload.cta_kg, payload.cta_kz, payload.cta_en,
                     payload.image_url, payload.action_type, payload.request_code, payload.external_url, payload.ai_prompt,
                     payload.active_from, payload.active_to, payload.min_adults, payload.min_children,
                     payload.min_stay_nights, payload.max_stay_nights, payload.priority, payload.sort_order, payload.is_active,
@@ -220,7 +225,23 @@ async def replace_campaign(campaign_id: uuid.UUID, payload: CampaignWrite, reque
 async def toggle_campaign(campaign_id: uuid.UUID, payload: CampaignToggle, request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
+            if payload.is_active:
+                current = await conn.fetchrow(
+                    '''SELECT "titleRu","titleKg","titleKz","titleEn","hookRu","hookKg","hookKz","hookEn",
+                              "ctaRu","ctaKg","ctaKz","ctaEn"
+                       FROM guest_offer_campaigns WHERE id=$1 AND "propertyId"=$2 FOR UPDATE''',
+                    campaign_id, pid,
+                )
+                if not current:
+                    raise HTTPException(status_code=404, detail="Guest offer campaign not found")
+                required = ("titleRu","titleKg","titleKz","titleEn","hookRu","hookKg","hookKz","hookEn","ctaRu","ctaKg","ctaKz","ctaEn")
+                missing = [field for field in required if not str(current[field] or "").strip()]
+                if missing:
+                    raise HTTPException(
+                        status_code=409,
+                        detail={"code": "GUEST_OFFER_TRANSLATIONS_INCOMPLETE", "missing": missing},
+                    )
             row = await conn.fetchrow(
                 '''UPDATE guest_offer_campaigns SET "isActive"=$3,"updatedAt"=now()
                    WHERE id=$1 AND "propertyId"=$2 RETURNING *''',

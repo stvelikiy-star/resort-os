@@ -18,9 +18,9 @@ def main() -> int:
 
     require(
         runtime,
-        'fallbackSiteContent, type SiteContent, type SiteLocale',
+        'fallbackSiteContent, isThreeCrownsPublishedContent, type SiteContent, type SiteContentResponse, type SiteLocale',
         'commitContent(fallbackSiteContent[locale], locale);',
-        'if (payload?.content) commitContent(payload.content, locale);',
+        'if (isThreeCrownsPublishedContent(payload)) commitContent(payload.content, locale);',
         'function commitContent(content: SiteContent, locale: SiteLocale)',
         'applyContent(content, locale);\n  dispatchReady(locale);',
         'queueMicrotask(() => applyContent(content, locale));',

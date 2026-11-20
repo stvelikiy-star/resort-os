@@ -5,10 +5,20 @@ import uuid
 import asyncpg
 import httpx
 
+from kitchen_e2e_target_guard import validate_target
+
 BASE = os.environ.get("CORE_API_URL", "http://127.0.0.1:8000")
 DB = os.environ["DATABASE_URL"].split("?", 1)[0]
 USERNAME = os.environ["BOOTSTRAP_OWNER_USERNAME"]
 PASSWORD = os.environ["BOOTSTRAP_OWNER_PASSWORD"]
+PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
+validate_target(
+    base=BASE,
+    database_url=DB,
+    property_code=PROPERTY_CODE,
+    cookie_secure=os.environ.get("COOKIE_SECURE", "false").lower() in {"true", "1", "yes"},
+    rc426_confirm=os.environ.get("RC426_KITCHEN_E2E_CONFIRM"),
+)
 
 
 def check(condition: bool, message: str) -> None:
@@ -19,7 +29,7 @@ def check(condition: bool, message: str) -> None:
 async def main() -> None:
     conn = await asyncpg.connect(DB)
     try:
-        property_id = await conn.fetchval("SELECT id FROM properties WHERE code='THREE_CROWNS'")
+        property_id = await conn.fetchval("SELECT id FROM properties WHERE code=$1", PROPERTY_CODE)
         check(property_id is not None, "property missing")
         payment_before = await conn.fetchval("SELECT count(*) FROM payments")
         reservation_total_before = await conn.fetchval("SELECT COALESCE(sum(\"totalKgs\"),0) FROM reservations")
@@ -27,6 +37,11 @@ async def main() -> None:
         async with httpx.AsyncClient(base_url=BASE, timeout=20) as client:
             login = await client.post("/api/v1/auth/login", json={"username": USERNAME, "password": PASSWORD})
             check(login.status_code == 200, f"owner login failed: {login.status_code} {login.text}")
+            whoami = await client.get("/api/v1/auth/me")
+            check(whoami.status_code == 200, f"owner login session unavailable: {whoami.status_code}")
+            check(whoami.json().get("property_code") == PROPERTY_CODE,
+                  "Kitchen E2E property mismatch between HTTP session and database")
+            check(whoami.json().get("role") == "OWNER", "Kitchen E2E requires owner role")
 
             bootstrap = await client.post("/api/v1/kitchen/menu/bootstrap-draft")
             check(bootstrap.status_code == 200, f"menu bootstrap failed: {bootstrap.text}")

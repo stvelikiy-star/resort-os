@@ -1,5 +1,6 @@
 import os
 
+from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED
 from .agent_context import router as agent_context_router
 from .ai_sales import router as ai_sales_router
 from .analytics_reports import router as analytics_reports_router
@@ -8,6 +9,7 @@ from .automation_read import router as automation_read_router
 from .booking_admin import router as booking_admin_router
 from .channel_outbound import router as channel_outbound_router
 from .communication_ingest import router as communication_ingest_router
+from .green_api_webhook import router as green_api_webhook_router
 from .crm_sync import router as crm_sync_router
 from .dining_control import router as dining_control_router
 from .dining_entitlements import router as dining_entitlements_router
@@ -29,16 +31,37 @@ from .guest_os import admin_router as guest_os_admin_router
 from .guest_os import public_router as guest_os_public_router
 from .guest_pin_admin import router as guest_pin_admin_router
 from .guest_requests import router as guest_requests_router
+from .guest_assistant import router as guest_assistant_router
+from .guest_stay_reviews import router as guest_stay_reviews_router
+from .room_wayfinding import router as room_wayfinding_router, guest_router as guest_wayfinding_router
 from .guest_service_settings import router as guest_service_settings_router
 from .guest_services import router as guest_services_router
 from .health import router as health_router
 from .hotel_finance import router as hotel_finance_router
+from .hotel_setup import router as hotel_setup_router
+from .hotel_rules import router as hotel_rules_router
 from .housekeeping_schedule import router as housekeeping_schedule_router
 from .inbox import router as inbox_router
+from .whatsapp_connection import router as whatsapp_connection_router
 from .kitchen import admin_router as kitchen_admin_router
 from .kitchen_arrivals import router as kitchen_arrivals_router
 from .kitchen_menu_management import router as kitchen_menu_management_router
+from .kitchen_stock import router as kitchen_stock_router
+from .kitchen_procurement import router as kitchen_procurement_router
+from .owner_kitchen_management import router as owner_kitchen_management_router
+from .owner_expenses import router as owner_expenses_router
+from .owner_supplier_documents import router as owner_supplier_documents_router
+from .owner_supplier_returns import router as owner_supplier_returns_router
+from .owner_cash_reconciliation import router as owner_cash_reconciliation_router
+from .owner_accrual_readiness import router as owner_accrual_readiness_router
+from .owner_delivered_revenue import router as owner_delivered_revenue_router
+from .owner_revenue_source_journal import router as owner_revenue_source_journal_router
+from .owner_revenue_corrections import router as owner_revenue_corrections_router
+from .owner_revenue_evidence import router as owner_revenue_evidence_router
+from .owner_accounting_journal import router as owner_accounting_journal_router
 from .main import app
+from .channel_reservations import router as channel_reservations_router
+from .channel_mappings import router as channel_mappings_router
 from .manager_dashboard import router as manager_dashboard_router
 from .marketing import integration_router as marketing_integration_router
 from .marketing import router as marketing_router
@@ -58,6 +81,7 @@ from .pms_chessboard import router as pms_chessboard_router
 from .pms_chessboard_read import router as pms_chessboard_read_router
 from .pms_control_snapshot import router as pms_control_snapshot_router
 from .pms_reservation_create import router as pms_reservation_create_router
+from .pms_holds import router as pms_holds_router
 from .public_ai_admin import router as public_ai_admin_router
 from .marina_assistant import router as marina_assistant_router
 from .rate_management import router as rate_management_router
@@ -74,6 +98,7 @@ from .service_point_payments import public_router as service_point_payments_publ
 from .service_points import admin_router as service_points_admin_router
 from .service_points import public_router as service_points_public_router
 from .site_content import router as site_content_router
+from .customer_site_page import router as customer_site_page_router
 from .site_media import router as site_media_router
 from .staff_control import router as staff_control_router
 from .staff_guest_requests import router as staff_guest_requests_router
@@ -84,6 +109,8 @@ from .telegram_auth import router as telegram_auth_router
 from .telegram_sales import router as telegram_sales_router
 
 install_observability(app)
+app.include_router(channel_reservations_router)
+app.include_router(channel_mappings_router)
 
 # Payment integrations must stay fail-closed when a deployment omits a flag.
 # The current production profile explicitly sets all three flags to false.
@@ -147,11 +174,16 @@ _strip_disabled_booking_payment_mutations()
 app.include_router(health_router)
 app.include_router(runtime_capabilities_router)
 app.include_router(site_content_router)
+app.include_router(customer_site_page_router)
 app.include_router(site_media_router)
 app.include_router(public_ai_admin_router)
 app.include_router(marina_assistant_router)
 app.include_router(guest_os_public_router)
 app.include_router(guest_requests_router)
+app.include_router(guest_assistant_router)
+app.include_router(guest_stay_reviews_router)
+app.include_router(room_wayfinding_router)
+app.include_router(guest_wayfinding_router)
 # Guest Marketplace owns the guest Kitchen menu/order contract and fails closed
 # on draft/inactive or non-published-for-today menu items.
 app.include_router(guest_marketplace_router)
@@ -171,12 +203,21 @@ app.include_router(booking_admin_router)
 app.include_router(reception_reservations_router)
 app.include_router(reception_readiness_router)
 app.include_router(reservation_detail_router)
+# Shared staging composes the *internal manual* reservation-payment handlers
+# for explicit ASGI allowlisting below. It never enables acquiring, provider
+# callbacks or the legacy request-confirm-payment mutation.
 if PAYMENT_OPERATIONS_ENABLED:
+    app.include_router(reservation_payments_router)
+elif MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+    # No-payment legacy launch remains closed. Isolated shared staging
+    # only exposes explicitly reviewed manual routes via ASGI allowlist.
     app.include_router(reservation_payments_router)
 app.include_router(folio_router)
 app.include_router(room_detail_router)
 app.include_router(staff_control_router)
 app.include_router(rate_management_router)
+app.include_router(hotel_setup_router)
+app.include_router(hotel_rules_router)
 app.include_router(hotel_finance_router)
 app.include_router(analytics_reports_router)
 app.include_router(owner_intelligence_router)
@@ -197,6 +238,7 @@ app.include_router(agent_context_router)
 app.include_router(pms_chessboard_read_router)
 app.include_router(pms_chessboard_router)
 app.include_router(pms_reservation_create_router)
+app.include_router(pms_holds_router)
 app.include_router(group_bookings_router)
 app.include_router(pms_control_snapshot_router)
 app.include_router(pms_bulk_tasks_router)
@@ -215,6 +257,20 @@ app.include_router(staff_guest_requests_router)
 # stripped of its historical duplicate menu mutations before composition, so
 # authorization no longer depends on include_router order.
 app.include_router(kitchen_menu_management_router)
+app.include_router(kitchen_stock_router)
+app.include_router(kitchen_procurement_router)
+app.include_router(owner_kitchen_management_router)
+app.include_router(owner_expenses_router)
+app.include_router(owner_supplier_documents_router)
+app.include_router(owner_supplier_returns_router)
+app.include_router(owner_cash_reconciliation_router)
+app.include_router(owner_accrual_readiness_router)
+app.include_router(owner_delivered_revenue_router)
+app.include_router(owner_revenue_source_journal_router)
+app.include_router(owner_revenue_corrections_router)
+app.include_router(owner_revenue_evidence_router)
+# Accounting journal creates immutable proposals only; no P&L posting.
+app.include_router(owner_accounting_journal_router)
 app.include_router(kitchen_admin_router)
 app.include_router(kitchen_arrivals_router)
 app.include_router(dining_control_router)
@@ -241,7 +297,9 @@ app.include_router(owner_pace_automation_router)
 app.include_router(crm_sync_router)
 app.include_router(google_control_router)
 app.include_router(communication_ingest_router)
+app.include_router(green_api_webhook_router)
 app.include_router(inbox_router)
+app.include_router(whatsapp_connection_router)
 app.include_router(channel_outbound_router)
 app.include_router(ai_sales_router)
 app.include_router(realtime_router)

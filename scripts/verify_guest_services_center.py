@@ -297,7 +297,7 @@ def main():
     reception_id = asyncio.run(ensure_staff(reception_username, "RECEPTION"))
     asyncio.run(ensure_staff(maid_username, "MAID"))
     asyncio.run(ensure_staff(tech_username, "TECHNICIAN"))
-    asyncio.run(ensure_staff(dining_username, "DINING_STAFF"))
+    asyncio.run(ensure_staff(dining_username, "COOK"))
 
     reception = login(reception_username, STAFF_PASSWORD)
     maid = login(maid_username, STAFF_PASSWORD)

@@ -14,6 +14,7 @@ on:
       - 'apps/admin/app/guest-crm.css'
       - 'apps/admin/app/layout.tsx'
       - 'scripts/verify_guest_crm.py'
+      - 'scripts/test_marina_guest_timeline_contract.py'
       - '.github/workflows/guest-crm-ci.yml'
   workflow_dispatch:
 
@@ -83,6 +84,7 @@ jobs:
         run: |
           pip install -r services/api/requirements.txt
           python -m compileall services/api/app scripts/verify_guest_crm.py
+          python scripts/test_marina_guest_timeline_contract.py -v
 
       - name: Seed canonical hotel and bootstrap owner
         run: |

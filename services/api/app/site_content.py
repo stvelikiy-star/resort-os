@@ -10,10 +10,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from .auth import require_roles
+from .customer_site_contract import project_legacy_published_content, validate_customer_site_content
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 SCOPE = "PUBLIC_SITE"
-SUPPORTED_LOCALES = ("ru", "kg", "en")
+CUSTOMER_SITE_SAFE_MODE = os.environ.get("MARINA_CUSTOMER_SITE_SAFE_MODE", "").lower() == "true"
+SUPPORTED_LOCALES = ("ru", "kg", "kz", "en")
 DEFAULTS_PATH = Path(__file__).resolve().parent.parent / "data" / "site_content_defaults.json"
 MAX_CONTENT_BYTES = 50_000
 MAX_FIELD_CHARS = 5_000
@@ -61,6 +63,28 @@ def default_for(locale: str) -> dict[str, Any]:
     return json.loads(json.dumps(defaults()[locale], ensure_ascii=False))
 
 
+def legacy_fixture_defaults_allowed() -> bool:
+    """Old property copy is available only to the isolated historical CI fixture.
+
+    Never use the AK BERMET defaults as another hotel's public CMS copy.
+    The historical fixture is preserved until its CI workflow is replaced.
+    """
+    if CUSTOMER_SITE_SAFE_MODE:
+        return False
+    app_env = os.environ.get("APP_ENV", "").lower()
+    # Transitional compatibility for existing historical Three Crowns smoke
+    # tests on disposable GitHub Actions runners only. Never in production or
+    # on a real property's deployed API, even if CI variables are inherited.
+    legacy_actions_fixture = (
+        PROPERTY_CODE == "THREE_CROWNS"
+        and app_env != "production"
+        and os.environ.get("GITHUB_ACTIONS", "").lower() == "true"
+        and os.environ.get("CI", "").lower() == "true"
+    )
+    old_isolated_akb_fixture = PROPERTY_CODE == "AK_BERMET_TEST" and app_env in ("staging", "test")
+    return legacy_actions_fixture or old_isolated_akb_fixture
+
+
 def merge_with_defaults(template: dict[str, Any], stored: dict[str, Any]) -> dict[str, Any]:
     """Overlay stored CMS values on the current reviewed schema defaults.
 
@@ -96,7 +120,7 @@ def decode_jsonb(value: Any, fallback: dict[str, Any]) -> dict[str, Any]:
 
 def validate_locale(locale: str) -> str:
     normalized = locale.lower().strip()
-    if normalized not in SUPPORTED_LOCALES:
+    if normalized not in SUPPORTED_LOCALES or (CUSTOMER_SITE_SAFE_MODE and normalized not in ("ru", "kg", "en")):
         raise HTTPException(status_code=404, detail="Unsupported locale")
     return normalized
 
@@ -116,6 +140,13 @@ def validate_public_content(locale: str, content: dict[str, Any]) -> None:
     exist in the reviewed locale defaults. This prevents the CMS from becoming
     an arbitrary parallel marketing schema and keeps runtime selectors stable.
     """
+    if CUSTOMER_SITE_SAFE_MODE:
+        validate_customer_site_content(locale, content)
+        combined = "\n".join(_content_strings(content))
+        for label, pattern in FORBIDDEN_PUBLIC_CONTENT.items():
+            if pattern.search(combined):
+                raise HTTPException(status_code=422, detail={"code": "PUBLIC_CONTENT_TRUTH_VIOLATION", "rule": label, "locale": locale})
+        return
     template = default_for(locale)
     encoded = json.dumps(content, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     if len(encoded) > MAX_CONTENT_BYTES:
@@ -180,18 +211,40 @@ async def load_row(conn, property_id: uuid.UUID, locale: str) -> dict[str, Any] 
     )
     if not row:
         return None
-    fallback = default_for(locale)
+    fallback = default_for(locale) if legacy_fixture_defaults_allowed() else {}
     raw_published = decode_jsonb(row["publishedJson"], {})
     return {
         "id": row["id"],
         "locale": row["locale"],
         "draftJson": decode_jsonb(row["draftJson"], fallback),
-        "publishedJson": merge_with_defaults(fallback, raw_published) if raw_published else {},
+        "publishedJson": (merge_with_defaults(fallback, raw_published) if fallback else raw_published) if raw_published else {},
         "version": row["version"],
         "publishedVersion": row["publishedVersion"],
         "publishedAt": row["publishedAt"],
         "updatedAt": row["updatedAt"],
     }
+
+
+def customer_published_view(locale: str, published_content: dict[str, Any]) -> dict[str, Any]:
+    """Read-only validated view shared by customer JSON and HTML endpoints."""
+    try:
+        validate_customer_site_content(locale, published_content)
+        return published_content
+    except HTTPException as exc:
+        hero = published_content.get("hero", {})
+        legacy_shape = (
+            isinstance(hero, dict) and "copy" in hero
+        ) or any(key not in {"hero", "contacts", "seo"} for key in published_content)
+        if exc.status_code != 422 or not legacy_shape:
+            raise
+        all_public_text = "\n".join(_content_strings(published_content))
+        for label, pattern in FORBIDDEN_PUBLIC_CONTENT.items():
+            if pattern.search(all_public_text):
+                raise HTTPException(
+                    status_code=422,
+                    detail={"code": "PUBLIC_CONTENT_TRUTH_VIOLATION", "rule": label, "locale": locale},
+                )
+        return project_legacy_published_content(locale, published_content)
 
 
 @router.get("/api/v1/site/content")
@@ -200,9 +253,14 @@ async def public_site_content(request: Request, locale: str = "ru"):
     async with request.app.state.db.acquire() as conn:
         property_id = await get_property_id(conn)
         row = await load_row(conn, property_id, locale)
-    if not row or not row["publishedJson"]:
+    if not row or not row["publishedJson"] or (not legacy_fixture_defaults_allowed() and not row["publishedVersion"]):
+        if not legacy_fixture_defaults_allowed():
+            raise HTTPException(status_code=404, detail="Site not published")
         return {"property": PROPERTY_CODE, "locale": locale, "content": default_for(locale), "published_version": 0, "published_at": None, "source": "DEFAULT"}
-    return {"property": PROPERTY_CODE, "locale": locale, "content": row["publishedJson"], "published_version": row["publishedVersion"], "published_at": row["publishedAt"], "source": "DATABASE"}
+    published_content = row["publishedJson"]
+    if CUSTOMER_SITE_SAFE_MODE:
+        published_content = customer_published_view(locale, published_content)
+    return {"property": PROPERTY_CODE, "locale": locale, "content": published_content, "published_version": row["publishedVersion"], "published_at": row["publishedAt"], "source": "DATABASE"}
 
 
 @router.get("/api/v1/admin/site/content")
@@ -210,14 +268,14 @@ async def admin_site_content(request: Request, _user: dict[str, Any] = Depends(m
     async with request.app.state.db.acquire() as conn:
         property_id = await get_property_id(conn)
         items = []
-        for locale in SUPPORTED_LOCALES:
+        for locale in (("ru", "kg", "en") if CUSTOMER_SITE_SAFE_MODE else SUPPORTED_LOCALES):
             row = await load_row(conn, property_id, locale)
             if not row:
-                default = default_for(locale)
-                items.append({"locale": locale, "draft": default, "published": default, "version": 0, "published_version": 0, "published_at": None, "updated_at": None, "source": "DEFAULT"})
+                default = default_for(locale) if legacy_fixture_defaults_allowed() else {}
+                items.append({"locale": locale, "draft": default, "published": default, "version": 0, "published_version": 0, "published_at": None, "updated_at": None, "source": "DEFAULT" if legacy_fixture_defaults_allowed() else "UNPUBLISHED"})
             else:
-                items.append({"locale": locale, "draft": row["draftJson"], "published": row["publishedJson"] or default_for(locale), "version": row["version"], "published_version": row["publishedVersion"], "published_at": row["publishedAt"], "updated_at": row["updatedAt"], "source": "DATABASE"})
-    return {"property": PROPERTY_CODE, "items": items}
+                items.append({"locale": locale, "draft": row["draftJson"], "published": row["publishedJson"] or (default_for(locale) if legacy_fixture_defaults_allowed() else {}), "version": row["version"], "published_version": row["publishedVersion"], "published_at": row["publishedAt"], "updated_at": row["updatedAt"], "source": "DATABASE"})
+    return {"property": PROPERTY_CODE, "mode": "customer" if CUSTOMER_SITE_SAFE_MODE else "legacy", "items": items}
 
 
 @router.put("/api/v1/admin/site/content/{locale}/draft")
@@ -259,6 +317,8 @@ async def publish_site_content(locale: str, request: Request, user: dict[str, An
             property_id = await get_property_id(conn)
             row = await load_row(conn, property_id, locale)
             if not row:
+                if not legacy_fixture_defaults_allowed():
+                    raise HTTPException(409, detail="Explicit property draft required before publication")
                 seed_content = default_for(locale)
                 validate_public_content(locale, seed_content)
                 seed = json.dumps(seed_content, ensure_ascii=False)

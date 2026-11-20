@@ -7,7 +7,7 @@ Public-site media status on this branch:
 - `lake-night.webp` — repository placeholder is not a valid WEBP binary and is intentionally **not referenced** by public pages;
 - `hero-resort.mp4`, `territory.mp4`, `lake.mp4` — repository copies are incomplete placeholders and are intentionally **not requested** by the current public runtime; the existing video layout remains on the verified poster fallback.
 
-The owner-approved media register identifies `three-crowns-media-pack-20260828.zip` as the READY source pack. It contains valid source WEBP images and the three complete MP4 files. Those binaries must be materialized through the repository/deployment asset path before the public implementation may reference them again. Do not substitute generated or third-party imagery.
+The owner-approved media register identifies `marina-smart-ak-bermet-media-pack-20261007.zip` as the READY source pack. It contains valid source WEBP images and the three complete MP4 files. Those binaries must be materialized through the repository/deployment asset path before the public implementation may reference them again. Do not substitute generated or third-party imagery.
 
 Until exact category media is materialized, room catalogue/detail surfaces use the verified resort fallback rather than presenting a corrupt or falsely attributed room image. The visual structure is preserved and the fallback can be replaced without changing layout after exact media mapping is confirmed.
 

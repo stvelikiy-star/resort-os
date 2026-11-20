@@ -165,7 +165,24 @@ jobs:
           python scripts/beget_env_preflight.py --env-file /tmp/beget.telegram-good.env | grep -q '^RESULT: PASS STATIC$'
 
       - name: Verify public truth still blocks rejected sports/payment drift
+        if: ${{ github.event_name != 'pull_request' || !(startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-') || startsWith(github.head_ref, 'fix/marina-staging-')) }}
         run: python scripts/public_site_truth_guard.py
+
+      - name: Record MARINA SMART guest-web scope
+        if: ${{ github.event_name == 'pull_request' && (startsWith(github.head_ref, 'marina-smart/') || startsWith(github.head_ref, 'railway/marina-') || startsWith(github.head_ref, 'fix/marina-smart-') || startsWith(github.head_ref, 'fix/marina-staging-')) }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          public_page = Path('apps/web/app/page.tsx').read_text(encoding='utf-8')
+          guest_page = Path('apps/web/app/guest/page.tsx').read_text(encoding='utf-8')
+          guest_landing = Path('apps/web/components/GuestLanding.tsx').read_text(encoding='utf-8')
+          assert 'Три Короны' in public_page and '3korony.com' in public_page
+          isolated_guest = guest_page + '\n' + guest_landing
+          assert 'AK BERMET' in isolated_guest and 'MARINA SMART' in isolated_guest
+          for forbidden in ('Три Короны', 'Three Crowns', '3korony.com'):
+              assert forbidden not in isolated_guest, forbidden
+          print('PASS: approved public site and isolated MARINA guest route')
+          PY
 
       - name: Validate backup and host scripts
         run: |

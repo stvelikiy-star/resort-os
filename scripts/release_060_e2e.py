@@ -222,13 +222,25 @@ async def main() -> None:
         assert layout["zone_label"] == "E2E зал" and layout["floor_shape"] == "RECTANGLE"
         assert abs(layout["floor_x"] - 37.5) < 0.01
 
+        # The floor endpoint is hotel-local "today", not D0 from the CI job.
+        # At midnight in Asia/Bishkek the job can cross into D0+1 while its
+        # already-resolved D0 stays unchanged. Match the displayed floor date
+        # without weakening stay-date validation or mutating production rules.
+        floor_before_seating = ok(
+            await client.get("/api/v1/dining/floor-layout"), "floor date before seating"
+        )
+        floor_day = date.fromisoformat(str(floor_before_seating["service_date"]))
+        assert D0 <= floor_day <= D2, (
+            f"hotel-local floor date {floor_day} outside synthetic stay {D0}..{D2}"
+        )
+
         session = ok(
             await client.post(
                 "/api/v1/dining/sessions",
                 json={
                     "stay_id": stay_id,
                     "table_id": table_id,
-                    "service_date": str(D0),
+                    "service_date": str(floor_day),
                     "meal_type": "BREAKFAST",
                     "status": "SEATED",
                 },
@@ -239,7 +251,16 @@ async def main() -> None:
         assert session["room_code"] == room_code and session["status"] == "SEATED"
         floor = ok(await client.get("/api/v1/dining/floor-layout"), "live floor")
         floor_table = next(item for item in floor["tables"] if item["id"] == table_id)
-        floor_session = next(item for item in floor["sessions"] if item["id"] == session_id)
+        assert str(floor["service_date"]) == str(floor_day), (
+            f"hotel local date moved during the seating check: {floor_day} -> {floor['service_date']}"
+        )
+        floor_session = next(
+            (item for item in floor["sessions"] if item["id"] == session_id),
+            None,
+        )
+        assert floor_session is not None, (
+            f"new dining session {session_id} missing from live floor {floor_day}"
+        )
         assert floor_table["status"] == "OCCUPIED"
         assert floor_session["stay_id"] == stay_id and floor_session["room_code"] == room_code
 

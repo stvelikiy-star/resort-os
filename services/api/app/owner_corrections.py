@@ -7,12 +7,13 @@ from asyncpg.exceptions import ExclusionViolationError
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
-from .auth import require_roles
+from .auth import password_hasher, require_roles
 
 
 router = APIRouter(prefix="/api/v1/admin/owner-corrections", tags=["owner-corrections"])
 commercial_access = require_roles("OWNER", "MANAGER", "RECEPTION")
 manager_access = require_roles("OWNER", "MANAGER")
+owner_access = require_roles("OWNER")
 
 
 async def _property_id(conn, property_code: str) -> uuid.UUID:
@@ -55,6 +56,14 @@ class AgentCreate(BaseModel):
     whatsapp: str | None = Field(default=None, max_length=50)
     email: EmailStr | None = None
     notes: str | None = Field(default=None, max_length=4000)
+    access_username: str | None = Field(default=None, min_length=2, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
+    access_password: str | None = Field(default=None, min_length=12, max_length=256)
+
+    @model_validator(mode="after")
+    def validate_access_pair(self):
+        if (self.access_username is None) != (self.access_password is None):
+            raise ValueError("access_username and access_password must be provided together")
+        return self
 
 
 class AgentUpdate(BaseModel):
@@ -71,6 +80,18 @@ class AgentInteractionCreate(BaseModel):
     kind: Literal["CALL", "WHATSAPP", "MESSAGE", "MEETING", "NOTE", "TASK"] = "NOTE"
     note: str = Field(min_length=1, max_length=4000)
     next_contact_at: datetime | None = None
+
+
+class AgentAccessPatch(BaseModel):
+    username: str | None = Field(default=None, min_length=2, max_length=80, pattern=r"^[A-Za-z0-9._-]+$")
+    password: str | None = Field(default=None, min_length=12, max_length=256)
+    active: bool | None = None
+
+    @model_validator(mode="after")
+    def require_change(self):
+        if not self.model_fields_set:
+            raise ValueError("At least one access field must be provided")
+        return self
 
 
 @router.get("/agents")
@@ -93,7 +114,9 @@ async def list_agents(
                    coalesce(sum(CASE WHEN r.status NOT IN ('CANCELLED','NO_SHOW') THEN r."totalKgs" ELSE 0 END),0)::bigint AS booked_kgs,
                    coalesce(sum(pay.received_kgs),0)::bigint AS received_kgs,
                    coalesce(sum(CASE WHEN r.status NOT IN ('CANCELLED','NO_SHOW') THEN (r."checkOut"-r."checkIn") ELSE 0 END),0)::int AS room_nights,
-                   max(r."checkIn") AS last_check_in
+                   max(r."checkIn") AS last_check_in,
+                   access.username AS access_username,
+                   access."isActive" AS access_active
             FROM booking_agents a
             LEFT JOIN reservations r ON r."agentId"=a.id
               AND ($4::date IS NULL OR r."checkIn">=$4::date)
@@ -102,11 +125,20 @@ async def list_agents(
               SELECT coalesce(sum(p."amountKgs") FILTER (WHERE p.status='RECEIVED'),0)::bigint AS received_kgs
               FROM payments p WHERE p."reservationId"=r.id
             ) pay ON true
+            LEFT JOIN LATERAL (
+              SELECT su.username,su."isActive"
+              FROM staff_users su
+              WHERE su."propertyId"=a."propertyId"
+                AND su."bookingAgentId"=a.id
+                AND su.role='AGENT'
+              ORDER BY su."createdAt" ASC
+              LIMIT 1
+            ) access ON true
             WHERE a."propertyId"=$1
               AND ($2::boolean OR a.status='ACTIVE')
               AND ($3='' OR lower(a.name) LIKE '%'||lower($3)||'%' OR lower(coalesce(a."contactName",'')) LIKE '%'||lower($3)||'%'
                    OR coalesce(a.phone,'') LIKE '%'||$3||'%' OR coalesce(a.whatsapp,'') LIKE '%'||$3||'%')
-            GROUP BY a.id
+            GROUP BY a.id,access.username,access."isActive"
             ORDER BY a.status,a.name
             ''',
             property_id,
@@ -131,6 +163,8 @@ async def list_agents(
                     "received_kgs": int(row["received_kgs"] or 0),
                     "room_nights": row["room_nights"],
                     "last_check_in": row["last_check_in"].isoformat() if row["last_check_in"] else None,
+                    "access_username": row["access_username"],
+                    "access_active": bool(row["access_active"]) if row["access_active"] is not None else None,
                 }
                 for row in rows
             ]
@@ -139,36 +173,57 @@ async def list_agents(
 
 @router.post("/agents", status_code=status.HTTP_201_CREATED)
 async def create_agent(payload: AgentCreate, request: Request, user: dict[str, Any] = Depends(manager_access)):
+    if payload.access_username and user["role"] != "OWNER":
+        raise HTTPException(status_code=403, detail="Only OWNER can create agent login credentials")
     agent_id = uuid.uuid4()
     async with request.app.state.db.acquire() as conn:
         property_id = await _property_id(conn, user["property_code"])
         try:
-            await conn.execute(
-                '''INSERT INTO booking_agents (id,"propertyId",name,"contactName",phone,whatsapp,email,notes,status,"createdAt","updatedAt")
-                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'ACTIVE',now(),now())''',
-                agent_id,
-                property_id,
-                payload.name.strip(),
-                payload.contact_name,
-                payload.phone,
-                payload.whatsapp,
-                str(payload.email) if payload.email else None,
-                payload.notes,
-            )
+            async with conn.transaction():
+                await conn.execute(
+                    '''INSERT INTO booking_agents (id,"propertyId",name,"contactName",phone,whatsapp,email,notes,status,"createdAt","updatedAt")
+                       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'ACTIVE',now(),now())''',
+                    agent_id,
+                    property_id,
+                    payload.name.strip(),
+                    payload.contact_name,
+                    payload.phone,
+                    payload.whatsapp,
+                    str(payload.email) if payload.email else None,
+                    payload.notes,
+                )
+                access_username = None
+                if payload.access_username and payload.access_password:
+                    access_username = payload.access_username.strip().lower()
+                    await conn.execute(
+                        '''INSERT INTO staff_users (
+                          id,"propertyId",username,"displayName","passwordHash",role,"bookingAgentId","isActive","createdAt","updatedAt"
+                        ) VALUES ($1,$2,$3,$4,$5,'AGENT',$6,true,now(),now())''',
+                        uuid.uuid4(),
+                        property_id,
+                        access_username,
+                        payload.contact_name or payload.name.strip(),
+                        password_hasher.hash(payload.access_password),
+                        agent_id,
+                    )
+                await _audit(
+                    conn,
+                    property_id=property_id,
+                    user=user,
+                    action="AGENT_CREATE",
+                    resource="BookingAgent",
+                    resource_id=str(agent_id),
+                    after={
+                        **payload.model_dump(mode="json", exclude={"access_password"}),
+                        "access_username": access_username,
+                        "access_created": access_username is not None,
+                    },
+                )
         except Exception as exc:
             if "unique" in str(exc).lower():
-                raise HTTPException(status_code=409, detail="Агент с таким названием уже существует") from exc
+                raise HTTPException(status_code=409, detail="Название агента или логин уже заняты") from exc
             raise
-        await _audit(
-            conn,
-            property_id=property_id,
-            user=user,
-            action="AGENT_CREATE",
-            resource="BookingAgent",
-            resource_id=str(agent_id),
-            after=payload.model_dump(mode="json"),
-        )
-    return {"id": str(agent_id), "status": "ACTIVE"}
+    return {"id": str(agent_id), "status": "ACTIVE", "access_username": access_username}
 
 
 @router.patch("/agents/{agent_id}")
@@ -254,6 +309,107 @@ async def create_agent_interaction(
     return {"id": str(interaction_id)}
 
 
+@router.patch("/agents/{agent_id}/access")
+async def patch_agent_access(
+    agent_id: uuid.UUID,
+    payload: AgentAccessPatch,
+    request: Request,
+    user: dict[str, Any] = Depends(owner_access),
+):
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            property_id = await _property_id(conn, user["property_code"])
+            agent = await conn.fetchrow(
+                'SELECT id,name,"contactName",status FROM booking_agents WHERE id=$1 AND "propertyId"=$2 FOR UPDATE',
+                agent_id,
+                property_id,
+            )
+            if not agent:
+                raise HTTPException(status_code=404, detail="Agent not found")
+            current = await conn.fetchrow(
+                '''SELECT id,username,"displayName","isActive"
+                   FROM staff_users
+                   WHERE "propertyId"=$1 AND "bookingAgentId"=$2 AND role='AGENT'
+                   ORDER BY "createdAt" ASC LIMIT 1 FOR UPDATE''',
+                property_id,
+                agent_id,
+            )
+            if current is None:
+                if not payload.username or not payload.password:
+                    raise HTTPException(status_code=422, detail="username and password are required to create agent access")
+                staff_id = uuid.uuid4()
+                username = payload.username.strip().lower()
+                active = True if payload.active is None else payload.active
+                try:
+                    row = await conn.fetchrow(
+                        '''INSERT INTO staff_users (
+                          id,"propertyId",username,"displayName","passwordHash",role,"bookingAgentId","isActive","createdAt","updatedAt"
+                        ) VALUES ($1,$2,$3,$4,$5,'AGENT',$6,$7,now(),now())
+                        RETURNING id,username,"isActive"''',
+                        staff_id,
+                        property_id,
+                        username,
+                        agent["contactName"] or agent["name"],
+                        password_hasher.hash(payload.password),
+                        agent_id,
+                        active,
+                    )
+                except Exception as exc:
+                    if "unique" in str(exc).lower():
+                        raise HTTPException(status_code=409, detail="Username already exists") from exc
+                    raise
+                action = "AGENT_ACCESS_CREATE"
+            else:
+                staff_id = current["id"]
+                username = payload.username.strip().lower() if payload.username is not None else current["username"]
+                active = payload.active if payload.active is not None else bool(current["isActive"])
+                password_hash = password_hasher.hash(payload.password) if payload.password is not None else None
+                try:
+                    row = await conn.fetchrow(
+                        '''UPDATE staff_users
+                           SET username=$2,
+                               "passwordHash"=COALESCE($3,"passwordHash"),
+                               "isActive"=$4,
+                               "updatedAt"=now()
+                           WHERE id=$1
+                           RETURNING id,username,"isActive"''',
+                        staff_id,
+                        username,
+                        password_hash,
+                        active,
+                    )
+                except Exception as exc:
+                    if "unique" in str(exc).lower():
+                        raise HTTPException(status_code=409, detail="Username already exists") from exc
+                    raise
+                if payload.username is not None or payload.password is not None or payload.active is not None:
+                    await conn.execute(
+                        'UPDATE auth_sessions SET "revokedAt"=now() WHERE "userId"=$1 AND "revokedAt" IS NULL',
+                        staff_id,
+                    )
+                action = "AGENT_ACCESS_UPDATE"
+            await _audit(
+                conn,
+                property_id=property_id,
+                user=user,
+                action=action,
+                resource="StaffUser",
+                resource_id=str(staff_id),
+                after={
+                    "agent_id": str(agent_id),
+                    "username": row["username"],
+                    "active": bool(row["isActive"]),
+                    "password_rotated": payload.password is not None,
+                },
+            )
+    return {
+        "agent_id": str(agent_id),
+        "username": row["username"],
+        "active": bool(row["isActive"]),
+        "password_rotated": payload.password is not None,
+    }
+
+
 @router.get("/agents/{agent_id}/report")
 async def agent_report(
     agent_id: uuid.UUID,
@@ -295,6 +451,13 @@ async def agent_report(
             from_date,
             to_date,
         )
+        access = await conn.fetchrow(
+            '''SELECT username,"isActive" FROM staff_users
+               WHERE "propertyId"=$1 AND "bookingAgentId"=$2 AND role='AGENT'
+               ORDER BY "createdAt" ASC LIMIT 1''',
+            property_id,
+            agent_id,
+        )
         interactions = await conn.fetch(
             '''SELECT id,kind,note,"nextContactAt","createdAt" FROM booking_agent_interactions
                WHERE "propertyId"=$1 AND "agentId"=$2 ORDER BY "createdAt" DESC LIMIT 200''',
@@ -315,6 +478,8 @@ async def agent_report(
                 "email": agent["email"],
                 "notes": agent["notes"],
                 "status": agent["status"],
+                "access_username": access["username"] if access else None,
+                "access_active": bool(access["isActive"]) if access else None,
             },
             "period": {
                 "from": from_date.isoformat() if from_date else None,

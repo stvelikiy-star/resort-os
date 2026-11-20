@@ -1,0 +1,238 @@
+name: MARINA SMART Ubuntu Production Package CI
+
+on:
+  pull_request:
+    paths:
+      - 'release/marina-smart-current-candidate.json'
+      - 'compose.marina-production.yaml'
+      - 'compose.marina-pilot-no-providers.yaml'
+      - '.env.marina-production.example'
+      - 'deploy/marina/**'
+      - 'deploy/marina-provisioner.Dockerfile'
+      - 'scripts/marina_production_preflight.py'
+      - 'scripts/test_marina_production_preflight.py'
+      - 'scripts/production_backup.sh'
+      - 'scripts/production_backup_test.sh'
+      - 'scripts/marina_rc441_monitor.py'
+      - 'scripts/test_marina_rc441_monitor.py'
+      - 'scripts/production_monitoring_check.py'
+      - 'scripts/production_monitoring_contract_test.py'
+      - 'scripts/host_preflight.sh'
+      - 'docs/MARINA_UBUNTU_PRODUCTION_RUNBOOK.md'
+      - 'docs/MARINA_PRE_CONNECTION_READINESS_20261022.md'
+      - 'docs/MARINA_FINAL_HOSTING_READINESS_2026-10-22.md'
+      - '.github/workflows/marina-production-package-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-production-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-isolated-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install YAML parser for rendered Compose assertions
+        run: python -m pip install --disable-pip-version-check PyYAML==6.0.2
+      - name: Build isolated, synthetic CI environment
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path('.env.marina-production.example').read_text()
+          values = {
+              'MARINA_INSTANCE_SLUG': 'ak-bermet-ci',
+              'MARINA_HOST_ROOT': '/srv/marina-smart/ak-bermet-ci',
+              'MARINA_HOST_DATA_DIR': '/srv/marina-smart/ak-bermet-ci/data',
+              'MARINA_RELEASE_SHA': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              'MARINA_PUBLIC_HOST': 'marina-ci.invalid',
+              'MARINA_ADMIN_HOST': 'admin.marina-ci.invalid',
+              'MARINA_STAFF_HOST': 'staff.marina-ci.invalid',
+              'MARINA_API_HOST': 'api.marina-ci.invalid',
+              'MARINA_AUTOMATION_HOST': 'automation.marina-ci.invalid',
+              'TLS_EMAIL': 'ops@marina.test',
+              'MARINA_POSTGRES_DB': 'marina_ak_bermet_ci',
+              'MARINA_POSTGRES_PASSWORD': 'ci_Marina_Db_Password_1234567890_ABC',
+              'PROPERTY_CODE': 'MARINA_CI_HOTEL',
+              'MARINA_PROPERTY_NAME': 'MARINA Synthetic Deployment CI',
+              'MARINA_TENANT_CODE': 'tenant_ak_bermet_ci',
+              'AUTOMATION_SERVICE_KEY': 'ci_automation_service_key_1234567890_ABC',
+              'N8N_ENCRYPTION_KEY': 'ci_n8n_encryption_key_1234567890_ABC',
+              'OFFSITE_BACKUP_REQUIRED': 'true',
+              'S3_ENDPOINT_URL': 'https://s3.example.test',
+              'S3_REGION': 'kg-1',
+              'S3_BACKUP_BUCKET': 'marina-backups-ci',
+              'S3_BACKUP_PREFIX': 'marina/ak-bermet-ci',
+              'S3_ACCESS_KEY_ID': 'CIACCESSKEY123456',
+              'S3_SECRET_ACCESS_KEY': 'ci_secret_key_1234567890_ABCDEF_123',
+              'MARINA_PROVISION_CONFIRM': 'CREATE_ONE_EMPTY_MARINA_PROPERTY',
+              'MARINA_OWNER_USERNAME': 'marina-ci-owner',
+              'MARINA_OWNER_PASSWORD': 'Only-Synthetic-CI-Owner-Password-2026!',
+          }
+          for key, value in values.items():
+              source = '\n'.join(f'{line.split("=",1)[0]}={value}' if line.startswith(key+'=') else line for line in source.split('\n'))
+          Path('.env.marina-production.ci').write_text(source)
+          PY
+      - name: Test fail-closed host, secret and bootstrap rules
+        run: |
+          python -m py_compile scripts/marina_production_preflight.py scripts/test_marina_production_preflight.py
+          python -m unittest discover -s scripts -p 'test_marina_production_preflight.py' -v
+          python scripts/marina_production_preflight.py --env-file .env.marina-production.ci --bootstrap --allow-test-hosts
+          bash -n scripts/host_preflight.sh
+          HOST_PREFLIGHT_LABEL='MARINA SMART CI host check' HOST_PREFLIGHT_ROOT="$RUNNER_TEMP/marina-preflight" bash scripts/host_preflight.sh | tee /tmp/marina-host-preflight.log
+          grep -Eq '^RESULT: PASS' /tmp/marina-host-preflight.log
+          ! grep -q '^FAIL:' /tmp/marina-host-preflight.log
+          grep -q '^FACT: cpu_count=' /tmp/marina-host-preflight.log
+          grep -q '^FACT: memory_mb=' /tmp/marina-host-preflight.log
+          grep -q '^FACT: root_free_gb=' /tmp/marina-host-preflight.log
+          bash scripts/production_backup_test.sh
+      - name: Test RC441 monitoring and notification delivery rules
+        run: |
+          python scripts/test_marina_rc441_monitor.py
+          python scripts/production_monitoring_contract_test.py
+      - name: Validate rendered Compose topology and isolation
+        run: |
+          docker compose --env-file .env.marina-production.ci -f compose.marina-production.yaml config > /tmp/marina-compose-default.yml
+          docker compose --profile bootstrap --env-file .env.marina-production.ci -f compose.marina-production.yaml config > /tmp/marina-compose-bootstrap.yml
+          grep -F 'NEXT_PUBLIC_CORE_WS_URL: wss://admin.marina-ci.invalid' /tmp/marina-compose-bootstrap.yml
+          grep -F 'internal: true' /tmp/marina-compose-bootstrap.yml
+          grep -F 'image: postgres:16.15-alpine' /tmp/marina-compose-bootstrap.yml
+          grep -F 'image: caddy:2.11.4-alpine' /tmp/marina-compose-bootstrap.yml
+          grep -F 'image: n8nio/n8n:2.37.10' /tmp/marina-compose-bootstrap.yml
+          if grep -Eq '(^|[^0-9])5432:5432' /tmp/marina-compose-bootstrap.yml; then
+            echo 'PostgreSQL must not publish a host port.' >&2; exit 1
+          fi
+          if grep -Eq '3korony\.com|THREE_CROWNS|/srv/three-crowns' /tmp/marina-compose-bootstrap.yml; then
+            echo 'MARINA render contains a Three Crowns host, property or path.' >&2; exit 1
+          fi
+          python - <<'PY'
+          import yaml
+          default = yaml.safe_load(open('/tmp/marina-compose-default.yml'))
+          data = yaml.safe_load(open('/tmp/marina-compose-bootstrap.yml'))
+          for name in ('migrate', 'provision', 'api', 'admin', 'staff'):
+              assert data['services'][name]['image'] == 'marina-ak-bermet-ci-' + name + ':' + 'a' * 40
+          web = data['services']['web']
+          assert web['image'] == 'caddy:2.11.4-alpine'
+          assert web['command'] == ['caddy', 'run', '--config', '/etc/caddy/Caddyfile']
+          mounts = {entry['target']: entry for entry in web['volumes']}
+          assert mounts['/etc/caddy/Caddyfile']['read_only'] is True
+          assert mounts['/srv/index.html']['read_only'] is True
+          assert 'customer-unpublished.Caddyfile' in mounts['/etc/caddy/Caddyfile']['source']
+          assert 'customer-unpublished.html' in mounts['/srv/index.html']['source']
+          assert 'ports' not in web
+          assert 'provision' not in default['services']
+          assert data['services']['provision']['profiles'] == ['bootstrap']
+          ports = {(p['published'], p['target'], p['protocol']) for p in data['services']['caddy']['ports']}
+          assert ports == {('80', 80, 'tcp'), ('443', 443, 'tcp'), ('443', 443, 'udp')}, ports
+          assert 'ports' not in data['services']['postgres']
+          assert data['services']['api']['environment']['MARINA_TENANT_CONTEXT_ENABLED'] == 'false'
+          assert data['services']['api']['environment']['MARINA_CUSTOMER_SITE_SAFE_MODE'] == 'true'
+          assert data['services']['api']['environment']['ENABLE_PAYMENT_OPERATIONS'] == 'false'
+          assert data['networks']['backend']['internal'] is True
+          assert data['networks']['backend']['name'].startswith('marina-ak-bermet-ci_')
+          assert all('ports' not in service for name, service in data['services'].items() if name != 'caddy')
+          print('PASS: only Caddy publishes ingress; database private; bootstrap opt-in; per-hotel isolated network')
+          PY
+      - name: Fail-closed restricted pilot Compose overlay (never starts containers)
+        run: |
+          docker compose --profile bootstrap --env-file .env.marina-production.ci \
+            -f compose.marina-production.yaml -f compose.marina-pilot-no-providers.yaml \
+            config > /tmp/marina-compose-pilot.yml
+          docker compose --profile bootstrap --profile integrations --env-file .env.marina-production.ci \
+            -f compose.marina-production.yaml -f compose.marina-pilot-no-providers.yaml \
+            config > /tmp/marina-compose-pilot-with-integrations.yml
+          python - <<'PY'
+          import copy
+          import yaml
+          original = yaml.safe_load(open('/tmp/marina-compose-bootstrap.yml'))
+          pilot = yaml.safe_load(open('/tmp/marina-compose-pilot.yml'))
+          integrated = yaml.safe_load(open('/tmp/marina-compose-pilot-with-integrations.yml'))
+          assert 'n8n' in original['services'], 'canonical source must retain integration functionality'
+          assert 'n8n' not in pilot['services'], 'pilot must never start a new n8n by default'
+          assert integrated['services']['n8n']['profiles'] == ['integrations']
+          assert integrated['services']['n8n']['image'] == original['services']['n8n']['image']
+          required_off = (
+              'ENABLE_AUTOMATION', 'ENABLE_AI_SALES', 'REQUIRE_AUTOMATION_SERVICE',
+              'ENABLE_GREEN_API_CONNECTION', 'ENABLE_PAYMENT_OPERATIONS', 'ENABLE_MKASSA',
+          )
+          env = pilot['services']['api']['environment']
+          for key in required_off:
+              assert env[key] == 'false', f'{key} must be disabled for the restricted pilot'
+          original_api = copy.deepcopy(original['services']['api'])
+          pilot_api = copy.deepcopy(pilot['services']['api'])
+          for key in required_off:
+              original_api['environment'].pop(key, None)
+              pilot_api['environment'].pop(key, None)
+          assert pilot_api == original_api, 'pilot must not modify any unrelated Core setting'
+          for name, baseline in original['services'].items():
+              if name not in ('n8n', 'api'):
+                  assert pilot['services'][name] == baseline, f'{name} topology changed'
+          assert pilot['networks'] == original['networks']
+          assert pilot['volumes'] == original['volumes']
+          print('PASS: restricted pilot excludes n8n, disables unapproved providers, preserves all other services')
+          print('BOUNDARY: deployment, TLS, external S3 and physical Android are NOT accepted by this render check')
+          PY
+      - name: Verify release tags change without moving hotel storage or networks
+        run: |
+          MARINA_RELEASE_SHA=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb docker compose --profile bootstrap --env-file .env.marina-production.ci -f compose.marina-production.yaml config > /tmp/marina-compose-previous.yml
+          python - <<'PY'
+          import yaml
+          current = yaml.safe_load(open('/tmp/marina-compose-bootstrap.yml'))
+          previous = yaml.safe_load(open('/tmp/marina-compose-previous.yml'))
+          assert current['name'] == previous['name']
+          assert current['networks'] == previous['networks']
+          assert current['volumes'] == previous['volumes']
+          for name in ('migrate', 'provision', 'api', 'admin', 'staff'):
+              service = previous['services'][name]
+              assert service['image'] == 'marina-ak-bermet-ci-' + name + ':' + 'b' * 40
+              assert service.get('volumes') == current['services'][name].get('volumes')
+          assert current['services']['web'] == previous['services']['web']
+          assert current['services']['postgres'] == previous['services']['postgres']
+          assert current['services']['n8n'] == previous['services']['n8n']
+          print('PASS: release-specific application images; hotel database, storage and networks unchanged')
+          PY
+      - name: Verify separate safe customer Web publication boundary
+        run: |
+          PYTHONPATH=scripts python3 -m unittest test_marina_customer_web_guard -v
+          docker run --rm -v "$PWD/deploy/marina/customer-unpublished.Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2.11.4-alpine caddy validate --config /etc/caddy/Caddyfile
+      - name: Validate strict Caddy host routing
+        run: |
+          docker run --rm \
+            -e TLS_EMAIL=ops@marina.test \
+            -e PUBLIC_HOST=marina-ci.invalid \
+            -e ADMIN_HOST=admin.marina-ci.invalid \
+            -e STAFF_HOST=staff.marina-ci.invalid \
+            -e API_HOST=api.marina-ci.invalid \
+            -e AUTOMATION_HOST=automation.marina-ci.invalid \
+            -v "$PWD/deploy/marina/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.11.4-alpine caddy validate --config /etc/caddy/Caddyfile
+      - name: Build the one-shot provisioner image
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Retry once for transient pip/network stream failures; deterministic build errors remain red.
+          for attempt in 1 2; do
+            if docker build --file deploy/marina-provisioner.Dockerfile --tag marina-provisioner-ci:local .; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 2 ]; then
+              echo 'MARINA_PROVISIONER_IMAGE_BUILD_FAIL after 2 attempts' >&2
+              exit 1
+            fi
+            echo 'Build attempt 1 failed; retrying once after short delay' >&2
+            sleep 5
+          done
+      - name: Verify customer site editor is initially enabled only for own hotel
+        run: |
+          docker run --rm --network none -v "$PWD/scripts:/work/scripts:ro" -w /work -e PYTHONPATH=/work/scripts \
+            --entrypoint python marina-provisioner-ci:local -m unittest test_marina_customer_provision_modules -v
+      - name: Check package boundary
+        run: |
+          ! grep -E '3korony\.com|THREE_CROWNS|/srv/three-crowns' compose.marina-production.yaml .env.marina-production.example deploy/marina/Caddyfile

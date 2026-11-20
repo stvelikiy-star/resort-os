@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { fallbackSiteContent, type SiteContent, type SiteLocale } from "../lib/siteContent";
-
-type Payload = { locale: SiteLocale; content: SiteContent; published_version: number };
+import { fallbackSiteContent, isThreeCrownsPublishedContent, type SiteContent, type SiteContentResponse, type SiteLocale } from "../lib/siteContent";
 
 function localeFromLocation(): SiteLocale {
   const query = new URLSearchParams(window.location.search).get("lang");
@@ -289,9 +287,9 @@ export default function SiteContentRuntime() {
 
     const controller = new AbortController();
     fetch(`/core/api/v1/site/content?locale=${locale}`, { cache: "no-store", signal: controller.signal })
-      .then(async (response) => response.ok ? (await response.json()) as Payload : null)
+      .then(async (response) => response.ok ? (await response.json()) as SiteContentResponse : null)
       .then((payload) => {
-        if (payload?.content) commitContent(payload.content, locale);
+        if (isThreeCrownsPublishedContent(payload)) commitContent(payload.content, locale);
       })
       .catch(() => undefined);
     return () => controller.abort();

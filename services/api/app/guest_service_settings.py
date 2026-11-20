@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/guest-service-settings", tags=["guest-service-settings"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -24,11 +24,8 @@ class GuestServiceSettingsPatch(BaseModel):
     on_demand_linen_price_kgs: int | None = Field(default=None, ge=0, le=100_000)
 
 
-async def _property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def _property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 async def ensure_settings(conn, property_id: uuid.UUID):
@@ -84,7 +81,7 @@ def serialize_settings(settings: dict[str, Any]) -> dict[str, Any]:
 @router.get("")
 async def get_guest_service_settings(request: Request, user: dict[str, Any] = Depends(manager_access)):
     async with request.app.state.db.acquire() as conn:
-        property_id = await _property_id(conn, user["property_code"])
+        property_id = await _property_id(conn, user)
         settings = await load_settings(conn, property_id)
     return serialize_settings(settings)
 
@@ -97,7 +94,7 @@ async def patch_guest_service_settings(
 ):
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            property_id = await _property_id(conn, user["property_code"])
+            property_id = await _property_id(conn, user)
             current = await load_settings(conn, property_id)
             supplied = payload.model_fields_set
 

@@ -1,0 +1,43 @@
+# HTTPS overlay for the dedicated synthetic demo only.
+# Use together with compose.marina-demo.yaml, never with a hotel fleet stack.
+services:
+  seed:
+    environment:
+      COOKIE_SECURE: "true"
+      WS_ENFORCE_SAME_ORIGIN: "true"
+      CORS_ORIGINS: https://${MARINA_DEMO_ADMIN_HOST:?Set demo admin host},https://${MARINA_DEMO_STAFF_HOST:?Set demo staff host},https://${MARINA_DEMO_WEB_HOST:?Set demo guest host}
+  api:
+    environment:
+      COOKIE_SECURE: "true"
+      WS_ENFORCE_SAME_ORIGIN: "true"
+      CORS_ORIGINS: https://${MARINA_DEMO_ADMIN_HOST:?Set demo admin host},https://${MARINA_DEMO_STAFF_HOST:?Set demo staff host},https://${MARINA_DEMO_WEB_HOST:?Set demo guest host}
+  caddy:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    environment:
+      TLS_EMAIL: ${MARINA_DEMO_TLS_EMAIL:?Set TLS contact email}
+      ADMIN_HOST: ${MARINA_DEMO_ADMIN_HOST:?Set demo admin host}
+      STAFF_HOST: ${MARINA_DEMO_STAFF_HOST:?Set demo staff host}
+      WEB_HOST: ${MARINA_DEMO_WEB_HOST:?Set demo guest host}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/marina/demo.Caddyfile:/etc/caddy/Caddyfile:ro
+      - marina_demo_caddy_data:/data
+      - marina_demo_caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      admin:
+        condition: service_started
+      staff:
+        condition: service_started
+      web:
+        condition: service_started
+    networks: [marina_demo_net]
+
+volumes:
+  marina_demo_caddy_data:
+  marina_demo_caddy_config:

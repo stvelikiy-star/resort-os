@@ -25,7 +25,9 @@ def test_guest_marketplace_core_is_fail_closed_for_daily_approved_menu():
     assert 'a."serviceDate"=$2 AND a."isAvailable"=true AND a."soldOut"=false' in CORE
     assert "GUEST_MARKETPLACE_MENU_NOT_PUBLISHED_TODAY" in CORE
     assert "GUEST_MARKETPLACE_ITEM_NOT_AVAILABLE_TODAY" in CORE
-    assert 'financial_posting": "NONE_AUTOMATIC"' in CORE
+    assert 'financial_posting": "OPEN_FOLIO_CHARGE_NOT_PAYMENT"' in CORE
+    assert "ensure_kitchen_order_charge" in CORE
+    assert "INSERT INTO payments" not in CORE
     assert '@router.get("/rooms/{token}/kitchen/menu")' in CORE
     assert '@router.post("/rooms/{token}/kitchen/orders"' in CORE
     assert "app.include_router(guest_marketplace_router)" in APP_ENTRY
@@ -39,7 +41,7 @@ def test_guest_marketplace_is_composed_in_guest_os():
 
 
 def test_guest_marketplace_offers_are_server_managed_not_hardcoded_partner_copy():
-    assert '"/offers"' in GUEST
+    assert '/offers`' in GUEST
     assert "OfferCampaign" in GUEST
     assert "NEXT_PUBLIC_KOL_MARKETPLACE_URL" not in GUEST
     assert "KOL_MARKETPLACE_URL" not in GUEST
@@ -51,7 +53,7 @@ def test_guest_marketplace_offers_are_server_managed_not_hardcoded_partner_copy(
 
 
 def test_kitchen_has_direct_role_bounded_entry_and_explicit_handoffs():
-    assert 'new Set(["OWNER", "MANAGER", "DINING_STAFF"])' in KITCHEN
+    assert 'new Set(["OWNER", "MANAGER", "COOK"])' in KITCHEN
     assert '"/core/api/v1/auth/login"' in KITCHEN
     assert "Отдельный вход «Официант / зал»" in KITCHEN
     assert 'href="/kitchen/today"' in KITCHEN
@@ -74,7 +76,7 @@ def test_dining_core_has_day_publish_stoplist_floor_and_table_booking():
     assert '@router.post("/table-reservations"' in DINING_CORE
     assert "DINING_TABLE_TIME_CONFLICT" in DINING_CORE
     assert '@router.patch("/orders/{order_id}/waiter")' in DINING_CORE
-    assert 'user["role"] == "DINING_STAFF"' in DINING_CORE
+    assert 'user["role"] == "WAITER"' in DINING_CORE
     assert '@router.get("/floor")' in DINING_CORE
     assert "app.include_router(dining_control_router)" in APP_ENTRY
 
@@ -83,12 +85,15 @@ def test_staff_has_separate_daily_menu_and_waiter_surfaces():
     assert "Опубликовать:" in DAY_PLANNER
     assert "Стоп-лист" in DAY_PLANNER
     assert '"/core/api/v1/dining/menu-day/publish"' in DAY_PLANNER
-    assert 'new Set(["OWNER", "MANAGER", "DINING_STAFF"])' in WAITER
+    assert 'new Set(["OWNER", "MANAGER", "WAITER"])' in WAITER
     assert '"/core/api/v1/dining/floor"' in WAITER
     assert "Взять заказ" in WAITER
     assert "Выдано гостю" in WAITER
     assert "Забронировать стол" in WAITER
-    assert 'import WaiterEntry from "../../components/WaiterEntry"' in WAITER_PAGE
+    assert 'import WaiterWorkspace from "../../components/WaiterWorkspace"' in WAITER_PAGE
+    workspace = (ROOT / "apps/staff/components/WaiterWorkspace.tsx").read_text()
+    assert 'import WaiterEntry from "./WaiterEntry"' in workspace
+    assert '<WaiterEntry />' in workspace
 
 
 def test_guest_offer_schema_is_manager_controlled_and_event_audited():
@@ -116,7 +121,7 @@ def test_guest_offer_core_is_role_bounded_targeted_and_non_commercial_authority(
 def test_owner_manager_admin_can_manage_guest_offer_campaigns():
     assert 'import GuestOffersBoard from "./GuestOffersBoard"' in ADMIN_SHELL
     assert '"OFFERS"' in ADMIN_SHELL
-    assert "Офферы гостю" in ADMIN_SHELL
+    assert "Предложения гостям" in ADMIN_SHELL
     assert '<GuestOffersBoard />' in ADMIN_SHELL
     assert '"/core/api/v1/admin/guest-offers"' in OFFERS_ADMIN
     assert "Русский" in OFFERS_ADMIN and "Кыргызча" in OFFERS_ADMIN and "English" in OFFERS_ADMIN
@@ -133,7 +138,9 @@ def test_dashboard_contrast_no_longer_blanket_forces_all_descendants_white():
 
 
 def test_reception_readiness_is_narrow_role_bounded_handoff():
-    assert 'ALLOWED_ROLES = {"OWNER", "MANAGER", "RECEPTION"}' in RECEPTION_CORE
+    assert 'reception_access = require_roles("OWNER", "MANAGER", "RECEPTION")' in RECEPTION_CORE
+    assert 'Depends(reception_access)' in RECEPTION_CORE
+    assert 'trusted_property_id(conn, user)' in RECEPTION_CORE
     assert "request_housekeeping_for_arrival" in RECEPTION_CORE
     assert "ARRIVAL_ROOM_TECH_BLOCK" in RECEPTION_CORE
     assert "type='HOUSEKEEPING'" in RECEPTION_CORE

@@ -1,0 +1,585 @@
+/* MARINA SMART FL2 — finished OWNER/PMS visual surfaces.
+ * Everything is opt-in via the authenticated shell; no booking/API/business behavior.
+ * Theme is a browser-local appearance preference and never affects hotel selection or RBAC. */
+html[data-marina-ui="future-luxury"] .fl2-theme-switch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid rgba(80,217,225,.38);
+  background: rgba(0,13,26,.25);
+  border-radius: 999px;
+}
+html[data-marina-ui="future-luxury"] .fl2-theme-switch button {
+  min-height: 32px;
+  min-width: 54px;
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: #e1f6ff;
+  background: transparent;
+  cursor: pointer;
+  font: 700 11px/1.2 system-ui,sans-serif;
+  white-space: nowrap;
+}
+html[data-marina-ui="future-luxury"] .fl2-theme-switch button[aria-pressed="true"] {
+  background: #35d5d9;
+  color: #062332;
+}
+html[data-marina-ui="future-luxury"] .fl2-theme-switch button:focus-visible,
+html[data-marina-ui="future-luxury"] .owner-pms-stack button:focus-visible,
+html[data-marina-ui="future-luxury"] .owner-pms-stack select:focus-visible,
+html[data-marina-ui="future-luxury"] .owner-pms-stack input:focus-visible {
+  outline: 3px solid #e7c187;
+  outline-offset: 2px;
+}
+/* Data-derived cards stay responsive instead of stretching randomly. */
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] {
+  --fl2-dense-panel: #0f2d40;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-grid > .command-panel {
+  min-width: 0;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-list > div,
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-money > div {
+  min-width: 0;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-money strong {
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-panel-head h2 {
+  color: #f6fbff;
+  text-wrap: balance;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .command-panel-head .eyebrow {
+  color: #e7c187;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .attention-row {
+  grid-template-columns: minmax(76px,.35fr) minmax(175px,1.6fr) minmax(112px,.8fr) minmax(95px,.55fr);
+  gap: 12px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .priority-pill {
+  border: 1px solid rgba(255,255,255,.1);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid>div {
+  border: 1px solid rgba(116,220,226,.15);
+  border-radius: 12px;
+  min-width: 0;
+  padding: 12px 10px;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid > div {
+  background: #163d50;
+  border-color: rgba(93, 211, 222, .28);
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid strong {
+  color: #f2fbff;
+  font-variant-numeric: tabular-nums;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid span {
+  /* The previous dark-navy text on navy cards was unreadable in Dark mode. */
+  color: #c8e2ec;
+}
+/* Real PMS reservation bars: preserve existing status/payment classes and native tooltip. */
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar {
+  height: 29px;
+  margin-block: 4px;
+  padding-inline: 9px;
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 750;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar strong {
+  font-size: 11px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar.type-reservation {
+  background: linear-gradient(110deg,#176eae,#258bd1);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar.status-checked_in {
+  background: linear-gradient(110deg,#0e8177,#11b89a);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar.type-maintenance,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar.type-manual {
+  background: linear-gradient(110deg,#805a3a,#a77d40);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-head {
+  min-height: 52px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-day-head {
+  font-variant-numeric: tabular-nums;
+  line-height: 1.45;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-day-head strong {
+  color: #f1ffff;
+  font-size: 14px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-day-head span {
+  font-size: 10px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-day-head.today strong {
+  color: #84f3ef;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-label strong {
+  color: #f5fbff;
+  font-size: 12px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-label span {
+  color: #b5cfdb;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-state {
+  background: #102f40;
+  color: #d6edf8;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-state.CLEAN { color:#6ce3c7; }
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-state.DIRTY { color:#ffb4b0;background:#372c39; }
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-state.IN_INSPECTION { color:#f5cf83;background:#3b3541; }
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-state.TECH_BLOCK { color:#e1e9f0;background:#293747; }
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-group-label {
+  background: #0d3446;
+  border-color: rgba(70,212,220,.22);
+  color: #d8f7fa;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-group-label span {
+  background: rgba(44,205,214,.19);
+  color: #e6f9fa;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-night-cell.weekend {
+  background: rgba(29,89,101,.55);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-night-cell.occupied {
+  background: rgba(32,69,81,.64);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-loading,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-legend {
+  color: #b9d3dd;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-legend i.free {
+  background: #0b3040;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-grid-legend i.selected {
+  background: #27bdc4;
+}
+/* Existing booking/detail dialogs — presentation only, no form/control replacement. */
+html[data-marina-ui="future-luxury"] .owner-booking-backdrop {
+  background: rgba(1,12,24,.73);
+  backdrop-filter: blur(5px);
+}
+html[data-marina-ui="future-luxury"] .owner-booking-modal {
+  color: #f2fcff;
+  background: linear-gradient(150deg,#132f43,#092334);
+  border: 1px solid rgba(75,211,223,.36);
+  box-shadow: 0 25px 90px rgba(0,0,0,.48);
+  border-radius: 20px;
+  padding: clamp(16px,2vw,26px);
+}
+html[data-marina-ui="future-luxury"] .owner-booking-modal h2,
+html[data-marina-ui="future-luxury"] .owner-booking-modal strong {
+  color: #f6fcff;
+}
+html[data-marina-ui="future-luxury"] .owner-booking-modal p,
+html[data-marina-ui="future-luxury"] .owner-booking-modal span,
+html[data-marina-ui="future-luxury"] .owner-booking-modal small {
+  color: #c3dbe4;
+}
+html[data-marina-ui="future-luxury"] .owner-booking-modal input,
+html[data-marina-ui="future-luxury"] .owner-booking-modal select,
+html[data-marina-ui="future-luxury"] .owner-booking-modal textarea {
+  color: #f4fcff;
+  background: #18394c;
+  border: 1px solid rgba(92,189,207,.4);
+  border-radius: 10px;
+  min-height: 40px;
+}
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-stay-facts div,
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-price-card,
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-nightly-prices span {
+  background: rgba(50,108,124,.28);
+  border: 1px solid rgba(76,205,216,.23);
+  border-radius: 11px;
+}
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-quiet-btn {
+  background: rgba(30,86,104,.4);
+  border: 1px solid rgba(71,199,212,.33);
+  color: #e7fbff;
+}
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-booking-actions button,
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-manager-price button {
+  background: #18bbc2;
+  color: #072832;
+  border-radius: 11px;
+}
+html[data-marina-ui="future-luxury"] .owner-booking-modal .owner-booking-error {
+  background: #4c2533;
+  color: #ffe8ec;
+  border: 1px solid #c5687c;
+}
+/* Restrained, native-feeling entrance. Do not animate unknown server success states. */
+@media (prefers-reduced-motion:no-preference) {
+  html[data-marina-ui="future-luxury"] .owner-booking-modal {
+    animation: fl2-dialog-in 200ms cubic-bezier(.2,.8,.2,1) both;
+  }
+}
+@keyframes fl2-dialog-in {
+  from { opacity:0;transform:translateY(11px) scale(.985); }
+  to { opacity:1;transform:translateY(0) scale(1); }
+}
+@media(max-width:760px){
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .attention-row{
+    grid-template-columns: 85px minmax(120px,1fr);
+  }
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] .attention-row>span:nth-child(n+3){
+    display:none;
+  }
+}
+/* Real Light mode with verified readable text; every override below is opt-in. */
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"]{
+  --fl2-night:#f1f7fa;
+  --fl2-abyss:#ecf4f8;
+  --fl2-panel:#fff;
+  --fl2-tile:#e8f5f8;
+  --fl2-edge:rgba(17,113,139,.21);
+  --fl2-ink:#092c40;
+  --fl2-muted:#486578;
+  --fl2-cyan:#078494;
+  --fl2-warm:#79500c;
+  color-scheme:light;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] body{
+  background:linear-gradient(135deg,#f1f7fa,#e6f3f8 70%,#f8fcff) fixed;
+  color:#092c40;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .auth-toolbar.admin-nav{
+  background:linear-gradient(165deg,#fff,#eef7fb)!important;
+  color:#0b3146;
+  border-color:rgba(11,119,143,.22);
+  box-shadow: 5px 0 28px rgba(8,46,75,.09);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .admin-identity strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .admin-tabs>button,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .admin-more-menu>summary,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .logout-button{
+  color:#0a3044;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .admin-identity span{
+  color:#496a7b;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .admin-tabs>button:hover,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .admin-more-menu>summary:hover{
+  background:#dff3f7;color:#07566a;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .admin-tabs>button.active,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .admin-more-panel button.active{
+  background:linear-gradient(105deg,#087b8c,#0ca6b2);
+  color:white;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .admin-more-panel{
+  background:#eaf6f9;
+  border:1px solid rgba(15,130,152,.18);
+  box-shadow:none;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .admin-more-panel button{color:#143d51}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .admin-nav-section-label{color:#835b12}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .shell-theme-toggle,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-theme-switch{
+  background:#e7f2f6;
+  border-color:#c6dee7;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .shell-theme-toggle button,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-theme-switch button{
+  color:#28556a;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .shell-theme-toggle button[aria-pressed="true"],
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .fl2-theme-switch button[aria-pressed="true"]{
+  background:#087f90;color:white;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .work-head{
+  background:linear-gradient(115deg,#fff,#def0f5)!important;
+  border-color:#b4d9e4!important;
+  box-shadow:0 18px 44px rgba(11,61,88,.08);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .work-head h1{
+  color:#092c40!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .work-head .eyebrow{
+  color:#7a510e!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .work-head .subtitle{
+  color:#4d687b!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-panel{
+  background:linear-gradient(160deg,#fff,#f6fbfd)!important;
+  color:#0a3045!important;
+  border-color:#c8e2ea!important;
+  box-shadow:0 10px 24px rgba(11,65,86,.06);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-panel-head h2,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-money strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-list strong{
+  color:#092f43!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article small,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-money span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-list span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-note{
+  color:#506f80!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-list>div,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-money>div,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .stay-row,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .attention-row{
+  background:#eff7fa!important;
+  border-color:#d2e5ea!important;
+  color:#153d50!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-drill{
+  color:#066679!important;
+  background:#e4f5f8!important;
+  border-color:#abd8df!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .command-drill span{
+  color:#066679!important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .fl2-real-occupancy-ring>div{
+  background:#fff;color:#0b3446;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .fl2-real-occupancy-ring span{
+  color:#527083;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid > div{
+  background:#eff8fa;
+  border-color:#c6e2eb;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid strong{
+  color:#113e52;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .dashboard-shell[data-fl2-owner="true"] .room-state-grid span{
+  color:#244c60;
+}
+/* Light PMS grid: sticky headers, room cells and booking colors retain their actions. */
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack{
+  color:#082e43;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-shell{
+  color:#0b3045;
+  background:linear-gradient(160deg,#fff,#f0f8fb);
+  border-color:#bfdae5;
+  box-shadow:0 14px 30px rgba(16,57,83,.08);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-title h1{
+  color:#092c41;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-title p{
+  color:#536f80;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-toolbar,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-selection-help,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-head{
+  color:#10384d;
+  background:#eff7fa;
+  border-color:#cce3ea;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-toolbar select,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-toolbar button,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-search,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-month-picker,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-date-nav{
+  color:#093549;
+  background:#fff;
+  border-color:#c3dfe7;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack input{
+  color:#093549;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack input::placeholder{
+  color:#647e8e;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-scroll{
+  background:#fff;border-color:#bfdae5;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-head,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-state-head,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-day-head{
+  color:#16445a;
+  background:#e9f5f8;
+  border-color:#c9e1e8;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-day-head strong,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-label strong{
+  color:#123f52;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-day-head.today,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-day-head.today strong{
+  background:#bceef0;color:#086675;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-group-label{
+  color:#16435a;background:#d8ecf3;border-color:#bfdde6;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-group-label span{
+  background:#c3e1ea;color:#174b60;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-row{
+  background:#fff;border-color:#dcebf1;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-row:nth-child(even){
+  background:#f7fbfc;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-state{
+  color:#376477;background:#fff;border-color:#dcebf1;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-state.CLEAN{color:#17765d;background:#edfbf5}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-state.DIRTY{color:#a94b49;background:#ffefed}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-state.IN_INSPECTION{color:#855e17;background:#fff4d9}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-state.TECH_BLOCK{color:#475a69;background:#e5ecf0}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-night-cell{
+  background:#fff;border-color:#dcecf0;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-night-cell.weekend{
+  background:#f7f5ee;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-night-cell.today{
+  background:#daf7f7;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-night-cell.occupied{
+  background:#e5f0f4;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-grid-legend{
+  color:#4c6d7f;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal{
+  color:#0c3144;
+  background:#fff;
+  border-color:#c4dce5;
+  box-shadow:0 25px 75px rgba(6,49,73,.22);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal h2,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal strong{
+  color:#0c3144;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal p,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal span,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal small{
+  color:#496b7c;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal input,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal select,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal textarea{
+  color:#123e52;background:#f9fdff;border-color:#bad9e3;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal .owner-stay-facts div,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal .owner-price-card,
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal .owner-nightly-prices span{
+  background:#eaf6f9;border-color:#c8e3eb;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-booking-modal .owner-quiet-btn{
+  color:#0b5367;background:#eff9fb;border-color:#bbdbe5;
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-marina-ui="future-luxury"] .owner-booking-modal{animation:none!important;transform:none!important}
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar{transition:none!important;transform:none!important}
+}
+
+/* FL2 visual acceptance: source grid has 300px room + 58px status.
+   Keep sticky offsets synchronized with the actual PMSOwnerGrid React template.
+   This is scoped to Future Luxury and does not change room/date calculations. */
+html[data-marina-ui="future-luxury"] .owner-pms-stack{
+  --fl2-pms-room-width:300px;
+  --fl2-pms-status-width:58px;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-state-head,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-state{
+  left:var(--fl2-pms-room-width);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-group-label{
+  box-sizing:border-box;
+  width:calc(var(--fl2-pms-room-width) + var(--fl2-pms-status-width));
+  min-width:calc(var(--fl2-pms-room-width) + var(--fl2-pms-status-width));
+}
+@media(max-width:760px){
+  html[data-marina-ui="future-luxury"] .owner-pms-stack{
+    --fl2-pms-room-width:160px;
+    --fl2-pms-status-width:58px;
+  }
+  html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-label{
+    padding-inline:6px;
+    gap:4px;
+    grid-template-columns:1fr;
+  }
+}
+/* Night-long bookings may occupy just one 26–34px cell.
+   Keep the full booking/source/payment detail in the existing native title,
+   visually clamp the text, and preserve keyboard access. */
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar{
+  container: marina-booking / inline-size;
+  min-width:0;
+  overflow:hidden;
+  padding-inline:clamp(3px,.5vw,8px);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar strong{
+  display:block;
+  flex:1 1 auto;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar span{
+  flex:0 0 auto;
+  white-space:nowrap;
+}
+@container marina-booking (max-width:115px){
+  .owner-booking-bar span{display:none}
+  .owner-booking-bar strong{font-size:10px}
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar:focus-visible{
+  outline:3px solid #f1d38c;
+  outline-offset:2px;
+  z-index:26;
+}
+/* The previous premium shadow accidentally masked PMS payment-underlines.
+   Retain payment status inside the existing reservation button, no API change. */
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar.payment-unpaid{
+  box-shadow:inset 0 -4px #f6bc59,0 5px 15px rgba(0,8,18,.24);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar.payment-partial{
+  box-shadow:inset 0 -4px #ffdf7b,0 5px 15px rgba(0,8,18,.24);
+}
+/* Accessible white text against existing reservation statuses: vivid but not washed out. */
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar.type-reservation{
+  background:linear-gradient(105deg,#124e80,#17668f);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar.status-checked_in{
+  background:linear-gradient(105deg,#075b5e,#0b7273);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar.type-maintenance,
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-booking-bar.type-manual{
+  background:linear-gradient(105deg,#674629,#79532d);
+}
+
+/* The group wrapper must be as wide as the date grid, otherwise its sticky
+   category title stops sticking halfway through horizontal scrolling. */
+html[data-marina-ui="future-luxury"] .owner-pms-stack
+.owner-grid-scroll[data-window-days="14"] .owner-grid-group{
+  min-width:calc(var(--fl2-pms-room-width) + var(--fl2-pms-status-width) + 476px);
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack
+.owner-grid-scroll[data-window-days="31"] .owner-grid-group{
+  min-width:calc(var(--fl2-pms-room-width) + var(--fl2-pms-status-width) + 806px);
+}
+/* Pinned room labels must be opaque; transparent labels leaked scrolled
+   reservation text beneath the sticky room column. */
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-label{
+  background:#0d2b3d;
+}
+html[data-marina-ui="future-luxury"] .owner-pms-stack .owner-room-row:nth-child(even) .owner-room-label{
+  background:#123448;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-label{
+  background:#fff;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .owner-pms-stack .owner-room-row:nth-child(even) .owner-room-label{
+  background:#f7fbfc;
+}

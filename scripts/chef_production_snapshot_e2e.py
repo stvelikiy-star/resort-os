@@ -90,6 +90,20 @@ async def main() -> None:
         before_breakfast = breakfast_snapshot(before)
         assert before_breakfast["state"] == "OPEN"
         assert before_breakfast["current_adult_portions"] >= original_adults
+        # A confirmed in-house stay with an active breakfast entitlement must
+        # contribute to checked-in portions, never to expected arrivals.
+        before_day = next(day for day in before["days"] if day["service_date"] == str(D0))
+        assert before_day["checked_in_stays_with_meals"] >= 1
+        assert before_day["expected_arrival_stays_with_meals"] >= 0
+        checked_in_before = int(before_breakfast["current_checked_in_total_portions"])
+        expected_before = int(before_breakfast["current_expected_arrival_total_portions"])
+        assert checked_in_before >= original_adults + original_children
+        assert checked_in_before + expected_before == before_breakfast["current_total_portions"]
+        assert before_breakfast["current_checked_in_stay_count"] >= 1
+        assert "guest_name" not in before_breakfast
+        assert "phone" not in before_breakfast
+        assert "guest_name" not in before_day
+        assert "phone" not in before_day
 
         ordinary = await owner.post(
             "/api/v1/dining/production-snapshots",
@@ -165,6 +179,13 @@ async def main() -> None:
         assert after_breakfast["delta_adult_portions"] == 1
         assert after_breakfast["delta_total_portions"] == 1
         assert after_breakfast["changed_since_snapshot"] is True
+        # The reception's late meal change updates the LIVE checked-in demand,
+        # not the pending-arrival count and never the immutable frozen baseline.
+        assert after_breakfast["current_checked_in_total_portions"] == checked_in_before + 1
+        assert after_breakfast["current_expected_arrival_total_portions"] == expected_before
+        assert after_breakfast["current_checked_in_total_portions"] + after_breakfast["current_expected_arrival_total_portions"] == after_breakfast["current_total_portions"]
+        assert after_breakfast["current_checked_in_stay_count"] == before_breakfast["current_checked_in_stay_count"]
+        assert after_breakfast["frozen_total_portions"] == frozen_total
 
         print(
             "Chef production snapshot E2E PASS:",

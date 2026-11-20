@@ -185,7 +185,7 @@ export default function ServicePointRuntime({ token }: { token: string }) {
 
   return <main className="spqr-shell">
     <section className="spqr-card">
-      <p className="spqr-eyebrow">ТРИ КОРОНЫ · СЕРВИСНАЯ ТОЧКА</p>
+      <p className="spqr-eyebrow">MARINA SMART · СЕРВИСНАЯ ТОЧКА</p>
       <h1>{point.point.name}</h1>
       {point.point.zone_label && <p className="spqr-zone">{point.point.zone_label}</p>}
 

@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
 
 router = APIRouter(prefix="/api/v1/admin/guest-crm", tags=["guest-crm"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -33,11 +33,8 @@ class PreferenceUpsert(BaseModel):
     value: str = Field(min_length=1, max_length=240)
 
 
-async def property_id(conn, property_code: str) -> uuid.UUID:
-    value = await conn.fetchval('SELECT id FROM properties WHERE code=$1', property_code)
-    if not value:
-        raise HTTPException(status_code=503, detail="Property not loaded")
-    return value
+async def property_id(conn, user: dict[str, Any]) -> uuid.UUID:
+    return await trusted_property_id(conn, user)
 
 
 async def require_guest(conn, property_id_value: uuid.UUID, guest_id: uuid.UUID):
@@ -70,7 +67,7 @@ async def guest_crm_detail(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        pid = await property_id(conn, user["property_code"])
+        pid = await property_id(conn, user)
         guest = await require_guest(conn, pid, guest_id)
         stays = await conn.fetch(
             '''
@@ -134,6 +131,54 @@ async def guest_crm_detail(
             guest_id,
         )
 
+        # Ratings entered by the guest in the verified room-QR cabinet become part
+        # of their existing long-lived guest history, not a parallel CRM.
+        # Canonical booking payments, not a copied ledger. The relationship is
+        # to the reservation (which may involve multiple guests), not a claim
+        # that this individual guest made the payment.
+        reservation_ids = sorted({row["reservationId"] for row in stays})
+        booking_payments = []
+        if reservation_ids:
+            booking_payments = await conn.fetch(
+                '''SELECT p.id,p."reservationId",p."amountKgs",p.method,
+                          p.status::text AS status,p.provider,p."externalRef",
+                          p."paidAt",p."createdAt"
+                   FROM payments p
+                   JOIN reservations r ON r.id=p."reservationId"
+                   WHERE r."propertyId"=$1 AND p."reservationId"=ANY($2::uuid[])
+                   ORDER BY p."createdAt" DESC LIMIT 150''',
+                pid, reservation_ids,
+            )
+        reviews = await conn.fetch(
+            '''SELECT "stayId",rating,comment,"createdAt","updatedAt"
+               FROM guest_stay_reviews WHERE "propertyId"=$1 AND "guestId"=$2
+               ORDER BY "createdAt" DESC''',
+            pid, guest_id,
+        )
+    reviews_by_stay = {
+        str(row["stayId"]): {
+            "rating": row["rating"],
+            "comment": row["comment"],
+            "created_at": row["createdAt"],
+            "updated_at": row["updatedAt"],
+            "manager_attention_required": row["rating"] <= 3,
+        }
+        for row in reviews
+    }
+
+    payments_by_reservation: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in booking_payments:
+        payments_by_reservation[str(row["reservationId"])].append({
+            "id": str(row["id"]),
+            "amount_kgs": int(row["amountKgs"]),
+            "method": row["method"],
+            "status": row["status"],
+            "provider": row["provider"],
+            "external_ref": row["externalRef"],
+            "paid_at": row["paidAt"],
+            "recorded_at": row["createdAt"],
+        })
+
     assignments_by: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in assignments:
         assignments_by[str(row["stayId"])].append(
@@ -188,6 +233,8 @@ async def guest_crm_detail(
                 "total_kgs": row["totalKgs"],
                 "assignments": assignments_by.get(str(row["id"]), []),
                 "requests": requests_by.get(str(row["id"]), []),
+                "guest_review": reviews_by_stay.get(str(row["id"])),
+                "booking_payments": payments_by_reservation.get(str(row["reservationId"]), [])[:5],
             }
             for row in stays
         ],
@@ -237,7 +284,7 @@ async def upsert_guest_preference(
 
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             await require_guest(conn, pid, guest_id)
             before = await conn.fetchrow(
                 '''SELECT id,"valueText","isActive" FROM guest_preferences WHERE "guestId"=$1 AND key=$2 FOR UPDATE''',
@@ -289,7 +336,7 @@ async def deactivate_guest_preference(
         raise HTTPException(status_code=404, detail="Preference not found")
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
-            pid = await property_id(conn, user["property_code"])
+            pid = await property_id(conn, user)
             await require_guest(conn, pid, guest_id)
             row = await conn.fetchrow(
                 '''SELECT id,"valueText","isActive" FROM guest_preferences WHERE "propertyId"=$1 AND "guestId"=$2 AND key=$3 FOR UPDATE''',

@@ -1,3 +1,4 @@
+import os
 import uuid
 from datetime import date
 from typing import Any
@@ -5,6 +6,7 @@ from typing import Any
 from fastapi import APIRouter, Cookie, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED
 from .folio_service_charges import ensure_guest_service_charge, void_guest_service_charge
 from .guest_os import GUEST_COOKIE, current_stay_for_room, resolve_room_qr, valid_guest_session
 from .guest_service_settings import load_settings
@@ -53,7 +55,8 @@ async def authorized_context(conn, token: str, raw_session: str | None):
     if not stay:
         raise HTTPException(status_code=401, detail={"code": "GUEST_SESSION_REQUIRED"})
     session = await valid_guest_session(conn, raw_session)
-    if not session or session["stayId"] != stay["stayId"] or session["guestId"] != stay["guestId"]:
+    if (not session or session["propertyId"] != qr["propertyId"]
+            or session["stayId"] != stay["stayId"] or session["guestId"] != stay["guestId"]):
         raise HTTPException(status_code=401, detail={"code": "GUEST_SESSION_REQUIRED"})
     return qr, stay, session
 
@@ -121,6 +124,16 @@ async def list_guest_requests(token: str, request: Request, tc_guest_session: st
 @router.post("/rooms/{token}/requests", status_code=status.HTTP_201_CREATED)
 async def create_guest_request(token: str, payload: GuestRequestCreate, request: Request, tc_guest_session: str | None = Cookie(default=None, alias=GUEST_COOKIE)):
     code = normalize_request_code(payload.request_code)
+    # RC4 Guest QR preview accepts only nonfinancial guest calls. All other
+    # requests (including paid HOUSEKEEPING/LINEN and provider/meal actions)
+    # remain 503 until separately reviewed with tenant-specific finance E2E.
+    if (MARINA_SHARED_AUTH_PREVIEW_ENABLED
+            and os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") == "true"
+            and code not in {"ADMIN", "MAINTENANCE"}):
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "SHARED_GUEST_SERVICE_NOT_REVIEWED", "request_code": code},
+        )
     source = f"GUEST_OS_{code}"
     description = payload.description.strip() if payload.description and payload.description.strip() else None
 
@@ -229,12 +242,24 @@ async def cancel_guest_request(token: str, task_id: uuid.UUID, request: Request,
         async with conn.transaction():
             qr, stay, _ = await authorized_context(conn, token, tc_guest_session)
             task = await conn.fetchrow(
-                '''SELECT id,status::text AS status,"chargeStatus" FROM operational_tasks
+                '''SELECT id,status::text AS status,"serviceCode","chargeKgs","chargeStatus" FROM operational_tasks
                    WHERE id=$1 AND "stayId"=$2 AND "createdByType"='GUEST' AND source LIKE 'GUEST_OS_%' FOR UPDATE''',
                 task_id, stay["stayId"],
             )
             if not task:
                 raise HTTPException(status_code=404, detail={"code": "GUEST_REQUEST_NOT_FOUND"})
+            # Even pre-existing guest tasks may contain a financial folio charge.
+            # RC4 permits cancellation only for its nonfinancial service codes;
+            # never let a guest stage session void a legacy paid charge.
+            if (MARINA_SHARED_AUTH_PREVIEW_ENABLED
+                    and os.environ.get("MARINA_SHARED_GUEST_QR_RC4_ENABLED") == "true"
+                    and (task["serviceCode"] not in {"ADMIN", "MAINTENANCE"}
+                         or task["chargeKgs"] is not None
+                         or task["chargeStatus"] not in {"NONE", None})):
+                raise HTTPException(
+                    status_code=503,
+                    detail={"code": "SHARED_GUEST_CHARGE_CANCELLATION_NOT_REVIEWED"},
+                )
             if task["status"] != "OPEN":
                 raise HTTPException(status_code=409, detail={"code": "GUEST_REQUEST_CANNOT_CANCEL", "status": task["status"]})
             if task["chargeStatus"] in {"PENDING", "POSTED"}:

@@ -74,6 +74,103 @@ type FinanceResponse = {
     remaining_kgs: number;
   };
   refunded_snapshot_all_time: { amount_kgs: number; payment_count: number };
+  /** Present for OWNER only; never returned by Core to MANAGER. */
+  /** Source-backed OWNER candidates, never booked or cash-paid amounts as revenue. */
+  owner_accrual_readiness_snapshot?: {
+    documented_source_corrections:{
+      recorded_corrections_count:number;
+      reversed_corrections_count:number;
+      active_by_kind_kgs:{
+        DISCOUNT:string;PACKAGE_SPLIT:string;CANCELLATION:string;
+        REFUND:string;TAX_COMPONENT:string;
+      };
+      metadata_only_documents_not_independently_verified:true;
+      server_verified_document_bytes_count:number;
+      missing_document_bytes_count:number;
+      all_recorded_document_bytes_available:boolean;
+      document_issuer_authenticity_independently_verified:false;
+      refunds_are_cash_evidence_not_recognized_revenue:true;
+      recognized_revenue_kgs:null;recognized_profit_kgs:null;
+      status:'SOURCE_CORRECTIONS_NOT_ACCOUNTING_POSTINGS';
+    };
+    source_approval_journal:{
+      approval_events_count:number;
+      reversal_events_count:number;
+      active_room_nights_count:number;
+      active_served_dining_count:number;
+      active_source_face_value_kgs:string;
+      status:'SOURCE_APPROVAL_NOT_ACCOUNTING_RECOGNITION';
+      recognized_revenue_kgs:null;
+      recognized_profit_kgs:null;
+    };
+    delivered_revenue_sources:{
+      accommodation:{
+        qualified_reservations:number;
+        delivered_booked_nights_count:number;
+        allocated_booking_face_value_kgs:string;
+        excluded_reservations_count:number;
+      };
+      dining:{
+        served_orders_count:number;
+        single_source_folio_linked_candidate_kgs:string;
+        excluded_orders_count:number;
+      };
+      recognition:{
+        recognized_total_revenue_kgs:null;
+        status:'SERVICE_DELIVERY_CANDIDATES_NOT_ACCOUNTING_POSTINGS';
+        cash_received_as_revenue:false;
+        automatic_posting:false;
+      };
+    };
+    posted_owner_obligations:{
+      posted_total_kgs:string;
+      non_stock_obligations_candidate_kgs:string;
+      stock_overlap_review_kgs:string;
+      matching_supplier_invoice_count:number;
+    };
+    kitchen_cost_movements:{
+      production_cost_candidate_kgs:string;
+      loss_cost_candidate_kgs:string;
+    };
+    revenue_source_candidates:{
+      served_dining_face_value_kgs:string;
+      served_without_linked_folio_count:number;
+      checked_out_booked_total_kgs:string;
+    };
+    recognition:{
+      recognized_revenue_kgs:null;
+      recognized_expenses_kgs:null;
+      recognized_profit_kgs:null;
+      completeness_verified:false;
+      status:"REQUIRES_APPROVED_RECOGNITION_LEDGER";
+      blockers:string[];
+    };
+  };
+  owner_supplier_stock_snapshot?: {
+    inventory: {
+      real_book_inventory_value_kgs: string | null;
+      sample_book_inventory_value_kgs: string | null;
+      valuation_status: "MOVEMENT_BASED" | "RECONCILIATION_REQUIRED";
+      linked_source: {
+        legacy_invoice_vs_stock_cost_delta_kgs: string;
+        source_mismatch_count: number;
+      };
+    };
+    supplier_documents: {
+      gross_obligations_kgs: string;
+      manual_settlements_kgs: string;
+      credit_notes_kgs: string;
+      outstanding_payables_kgs: string;
+      return_stock_carrying_cost_kgs: string;
+      return_credit_minus_stock_cost_kgs: string;
+      payables_status: "RECORDED_OBLIGATIONS_BALANCED" | "RECONCILIATION_REQUIRED";
+    };
+    financial_truth: {
+      recognized_profit_kgs: null;
+      is_recognized_profit_complete: false;
+      stock_receipts_are_expenses: false;
+    };
+  };
   recent_payments: Array<{
     id: string;
     amount_kgs: number;
@@ -104,6 +201,15 @@ function monthStart(value: Date) {
 }
 
 const money = (value: number) => `${new Intl.NumberFormat("ru-RU").format(Number(value || 0))} сом`;
+/** Do not coerce missing/invalid reconciliation values to zero, and avoid float rounding. */
+const exactSom = (value: string | null | undefined) => {
+  if (value === null) return "Требуется сверка";
+  const m = typeof value === "string" ? /^(-?)(\d+)(?:\.(\d{1,4}))?$/.exec(value) : null;
+  if (!m) return "Нет подтверждённых данных";
+  const whole = m[2].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  const fraction = (m[3] || "").replace(/0+$/, "");
+  return (m[1] === "-" ? "−" : "") + whole + (fraction ? "," + fraction : "") + " сом";
+};
 
 const balanceLabel: Record<string, string> = {
   PRE_ARRIVAL: "До заезда",
@@ -175,6 +281,109 @@ export default function HotelFinanceBoard() {
         <article><span>Долг после выезда</span><strong>{money(data.receivables_snapshot.checked_out_kgs)}</strong><small>{data.receivables_snapshot.checked_out_count} CHECKED_OUT</small></article>
         <article><span>Стоимость активных броней</span><strong>{money(data.active_reservations_snapshot.booked_total_kgs)}</strong><small>{data.active_reservations_snapshot.reservation_count} GUARANTEED / CHECKED_IN</small></article>
       </section>
+
+      {data.owner_supplier_stock_snapshot &&
+        data.owner_supplier_stock_snapshot.financial_truth.recognized_profit_kgs === null &&
+        data.owner_supplier_stock_snapshot.financial_truth.is_recognized_profit_complete === false &&
+        data.owner_supplier_stock_snapshot.financial_truth.stock_receipts_are_expenses === false &&
+        <section className="finance-split-grid" data-testid="owner-supplier-stock-reconciliation">
+          <article className="finance-section">
+            <div className="section-head">
+              <h2>OWNER · склад и себестоимость</h2>
+              <span>Снимок движений, не прибыль</span>
+            </div>
+            <div className="finance-state-grid">
+              <div><span>Стоимость запасов</span>
+                <strong>{exactSom(data.owner_supplier_stock_snapshot.inventory.real_book_inventory_value_kgs)}</strong>
+                <small>По сохранённым поступлениям и списаниям</small></div>
+              <div><span>Возвраты поставщикам</span>
+                <strong>{exactSom(data.owner_supplier_stock_snapshot.supplier_documents.return_stock_carrying_cost_kgs)}</strong>
+                <small>Складская стоимость выбытия</small></div>
+              <div><span>Старые приходы — разница с накладными</span>
+                <strong>{exactSom(data.owner_supplier_stock_snapshot.inventory.linked_source.legacy_invoice_vs_stock_cost_delta_kgs)}</strong>
+                <small>Не исправляется и не списывается автоматически</small></div>
+              <div><span>Состояние оценки</span><strong>
+                {data.owner_supplier_stock_snapshot.inventory.valuation_status === "MOVEMENT_BASED"
+                  ? "По движениям" : "Требуется сверка"}</strong></div>
+            </div>
+          </article>
+          <article className="finance-section">
+            <div className="section-head"><h2>OWNER · поставщики</h2>
+              <span>Не клиентские платежи и не прибыль</span></div>
+            <div className="finance-state-grid">
+              <div><span>Накладные</span><strong>{exactSom(data.owner_supplier_stock_snapshot.supplier_documents.gross_obligations_kgs)}</strong></div>
+              <div><span>Зарегистрированные оплаты</span><strong>{exactSom(data.owner_supplier_stock_snapshot.supplier_documents.manual_settlements_kgs)}</strong></div>
+              <div><span>Кредитовые корректировки</span><strong>{exactSom(data.owner_supplier_stock_snapshot.supplier_documents.credit_notes_kgs)}</strong></div>
+              <div><span>Неоплаченная задолженность</span><strong>{exactSom(data.owner_supplier_stock_snapshot.supplier_documents.outstanding_payables_kgs)}</strong></div>
+              <div><span>Разница кредита и стоимости возврата</span><strong>{exactSom(data.owner_supplier_stock_snapshot.supplier_documents.return_credit_minus_stock_cost_kgs)}</strong></div>
+            </div>
+            <p className="finance-footnote">
+              Прибыль не рассчитана. Сначала нужна сверка признанной выручки,
+              хозяйственных расходов и корректировок себестоимости.
+            </p>
+          </article>
+        </section>}
+
+      {data.owner_accrual_readiness_snapshot &&
+        data.owner_accrual_readiness_snapshot.recognition.recognized_revenue_kgs === null &&
+        data.owner_accrual_readiness_snapshot.recognition.recognized_expenses_kgs === null &&
+        data.owner_accrual_readiness_snapshot.recognition.recognized_profit_kgs === null &&
+        data.owner_accrual_readiness_snapshot.recognition.completeness_verified === false &&
+        <section className="finance-split-grid" data-testid="owner-accrual-readiness">
+          <article className="finance-section">
+            <div className="section-head"><h2>OWNER · доходы и расходы</h2>
+              <span>Источники для сверки, не прибыль</span></div>
+            <div className="finance-state-grid">
+              <div><span>Проведённые обязательства</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.posted_owner_obligations.posted_total_kgs)}</strong></div>
+              <div><span>Хозяйственные расходы (кандидаты)</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.posted_owner_obligations.non_stock_obligations_candidate_kgs)}</strong></div>
+              <div><span>Требуется сверка с запасами</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.posted_owner_obligations.stock_overlap_review_kgs)}</strong></div>
+              <div><span>Совпадения накладных и расходов</span>
+                <strong>{data.owner_accrual_readiness_snapshot.posted_owner_obligations.matching_supplier_invoice_count}</strong></div>
+            </div>
+          </article>
+          <article className="finance-section">
+            <div className="section-head"><h2>OWNER · признание выручки</h2>
+              <span>Подтверждения ещё нет</span></div>
+            <div className="finance-state-grid">
+              <div><span>Себестоимость приготовления</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.kitchen_cost_movements.production_cost_candidate_kgs)}</strong></div>
+              <div><span>Потери кухни</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.kitchen_cost_movements.loss_cost_candidate_kgs)}</strong></div>
+              <div><span>Обслуженные заказы (не выручка)</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.revenue_source_candidates.served_dining_face_value_kgs)}</strong></div>
+              <div><span>Брони после выезда (не выручка)</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.revenue_source_candidates.checked_out_booked_total_kgs)}</strong></div>
+              <div><span>Подтверждённые ночи проживания (оценка)</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.delivered_revenue_sources.accommodation.allocated_booking_face_value_kgs)}</strong>
+                <small>{data.owner_accrual_readiness_snapshot.delivered_revenue_sources.accommodation.delivered_booked_nights_count} ночей; {data.owner_accrual_readiness_snapshot.delivered_revenue_sources.accommodation.excluded_reservations_count} броней требуют сверки</small></div>
+              <div><span>Обслуженные ресторанные заказы со сверенным folio</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.delivered_revenue_sources.dining.single_source_folio_linked_candidate_kgs)}</strong>
+                <small>{data.owner_accrual_readiness_snapshot.delivered_revenue_sources.dining.excluded_orders_count} заказов требуют сверки; folio не суммируется повторно</small></div>
+              <div><span>Подтверждённые источники (не бухгалтерская выручка)</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.source_approval_journal.active_source_face_value_kgs)}</strong>
+                <small>{data.owner_accrual_readiness_snapshot.source_approval_journal.approval_events_count} утверждений; {data.owner_accrual_readiness_snapshot.source_approval_journal.reversal_events_count} отмен</small>
+              </div>
+              <div><span>Действующие подтверждённые источники</span>
+                <strong>{data.owner_accrual_readiness_snapshot.source_approval_journal.active_room_nights_count} ночей · {data.owner_accrual_readiness_snapshot.source_approval_journal.active_served_dining_count} заказов</strong>
+                <small>Это журнал подтверждений, а не проводки признанной выручки.</small></div>
+
+              <div><span>Документальные корректировки (без признания выручки)</span>
+                <strong>{data.owner_accrual_readiness_snapshot.documented_source_corrections.recorded_corrections_count} записей</strong>
+                <small>{data.owner_accrual_readiness_snapshot.documented_source_corrections.reversed_corrections_count} отмен; {data.owner_accrual_readiness_snapshot.documented_source_corrections.server_verified_document_bytes_count} файлов проверены по SHA-256; {data.owner_accrual_readiness_snapshot.documented_source_corrections.missing_document_bytes_count} отсутствуют; подлинность издателя не подтверждена</small></div>
+              <div><span>Скидки · отмены</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.DISCOUNT)} · {exactSom(data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.CANCELLATION)}</strong></div>
+              <div><span>Пакеты · налоговая составляющая</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.PACKAGE_SPLIT)} · {exactSom(data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.TAX_COMPONENT)}</strong></div>
+              <div><span>Возвраты (денежные документы, не выручка)</span>
+                <strong>{exactSom(data.owner_accrual_readiness_snapshot.documented_source_corrections.active_by_kind_kgs.REFUND)}</strong></div>
+
+            </div>
+            <p className="finance-footnote">Прибыль недоступна: нет принятого журнала признания доходов и всех затрат.</p>
+          </article>
+        </section>}
 
       <section className="finance-split-grid">
         <article className="finance-section">

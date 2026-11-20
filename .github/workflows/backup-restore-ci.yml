@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   backup-restore:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     services:
       postgres:
@@ -50,6 +50,17 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Select PostgreSQL 16 clients for the PostgreSQL 16 restore target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! test -x /usr/lib/postgresql/16/bin/pg_dump; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client-16
+          fi
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+          /usr/lib/postgresql/16/bin/pg_dump --version | grep -E ' 16\.'
+          /usr/lib/postgresql/16/bin/pg_restore --version | grep -E ' 16\.'
 
       - uses: actions/setup-node@v4
         with:

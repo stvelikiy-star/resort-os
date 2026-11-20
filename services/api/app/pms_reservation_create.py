@@ -1,20 +1,22 @@
+import json
 import re
 import secrets
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Any
 
 from asyncpg.exceptions import ExclusionViolationError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import require_roles
+from .auth import require_roles, trusted_property_id
+from . import auth as auth_module
 from .guest_identity import resolve_or_create_guest
 from .main import price_room_type
 
 
 router = APIRouter(prefix="/api/v1/admin/pms/reservations", tags=["admin-pms-owner-grid"])
-manager_access = require_roles("OWNER", "MANAGER")
+manager_access = require_roles("OWNER", "MANAGER", "AGENT", "RECEPTION")
 
 # Owner-approved rule: these categories never accept extra places.
 EXTRA_BED_DENIED_ROOM_TYPES = {
@@ -38,6 +40,7 @@ class GridReservationPreviewPayload(BaseModel):
     discount_percent: int | None = Field(default=None, ge=0, le=100)
     discount_reason: str | None = Field(default=None, max_length=500)
     agent_id: uuid.UUID | None = None
+    hold_id: uuid.UUID | None = None
 
     @model_validator(mode="after")
     def validate_dates(self):
@@ -59,10 +62,13 @@ class GridReservationCommitPayload(GridReservationPreviewPayload):
     expected_pricing_source: str = Field(pattern="^(CORE_RATE|MANAGER_OVERRIDE)$")
 
 
-async def property_context(conn, property_code: str):
+async def property_context(conn, user: dict[str, Any]):
+    # Resolve property ID from the server-validated authenticated session.
+    # Reuse this boundary for individual and group reservation operations.
+    property_id = await trusted_property_id(conn, user)
     row = await conn.fetchrow(
-        'SELECT id,timezone,currency FROM properties WHERE code=$1',
-        property_code,
+        'SELECT id,timezone,currency FROM properties WHERE id=$1',
+        property_id,
     )
     if not row:
         raise HTTPException(status_code=503, detail="Property not loaded")
@@ -74,7 +80,7 @@ async def load_room(conn, property_id: uuid.UUID, room_id: uuid.UUID, lock: bool
     return await conn.fetchrow(
         f'''
         SELECT room.id,room.code,room.name,room."operationalState"::text AS operational_state,
-               room."bedConfiguration",room."buildingOrZone",room."floorLabel",room."roomTypeId",
+               room."bedConfiguration",room."buildingOrZone",room."floorLabel",room."roomTypeId",room.notes,
                rt.code AS room_type_code,rt.name AS room_type_name,
                rt."capacityAdults",rt."capacityChildren"
         FROM rooms room
@@ -86,7 +92,7 @@ async def load_room(conn, property_id: uuid.UUID, room_id: uuid.UUID, lock: bool
     )
 
 
-async def find_conflicts(conn, room_id: uuid.UUID, check_in: date, check_out: date):
+async def find_conflicts(conn, room_id: uuid.UUID, check_in: date, check_out: date, exclude_block_id: uuid.UUID | None = None):
     rows = await conn.fetch(
         '''
         SELECT ib.id,ib."blockType"::text AS block_type,ib."startDate",ib."endDate",ib.reason,
@@ -94,6 +100,7 @@ async def find_conflicts(conn, room_id: uuid.UUID, check_in: date, check_out: da
         FROM inventory_blocks ib
         LEFT JOIN reservations r ON r.id=ib."reservationId"
         WHERE ib."roomId"=$1 AND ib.active=true
+          AND ($4::uuid IS NULL OR ib.id<>$4)
           AND daterange(ib."startDate",ib."endDate",'[)')
               && daterange($2::date,$3::date,'[)')
         ORDER BY ib."startDate",ib."endDate"
@@ -101,6 +108,7 @@ async def find_conflicts(conn, room_id: uuid.UUID, check_in: date, check_out: da
         room_id,
         check_in,
         check_out,
+        exclude_block_id,
     )
     return [
         {
@@ -139,6 +147,77 @@ async def returning_guest_context(conn, property_id: uuid.UUID, phone: str | Non
         "previous_stays": previous,
         "auto_discount_percent": RETURNING_GUEST_DISCOUNT_PERCENT if previous > 0 else 0,
     }
+
+
+async def linked_agent_id_for_user(conn, property_id: uuid.UUID, user: dict[str, Any]) -> uuid.UUID | None:
+    if user["role"] != "AGENT":
+        return None
+    row = await conn.fetchrow(
+        '''
+        SELECT su."bookingAgentId" AS agent_id, ba.status
+        FROM staff_users su
+        LEFT JOIN booking_agents ba ON ba.id=su."bookingAgentId" AND ba."propertyId"=su."propertyId"
+        WHERE su.id=$1 AND su."propertyId"=$2 AND su."isActive"=true
+        ''',
+        user["id"],
+        property_id,
+    )
+    if not row or not row["agent_id"] or row["status"] != "ACTIVE":
+        raise HTTPException(status_code=403, detail={"code": "AGENT_ACCOUNT_NOT_LINKED"})
+    return row["agent_id"]
+
+
+def enforce_agent_booking_scope(payload: GridReservationPreviewPayload, agent_id: uuid.UUID):
+    if payload.manager_total_kgs is not None:
+        raise HTTPException(status_code=403, detail={"code": "AGENT_MANAGER_PRICE_FORBIDDEN"})
+    if payload.extra_bed_count or payload.extra_bed_unit_kgs is not None:
+        raise HTTPException(status_code=403, detail={"code": "AGENT_EXTRA_BED_FORBIDDEN"})
+    if payload.discount_percent not in (None, 0) or bool(payload.discount_reason):
+        raise HTTPException(status_code=403, detail={"code": "AGENT_DISCOUNT_FORBIDDEN"})
+    if payload.hold_id is not None:
+        raise HTTPException(status_code=403, detail={"code": "AGENT_HOLD_CONFIRM_FORBIDDEN"})
+    if payload.agent_id is not None and payload.agent_id != agent_id:
+        raise HTTPException(status_code=403, detail={"code": "AGENT_ID_OVERRIDE_FORBIDDEN"})
+    return payload.model_copy(
+        update={
+            "manager_total_kgs": None,
+            "extra_bed_count": 0,
+            "extra_bed_unit_kgs": None,
+            "discount_percent": 0,
+            "discount_reason": None,
+            "agent_id": agent_id,
+            "guest_phone": None,
+        }
+    )
+
+
+
+def enforce_reception_booking_scope(payload: GridReservationPreviewPayload):
+    """Shared RECEPTION may book the published core rate, never control pricing.
+
+    Keep this scoped to the explicitly gated shared-auth staging environment;
+    single-property legacy role authority must not broaden silently.
+    """
+    if not auth_module.MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+        raise HTTPException(status_code=403, detail={"code": "RECEPTION_SHARED_ONLY"})
+    if (payload.manager_total_kgs is not None or payload.extra_bed_count != 0
+            or payload.extra_bed_unit_kgs is not None
+            or payload.discount_percent not in (None, 0)
+            or bool(payload.discount_reason)
+            or payload.agent_id is not None or payload.hold_id is not None):
+        raise HTTPException(status_code=403, detail={"code": "RECEPTION_PRICE_OR_HOLD_OVERRIDE_FORBIDDEN"})
+    if (isinstance(payload, GridReservationCommitPayload)
+            and payload.expected_pricing_source != "CORE_RATE"):
+        raise HTTPException(status_code=403, detail={"code": "RECEPTION_CORE_RATE_REQUIRED"})
+    # Rebooking a prior guest must not silently confer manager-only discounts.
+    # Identity is still resolved using the real guest phone during commit.
+    return payload.model_copy(update={
+        "manager_total_kgs": None, "extra_bed_count": 0,
+        "extra_bed_unit_kgs": None, "discount_percent": 0,
+        "discount_reason": None, "agent_id": None,
+        "hold_id": None, "guest_phone": None,
+    })
+
 
 
 async def load_agent(conn, property_id: uuid.UUID, agent_id: uuid.UUID | None):
@@ -202,6 +281,20 @@ def pricing_result(
     }
 
 
+def confirmed_room_max_capacity(room) -> int | None:
+    raw = room["notes"]
+    if not raw:
+        return None
+    try:
+        metadata = json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    value = metadata.get("max_capacity")
+    if isinstance(value, int) and value > 0:
+        return value
+    return None
+
+
 async def build_preview(conn, property_id: uuid.UUID, payload: GridReservationPreviewPayload, *, lock: bool = False):
     room = await load_room(conn, property_id, payload.room_id, lock=lock)
     if not room:
@@ -212,7 +305,13 @@ async def build_preview(conn, property_id: uuid.UUID, payload: GridReservationPr
             detail={"code": "TARGET_ROOM_TECH_BLOCK", "room_code": room["code"]},
         )
 
+    base_adult_capacity = int(room["capacityAdults"])
+    confirmed_max_capacity = confirmed_room_max_capacity(room)
+    max_extra_bed_count = None if confirmed_max_capacity is None else max(0, confirmed_max_capacity - base_adult_capacity)
     extra_allowed = room["room_type_code"] not in EXTRA_BED_DENIED_ROOM_TYPES
+    if max_extra_bed_count is not None:
+        extra_allowed = extra_allowed and max_extra_bed_count > 0
+
     if payload.extra_bed_count > 0 and not extra_allowed:
         raise HTTPException(
             status_code=409,
@@ -221,9 +320,20 @@ async def build_preview(conn, property_id: uuid.UUID, payload: GridReservationPr
                 "room_code": room["code"],
                 "room_type_code": room["room_type_code"],
                 "room_type_name": room["room_type_name"],
+                "max_extra_bed_count": max_extra_bed_count,
             },
         )
-    effective_adult_capacity = int(room["capacityAdults"]) + (payload.extra_bed_count if extra_allowed else 0)
+    if max_extra_bed_count is not None and payload.extra_bed_count > max_extra_bed_count:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "EXTRA_BED_LIMIT_EXCEEDED",
+                "room_code": room["code"],
+                "max_extra_bed_count": max_extra_bed_count,
+                "requested_extra_bed_count": payload.extra_bed_count,
+            },
+        )
+    effective_adult_capacity = base_adult_capacity + (payload.extra_bed_count if extra_allowed else 0)
     if effective_adult_capacity < payload.adults:
         raise HTTPException(
             status_code=409,
@@ -237,7 +347,19 @@ async def build_preview(conn, property_id: uuid.UUID, payload: GridReservationPr
             },
         )
 
-    conflicts = await find_conflicts(conn, payload.room_id, payload.check_in, payload.check_out)
+    owned_hold_block_id = None
+    if payload.hold_id is not None:
+        held = await conn.fetchrow("""
+            SELECT "inventoryBlockId" FROM marina_reservation_holds
+            WHERE id=$1 AND "propertyId"=$2 AND "roomId"=$3
+              AND "checkIn"=$4 AND "checkOut"=$5
+              AND "releasedAt" IS NULL AND "confirmedReservationId" IS NULL
+              AND "expiresAt">now()
+        """, payload.hold_id, property_id, payload.room_id, payload.check_in, payload.check_out)
+        if not held:
+            raise HTTPException(status_code=409, detail={"code": "HOLD_EXPIRED_OR_UNAVAILABLE"})
+        owned_hold_block_id = held["inventoryBlockId"]
+    conflicts = await find_conflicts(conn, payload.room_id, payload.check_in, payload.check_out, owned_hold_block_id)
     core_pricing = await price_room_type(
         conn,
         room["roomTypeId"],
@@ -270,8 +392,10 @@ async def build_preview(conn, property_id: uuid.UUID, payload: GridReservationPr
             "building_or_zone": room["buildingOrZone"],
             "floor": room["floorLabel"],
             "operational_state": room["operational_state"],
-            "capacity_adults": int(room["capacityAdults"]),
+            "capacity_adults": base_adult_capacity,
             "capacity_children": room["capacityChildren"],
+            "max_capacity_adults": confirmed_max_capacity,
+            "max_extra_bed_count": max_extra_bed_count,
             "extra_bed_allowed": extra_allowed,
             "effective_capacity_adults": effective_adult_capacity,
         },
@@ -298,8 +422,19 @@ async def preview_grid_reservation(
     user: dict[str, Any] = Depends(manager_access),
 ):
     async with request.app.state.db.acquire() as conn:
-        prop = await property_context(conn, user["property_code"])
-        return await build_preview(conn, prop["id"], payload)
+        # Expired HOLD inventory must be released within the same transaction
+        # before quoting ordinary room availability; the background worker
+        # alone has a periodic delay and is not the source of booking authority.
+        async with conn.transaction():
+            prop = await property_context(conn, user)
+            from .pms_holds import expire_holds
+            await expire_holds(conn, prop["id"])
+            if user["role"] == "AGENT":
+                linked_agent_id = await linked_agent_id_for_user(conn, prop["id"], user)
+                payload = enforce_agent_booking_scope(payload, linked_agent_id)
+            elif user["role"] == "RECEPTION":
+                payload = enforce_reception_booking_scope(payload)
+            return await build_preview(conn, prop["id"], payload)
 
 
 @router.post("/new/commit", status_code=status.HTTP_201_CREATED)
@@ -316,12 +451,43 @@ async def commit_grid_reservation(
     async with request.app.state.db.acquire() as conn:
         try:
             async with conn.transaction():
-                prop = await property_context(conn, user["property_code"])
-                # Commit always prices against the canonical phone field, even if an older client omitted guest_phone.
+                prop = await property_context(conn, user)
+                # Handle expired holds even for ordinary bookings without hold_id.
+                # Transaction rollback restores all holds if subsequent commit fails.
+                from .pms_holds import expire_holds
+                await expire_holds(conn, prop["id"])
+                is_agent = user["role"] == "AGENT"
+                is_reception = user["role"] == "RECEPTION"
+                if is_reception:
+                    payload = enforce_reception_booking_scope(payload)
+                if is_agent:
+                    linked_agent_id = await linked_agent_id_for_user(conn, prop["id"], user)
+                    payload = enforce_agent_booking_scope(payload, linked_agent_id)
+                    if payload.expected_pricing_source != "CORE_RATE":
+                        raise HTTPException(status_code=403, detail={"code": "AGENT_PRICING_SOURCE_FORBIDDEN"})
+                # The hold block is retired only within this booking transaction.
+                if payload.hold_id is not None:
+                    if is_agent:
+                        raise HTTPException(status_code=403, detail={"code": "AGENT_HOLD_CONFIRM_FORBIDDEN"})
+                    held = await conn.fetchrow("""
+                        SELECT "roomId","inventoryBlockId","checkIn","checkOut",
+                               "guestName","guestPhone","releasedAt","confirmedReservationId","expiresAt"
+                        FROM marina_reservation_holds
+                        WHERE id=$1 AND "propertyId"=$2 FOR UPDATE
+                    """, payload.hold_id, prop["id"])
+                    if not held or held["releasedAt"] is not None or held["confirmedReservationId"] is not None or held["expiresAt"] <= datetime.now(timezone.utc):
+                        raise HTTPException(status_code=409, detail={"code": "HOLD_EXPIRED_OR_UNAVAILABLE"})
+                    if (held["roomId"] != payload.room_id or held["checkIn"] != payload.check_in
+                            or held["checkOut"] != payload.check_out or held["guestPhone"] != payload.phone
+                            or held["guestName"] != payload.guest_name):
+                        raise HTTPException(status_code=409, detail={"code": "HOLD_DETAILS_MISMATCH"})
+                # Commit always prices against the canonical phone field for management.
+                # Agent pricing stays on the public/core rate and must not unlock returning-guest discounts.
                 commit_preview_payload = GridReservationPreviewPayload(
                     **{
-                        **payload.model_dump(exclude={"guest_name", "phone", "email", "notes", "expected_total_kgs", "expected_pricing_source"}),
-                        "guest_phone": payload.phone,
+                        **payload.model_dump(exclude={"guest_name", "phone", "email", "notes", "expected_total_kgs", "expected_pricing_source", "hold_id"}),
+                        "guest_phone": None if (is_agent or is_reception) else payload.phone,
+                        "hold_id": payload.hold_id,
                     }
                 )
                 preview = await build_preview(conn, prop["id"], commit_preview_payload, lock=True)
@@ -364,6 +530,19 @@ async def commit_grid_reservation(
                         },
                     )
 
+                # Only retire the HOLD after pricing and availability preview has succeeded.
+                # All subsequent writes share the transaction; an error restores the block.
+                if payload.hold_id is not None:
+                    # Expiry is enforced at the actual conversion point, not only
+                    # when the transaction first fetched the HOLD.
+                    if await conn.fetchval('SELECT "expiresAt" <= clock_timestamp() FROM marina_reservation_holds WHERE id=$1', payload.hold_id):
+                        raise HTTPException(status_code=409, detail={"code": "HOLD_EXPIRED_OR_UNAVAILABLE"})
+                    retired = await conn.fetchval("""
+                        UPDATE inventory_blocks SET active=false,"updatedAt"=now()
+                        WHERE id=$1 AND active=true RETURNING id
+                    """, held["inventoryBlockId"])
+                    if retired is None:
+                        raise HTTPException(status_code=409, detail={"code": "HOLD_INVENTORY_MISSING"})
                 room = preview["room"]
                 identity = await resolve_or_create_guest(
                     conn,
@@ -442,13 +621,20 @@ async def commit_grid_reservation(
                     payload.check_out,
                     booking_number,
                 )
+                if payload.hold_id is not None:
+                    await conn.execute('UPDATE marina_reservation_holds SET "confirmedReservationId"=$2 WHERE id=$1 AND "propertyId"=$3', payload.hold_id, reservation_id, prop["id"])
+                audit_action = ("AGENT_CREATE_RESERVATION_FROM_GRID" if is_agent else
+                                "RECEPTION_CREATE_RESERVATION_FROM_GRID" if is_reception else
+                                "MANAGER_CREATE_RESERVATION_FROM_GRID")
+                audit_source = ("PMS_AGENT_GRID" if is_agent else
+                                "PMS_RECEPTION_GRID" if is_reception else "PMS_OWNER_GRID")
                 await conn.execute(
                     '''
                     INSERT INTO audit_logs (
                       id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,
                       "afterJson","createdAt"
-                    ) VALUES ($1,$2,'STAFF',$3,'MANAGER_CREATE_RESERVATION_FROM_GRID','Reservation',$4,
-                      'PMS_OWNER_GRID','SUCCESS',jsonb_build_object(
+                    ) VALUES ($1,$2,'STAFF',$3,$25,'Reservation',$4,
+                      $26,'SUCCESS',jsonb_build_object(
                         'booking_number',$5::text,
                         'room_id',$6::text,
                         'room_code',$7::text,
@@ -496,6 +682,8 @@ async def commit_grid_reservation(
                     preview["pricing"].get("core_total_kgs"),
                     str(identity["guest_id"]),
                     auto_discount_discovered_at_commit,
+                    audit_action,
+                    audit_source,
                 )
         except ExclusionViolationError as exc:
             raise HTTPException(
@@ -524,5 +712,86 @@ async def commit_grid_reservation(
         "pricing_source": preview["pricing"]["source"],
         "price_adjusted_at_commit": auto_discount_discovered_at_commit,
         "payment_created": False,
-        "payment_terms": "MANAGER_CONTROLLED",
+        "payment_terms": ("AGENT_CORE_RATE" if user["role"] == "AGENT" else
+                          "RECEPTION_CORE_RATE" if user["role"] == "RECEPTION" else
+                          "MANAGER_CONTROLLED"),
+    }
+
+
+@router.post("/{reservation_id}/cancel")
+async def cancel_grid_reservation(
+    reservation_id: uuid.UUID,
+    request: Request,
+    user: dict[str, Any] = Depends(require_roles("OWNER", "MANAGER", module_grant=False)),
+):
+    """Cancel an unpaid, not-checked-in PMS reservation and release its inventory.
+
+    Paid or operationally active reservations require a separate reviewed refund/
+    stay workflow. Channel reservations must be cancelled through their own ledger.
+    """
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            prop = await property_context(conn, user)
+            row = await conn.fetchrow(
+                """SELECT id,status::text AS status,"requestId","bookingNumber"
+                   FROM reservations WHERE id=$1 AND "propertyId"=$2 FOR UPDATE""",
+                reservation_id, prop["id"],
+            )
+            if not row:
+                raise HTTPException(status_code=404, detail={"code": "RESERVATION_NOT_FOUND"})
+            if row["status"] != "GUARANTEED":
+                raise HTTPException(status_code=409, detail={"code": "RESERVATION_NOT_CANCELLABLE"})
+            # Never silently refund, revoke an active stay, or alter an OTA ledger.
+            source = await conn.fetchval(
+                'SELECT source::text FROM reservation_requests WHERE id=$1 AND "propertyId"=$2',
+                row["requestId"], prop["id"],
+            )
+            if source != "PMS":
+                raise HTTPException(status_code=409, detail={"code": "CANCELLATION_REQUIRES_SOURCE_WORKFLOW"})
+            payment_count = await conn.fetchval(
+                'SELECT count(*) FROM payments WHERE "reservationId"=$1', reservation_id,
+            )
+            stay_count = await conn.fetchval(
+                'SELECT count(*) FROM stays WHERE "reservationId"=$1', reservation_id,
+            )
+            open_charge_count = await conn.fetchval(
+                """SELECT count(*) FROM guest_folio_charges
+                   WHERE "propertyId"=$1 AND "reservationId"=$2
+                     AND status NOT IN ('WAIVED','VOID')""",
+                prop["id"], reservation_id,
+            )
+            if payment_count or stay_count or open_charge_count:
+                raise HTTPException(status_code=409, detail={"code": "CANCELLATION_REQUIRES_FINANCE_OR_STAY_REVIEW"})
+            await conn.execute(
+                """UPDATE reservations SET status='CANCELLED',"updatedAt"=now()
+                   WHERE id=$1 AND "propertyId"=$2""", reservation_id, prop["id"],
+            )
+            await conn.execute(
+                """UPDATE reservation_requests SET status='CANCELLED',"updatedAt"=now()
+                   WHERE id=$1 AND "propertyId"=$2""", row["requestId"], prop["id"],
+            )
+            released = await conn.fetchval(
+                """WITH updated AS (
+                     UPDATE inventory_blocks SET active=false,"updatedAt"=now()
+                     WHERE "reservationId"=$1 AND "blockType"='RESERVATION' AND active=true
+                     RETURNING id
+                   ) SELECT count(*) FROM updated""", reservation_id,
+            )
+            if not released:
+                raise HTTPException(status_code=409, detail={"code": "RESERVATION_INVENTORY_MISSING"})
+            await conn.execute(
+                """INSERT INTO audit_logs
+                   (id,"propertyId","actorType","actorId",action,resource,"resourceId",
+                    source,result,"afterJson","createdAt")
+                   VALUES ($1,$2,'STAFF',$3,'MANAGER_CANCEL_UNPAID_PMS_RESERVATION',
+                           'Reservation',$4,'PMS_OWNER_GRID','SUCCESS',
+                           jsonb_build_object('booking_number',$5::text,'released_blocks',$6::int),now())""",
+                uuid.uuid4(), prop["id"], user["id"], str(reservation_id),
+                row["bookingNumber"], released,
+            )
+    return {
+        "reservation_id": str(reservation_id),
+        "status": "CANCELLED",
+        "released_blocks": released,
+        "payment_refunded": False,
     }

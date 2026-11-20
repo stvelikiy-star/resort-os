@@ -207,7 +207,7 @@ export default function SiteMediaBoard() {
     {message && <div className={styles.notice}>{message}</div>}
 
     <section className={styles.upload}>
-      <div><strong>Добавить фото</strong><span>JPEG / PNG / WebP · до 8 МБ · оригинал хранится в Resort Core</span></div>
+      <div><strong>Добавить фото</strong><span>JPEG / PNG / WebP · до 8 МБ · оригинал хранится в MARINA SMART</span></div>
       <input value={uploadAlt} onChange={(event) => setUploadAlt(event.target.value)} placeholder="Описание фото для accessibility / SEO" />
       <label className={styles.uploadButton} aria-disabled={busy === "upload"}>{busy === "upload" ? "Загружаю…" : "Выбрать файл"}<input disabled={busy === "upload"} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0] || null; void upload(file); event.target.value = ""; }} /></label>
       <button type="button" onClick={() => setShowLibrary((value) => !value)}>{showLibrary ? "Скрыть медиатеку" : "Показать медиатеку"}</button>

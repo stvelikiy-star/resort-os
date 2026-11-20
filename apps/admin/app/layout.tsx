@@ -4,6 +4,7 @@ import AdminLocaleSanitizer from "../components/AdminLocaleSanitizer";
 import "./globals.css";
 import "./auth.css";
 import "./admin-nav-polish.css";
+import "./fl2-ui-kit.css";
 import "./nfc.css";
 import "./finance.css";
 import "./hotel-finance.css";
@@ -23,6 +24,7 @@ import "./reception-readiness.css";
 import "./inbox.css";
 import "./staff.css";
 import "./management-control.css";
+import "./hotel-setup.css";
 import "./room-detail.css";
 import "./room-qr.css";
 import "./service-points.css";
@@ -46,10 +48,25 @@ import "./owner-corrections.css";
 import "./three-crowns-admin.css";
 import "./mobile-hardening.css";
 import "./admin-experience.css";
+import "./fl2-owner-dashboard.css";
+import "./fl2-premium-visual.css";
+import "./fl2-owner-pms-finish.css";
+import "./fl2-reception-visual.css";
+import "./fl2-guest-finance.css";
+import "./fl2-operational-web.css";
+import "./fl2-guest-touchpoints.css";
+import "./fl2-operations-knowledge-growth.css";
+import "./fl2-interaction-polish.css";
+import "./fl2-owner-composition.css";
+import "./fl2-pms-composition.css";
+import "./fl2-bookings-reception-composition.css";
+import "./fl2-finance-owner-composition.css";
+import "./fl2-foundation.css";
+import "./fl2-shell.css";
 
 export const metadata: Metadata = {
-  title: "Три Короны — Resort OS",
-  description: "PMS, CRM, сайт и операционный центр Three Crowns",
+  title: "MARINA SMART — Hotel OS",
+  description: "PMS, CRM, сайт и операционный центр MARINA SMART",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

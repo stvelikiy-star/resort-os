@@ -1,0 +1,91 @@
+:3000 {
+  header {
+    Cache-Control "private, no-store"
+    X-Robots-Tag "noindex, nofollow"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "no-referrer"
+  }
+
+  @health path /healthz
+  handle @health {
+    respond "OK" 200
+  }
+
+  handle /g/* {
+    reverse_proxy guest-web:3000
+  }
+
+  handle /_marina_guest/_next/static/* {
+    uri strip_prefix /_marina_guest
+    reverse_proxy guest-web:3000
+  }
+
+  @guest_api path /core/api/v1/guest-os/rooms/* /core/api/v1/guest-os/logout
+  handle @guest_api {
+    uri strip_prefix /core
+    reverse_proxy api:8000
+  }
+
+  # Internal application routes must never fall through to the HTML placeholder.
+  @private_paths path /core/* /_marina_guest/*
+  handle @private_paths {
+    respond 404
+  }
+
+  @site_html {
+    not path /g/* /core/* /_marina_guest/*
+  }
+  header @site_html Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+
+  @homepage {
+    method GET
+    path /
+    header Accept *text/html*
+  }
+  handle @homepage {
+    rewrite * /api/v1/site/customer-page?{query}
+    reverse_proxy api:8000
+  }
+
+  # Restore only the legacy public catalogue index from this hotel's DB.
+  # Unpublished sites and deep links are deliberately not synthesized.
+  @catalogue {
+    method GET
+    path /rooms /rooms/
+    header Accept *text/html*
+  }
+  handle @catalogue {
+    rewrite * /api/v1/site/customer-rooms?{query}
+    reverse_proxy api:8000
+  }
+
+  # Exact historical room URLs require a verified hotel-local slug map.
+  # Unmapped links return 404 from the API, never another property's catalogue.
+  @legacy_room_detail {
+    method GET
+    path /rooms/*
+    header Accept *text/html*
+  }
+  handle @legacy_room_detail {
+    # Caddy normally sorts rewrite before uri. route preserves strip -> rewrite.
+    route {
+      uri strip_prefix /rooms
+      rewrite * /api/v1/site/customer-room{path}?{query}
+      reverse_proxy api:8000
+    }
+  }
+
+  @unpublished {
+    method GET
+    header Accept *text/html*
+  }
+  handle @unpublished {
+    root * /srv
+    rewrite * /index.html
+    file_server
+  }
+
+  handle {
+    respond "Not published" 503
+  }
+}

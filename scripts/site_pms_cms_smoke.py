@@ -69,9 +69,14 @@ def main() -> int:
     check(status == 200 and login.get("role") in {"OWNER", "MANAGER"}, "Manager authentication")
 
     status, admin_content = request("/api/v1/admin/site/content", authenticated=True)
-    check(status == 200 and len(admin_content.get("items", [])) == 3, "CMS admin exposes RU/KG/EN")
+    check(status == 200 and len(admin_content.get("items", [])) == 4, "CMS admin exposes RU/KG/KZ/EN")
 
+    locales = {item["locale"] for item in admin_content["items"]}
+    check(locales == {"ru", "kg", "kz", "en"}, "CMS admin locale set is exact")
     ru_item = next(item for item in admin_content["items"] if item["locale"] == "ru")
+
+    status, kz_public = request("/api/v1/site/content?locale=kz")
+    check(status == 200 and kz_public.get("locale") == "kz" and kz_public.get("content", {}).get("hero", {}).get("title"), "Public CMS serves KZ")
 
     forbidden = json.loads(json.dumps(ru_item["draft"], ensure_ascii=False))
     forbidden.setdefault("booking", {})["intro"] = "Для подтверждения нужна 30% предоплата."

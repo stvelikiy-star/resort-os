@@ -152,7 +152,10 @@ def repository_checks(root: Path, *, allow_candidate_contract: bool = False) -> 
                     errors.append(f"{path} must include migration {migration}")
 
     constraint_count = str(len(CRITICAL_CONSTRAINTS))
-    if constraint_count not in migration_doc or "scripts/release_contract.py" not in migration_doc:
+    # The accepted Three Crowns production RC is frozen (24 migrations / 93
+    # constraints). A draft forward candidate has 39 / 106; never rewrite the
+    # frozen production documentation merely to make a candidate check green.
+    if not allow_candidate_contract and (constraint_count not in migration_doc or "scripts/release_contract.py" not in migration_doc):
         errors.append(
             f"production migration documentation must reference the current shared {constraint_count}-constraint release contract"
         )

@@ -1,1 +1,79 @@
 .wrap{max-width:1100px;margin:18px auto 42px;padding:0 18px}.card{background:#fff;border:1px solid rgba(10,17,40,.12);border-radius:22px;padding:20px;box-shadow:0 14px 44px rgba(10,17,40,.1);color:#0a1128}.head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px}.eyebrow{margin:0 0 5px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;opacity:.55}.head h2{margin:0;font-size:24px}.refresh,.action{border:0;border-radius:12px;padding:9px 12px;font:inherit;font-weight:800;cursor:pointer}.refresh{background:rgba(10,17,40,.07);color:#0a1128}.stack{display:grid;gap:10px}.item{border:1px solid rgba(10,17,40,.1);border-radius:16px;padding:14px;background:rgba(10,17,40,.025)}.meta{display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:800}.meta span:last-child{padding:4px 7px;border-radius:999px;background:rgba(10,17,40,.08)}.item h3{margin:8px 0 4px;font-size:18px}.item p{margin:0 0 8px;line-height:1.45;color:rgba(10,17,40,.7)}.item small{display:block;opacity:.55}.actions{display:flex;gap:8px;margin-top:12px}.action{background:#0a1128;color:#fff}.done{background:#196c3d}.empty{padding:18px 4px;opacity:.58}@media(max-width:640px){.wrap{padding:0 10px}.card{padding:15px;border-radius:18px}.head h2{font-size:21px}.meta{align-items:flex-start;flex-direction:column}}
+/* Future Luxury 2.0 — shift guest requests, no changes to claim/complete. */
+.wrap{
+  --req-panel:#fff;
+  --req-raised:#edf7f9;
+  --req-line:#c7dfe7;
+  --req-ink:#123a4c;
+  --req-muted:#527080;
+  max-width:1500px;
+}
+.card{
+  color:var(--req-ink);
+  background:linear-gradient(150deg,#fff,#f3fafb);
+  border:1px solid var(--req-line);
+  box-shadow:0 13px 33px rgba(9,66,87,.075);
+}
+.eyebrow{opacity:1;color:#87601f}
+.head h2{
+  color:var(--req-ink);
+  font-size:clamp(23px,2.1vw,33px);
+  letter-spacing:-.038em;
+}
+.refresh,.action{
+  min-height:44px;
+  border:1px solid var(--req-line);
+  border-radius:11px;
+  padding:10px 14px;
+}
+.refresh{background:var(--req-raised);color:var(--req-ink)}
+.stack{gap:11px}
+.item{
+  color:var(--req-ink);
+  background:var(--req-raised);
+  border:1px solid var(--req-line);
+  border-left:4px solid #1dbac7;
+  border-radius:15px;
+  min-width:0;
+}
+.meta{color:var(--req-muted)}
+.meta span:last-child{
+  background:#d8f1f4;
+  color:#12586d;
+  border:1px solid #afdade;
+}
+.item h3{color:var(--req-ink);overflow-wrap:anywhere}
+.item p,.item small{opacity:1;color:var(--req-muted)}
+.actions{flex-wrap:wrap;gap:8px}
+.action{color:#07303b;background:linear-gradient(105deg,#1bbdc7,#51ddda);border-color:#38c8cf}
+.done{color:#fff;background:#177d61;border-color:#177d61}
+.action:disabled{opacity:.55;cursor:not-allowed}
+.empty{opacity:1;color:var(--req-muted)}
+.wrap :is(button,a):focus-visible{outline:3px solid #a9762a;outline-offset:3px}
+@media(prefers-color-scheme:dark){
+  .wrap{
+    --req-panel:#113549;
+    --req-raised:#1a4155;
+    --req-line:rgba(79,199,215,.3);
+    --req-ink:#f0fbff;
+    --req-muted:#bfd6df;
+  }
+  .card{
+    color:var(--req-ink);
+    background:linear-gradient(145deg,#113549,#0c2b3d);
+    border-color:var(--req-line);
+    box-shadow:0 13px 33px rgba(0,9,24,.12);
+  }
+  .eyebrow{color:#e9c58a}
+  .refresh{background:#20475a;color:var(--req-ink);border-color:var(--req-line)}
+  .item{background:var(--req-raised);border-color:var(--req-line);border-left-color:#28c8ce}
+  .meta span:last-child{background:#245669;color:#d9f6f8;border-color:#388396}
+  .action{color:#06323c}
+  .done{background:#1a765c;color:#e9fff3;border-color:#278e70}
+}
+@media(max-width:640px){
+  .head{display:grid;grid-template-columns:minmax(0,1fr)}
+  .refresh{width:100%}
+  .actions .action{flex:1 1 135px}
+}
+@media(prefers-reduced-motion:reduce){.wrap button{animation:none!important;transition:none!important}}

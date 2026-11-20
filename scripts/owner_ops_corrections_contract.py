@@ -31,7 +31,7 @@ def main() -> int:
     require('import MarketingBoard from "./MarketingBoard"' in admin, "MarketingBoard missing from final AdminShell")
     require('tab === "MARKETING"' in admin and '>Маркетинг</button>' in admin, "Marketing tab missing from final admin")
     require('import AgentsBoard from "./AgentsBoard"' in admin, "AgentsBoard missing from final AdminShell")
-    require('tab === "AGENTS"' in admin and '>Агенты</button>' in admin, "Agents tab missing from final admin")
+    require('tab === "AGENTS"' in admin and '>Агентства</button>' in admin, "Agents tab missing from final admin")
     require("app.include_router(marketing_router)" in app_entry, "Marketing API router not composed")
     require("app.include_router(marketing_integration_router)" in app_entry, "Marketing integration router not composed")
     require("app.include_router(marketing_automation_router)" in app_entry, "Marketing automation router not composed")
@@ -60,7 +60,7 @@ def main() -> int:
     # Drag/drop must never directly commit. It opens builder -> preview -> explicit confirmation -> commit.
     require("/schedule/preview" in builder, "Reservation schedule preview endpoint missing")
     require("/schedule/commit" in builder, "Reservation schedule commit endpoint missing")
-    require("Проверить в Resort Core" in builder, "Explicit server preview action missing")
+    require("Проверить в MARINA SMART" in builder, "Explicit server preview action missing")
     require("Подтвердить и сохранить график" in builder, "Explicit move/save confirmation missing")
 
     # Public request success remains server-confirmed and visible to the guest.

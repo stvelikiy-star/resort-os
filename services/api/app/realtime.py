@@ -2,13 +2,14 @@ import asyncio
 import hashlib
 import json
 import os
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
-from .auth import SESSION_COOKIE, hash_session_token
-from .websocket_security import require_websocket_same_origin
+from .auth import SESSION_COOKIE, resolve_session_user, trusted_property_id
+from .section_permissions import role_or_section_allowed
+from .websocket_security import require_websocket_same_origin, websocket_authority
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
 POLL_SECONDS = float(os.environ.get("PMS_WS_POLL_SECONDS", "2"))
@@ -25,45 +26,20 @@ def parse_iso_date(raw: str | None, fallback: date) -> date:
 
 
 async def authenticate_websocket(websocket: WebSocket, conn) -> dict[str, Any] | None:
-    raw_token = websocket.cookies.get(SESSION_COOKIE)
-    if not raw_token:
-        await websocket.close(code=4401, reason="Authentication required")
-        return None
-    row = await conn.fetchrow(
-        '''
-        SELECT s."expiresAt",s."revokedAt",u.id AS user_id,u.username,u.role::text AS role,u."isActive",
-               p.code AS property_code
-        FROM auth_sessions s
-        JOIN staff_users u ON u.id=s."userId"
-        JOIN properties p ON p.id=u."propertyId"
-        WHERE s."tokenHash"=$1
-        ''',
-        hash_session_token(raw_token),
-    )
-    if (
-        not row
-        or row["revokedAt"] is not None
-        or row["expiresAt"] <= datetime.utcnow()
-        or not row["isActive"]
-        or row["property_code"] != PROPERTY_CODE
-    ):
+    try:
+        user = await resolve_session_user(conn, websocket.cookies.get(SESSION_COOKIE), touch=False)
+    except HTTPException:
         await websocket.close(code=4401, reason="Session expired or invalid")
         return None
-    if row["role"] not in {"OWNER", "MANAGER"}:
+    roles = ("OWNER", "MANAGER", "RECEPTION")
+    if user["role"] not in roles or not role_or_section_allowed(user, "/api/v1/pms/grid", roles):
         await websocket.close(code=4403, reason="PMS realtime requires management role")
         return None
-    return {
-        "id": str(row["user_id"]),
-        "username": row["username"],
-        "role": row["role"],
-        "property_code": row["property_code"],
-    }
+    return user
 
 
-async def build_snapshot(conn, start: date, end: date) -> dict[str, Any]:
-    property_id = await conn.fetchval("SELECT id FROM properties WHERE code=$1", PROPERTY_CODE)
-    if not property_id:
-        raise RuntimeError("Property seed is not loaded")
+async def build_snapshot(conn, start: date, end: date, user: dict[str, Any]) -> dict[str, Any]:
+    property_id = await trusted_property_id(conn, user)
     rooms = await conn.fetch(
         '''
         SELECT r.id,r.code,r.name,r."buildingOrZone",r."floorLabel",r."bedConfiguration",
@@ -80,10 +56,12 @@ async def build_snapshot(conn, start: date, end: date) -> dict[str, Any]:
         '''
         SELECT ib.id,ib."roomId",ib."blockType"::text AS block_type,ib."startDate",ib."endDate",ib.reason,
                res.id AS reservation_id,res."bookingNumber",res.status::text AS reservation_status,
+               rr.source AS channel_source,
                g."firstName",g."lastName",g.phone
         FROM inventory_blocks ib
         JOIN rooms r ON r.id=ib."roomId"
         LEFT JOIN reservations res ON res.id=ib."reservationId"
+        LEFT JOIN reservation_requests rr ON rr.id=res."requestId"
         LEFT JOIN guests g ON g.id=res."primaryGuestId"
         WHERE r."propertyId"=$1 AND ib.active=true
           AND daterange(ib."startDate",ib."endDate",'[)') && daterange($2::date,$3::date,'[)')
@@ -106,9 +84,10 @@ async def build_snapshot(conn, start: date, end: date) -> dict[str, Any]:
             "reservation_status": block["reservation_status"],
             "guest_name": guest_name,
             "guest_phone": block["phone"],
+            "channel_source": block["channel_source"],
         })
     return {
-        "property": PROPERTY_CODE,
+        "property": user["property_code"],
         "start": start.isoformat(),
         "end": end.isoformat(),
         "rooms": [{
@@ -144,27 +123,35 @@ async def pms_grid_websocket(websocket: WebSocket):
 
     async with websocket.app.state.db.acquire() as conn:
         user = await authenticate_websocket(websocket, conn)
-        if not user:
-            return
-        await websocket.accept()
-        last_digest: str | None = None
-        heartbeat = 0
-        try:
-            while True:
-                snapshot = await build_snapshot(conn, start, end)
-                encoded = json.dumps(snapshot, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-                digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
-                if digest != last_digest:
-                    await websocket.send_json({
-                        "type": "pms.grid.snapshot",
-                        "version": digest[:16],
-                        "data": snapshot,
-                    })
-                    last_digest = digest
-                heartbeat += 1
-                if heartbeat >= max(1, int(20 / max(POLL_SECONDS, 0.25))):
-                    await websocket.send_json({"type": "heartbeat"})
-                    heartbeat = 0
-                await asyncio.sleep(max(POLL_SECONDS, 0.25))
-        except WebSocketDisconnect:
-            return
+    if not user:
+        return
+    await websocket.accept()
+    authority = websocket_authority(user)
+    last_digest: str | None = None
+    heartbeat = 0
+    try:
+        while True:
+            async with websocket.app.state.db.acquire() as conn:
+                user = await authenticate_websocket(websocket, conn)
+                if not user:
+                    return
+                if websocket_authority(user) != authority:
+                    await websocket.close(code=4403, reason="Session authority changed; reconnect required")
+                    return
+                snapshot = await build_snapshot(conn, start, end, user)
+            encoded = json.dumps(snapshot, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+            digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+            if digest != last_digest:
+                await websocket.send_json({
+                    "type": "pms.grid.snapshot",
+                    "version": digest[:16],
+                    "data": snapshot,
+                })
+                last_digest = digest
+            heartbeat += 1
+            if heartbeat >= max(1, int(20 / max(POLL_SECONDS, 0.25))):
+                await websocket.send_json({"type": "heartbeat"})
+                heartbeat = 0
+            await asyncio.sleep(max(POLL_SECONDS, 0.25))
+    except WebSocketDisconnect:
+        return

@@ -8,7 +8,7 @@ PAGE = ROOT / "apps/web/app/g/[token]/page.tsx"
 
 REQUIRED_RUNTIME = [
     "Заявка отправлена. Статус появится в разделе «Мои заявки».",
-    "Өтүнмө жөнөтүлдү. Абалы «Менин өтүнмөлөрүм» бөлүмүндө көрүнөт.",
+    "Өтүнмө жөнөтүлдү. Анын абалы «Менин өтүнмөлөрүм» бөлүмүндө көрүнөт.",
     "Request sent. Its status will appear under My requests.",
 ]
 

@@ -128,7 +128,7 @@ def public_candidate(candidate: dict[str, Any]):
 @router.post("/availability")
 async def group_availability(payload: GroupAvailabilityPayload, request: Request, user: dict[str, Any] = Depends(access)):
     async with request.app.state.db.acquire() as conn:
-        prop = await property_context(conn, user["property_code"])
+        prop = await property_context(conn, user)
         rooms = await conn.fetch(
             '''SELECT id FROM rooms WHERE "propertyId"=$1 ORDER BY
                  COALESCE(NULLIF(regexp_replace(code,'\\D','','g'),''),'999999')::int,code''',
@@ -173,7 +173,7 @@ async def commit_group(payload: GroupCommitPayload, request: Request, user: dict
     async with request.app.state.db.acquire() as conn:
         try:
             async with conn.transaction():
-                prop = await property_context(conn, user["property_code"])
+                prop = await property_context(conn, user)
                 contact = await resolve_or_create_guest(
                     conn,
                     property_id=prop["id"],
@@ -308,7 +308,7 @@ async def commit_group(payload: GroupCommitPayload, request: Request, user: dict
 @router.get("")
 async def list_groups(request: Request, user: dict[str, Any] = Depends(access)):
     async with request.app.state.db.acquire() as conn:
-        prop = await property_context(conn, user["property_code"])
+        prop = await property_context(conn, user)
         rows = await conn.fetch(
             '''SELECT bg.id,bg.code,bg.name,bg."contactName",bg."contactPhone",bg."checkIn",bg."checkOut",bg.status,bg.notes,
                       count(bgm.id)::int AS room_count,COALESCE(sum(r."totalKgs"),0)::int AS total_kgs,

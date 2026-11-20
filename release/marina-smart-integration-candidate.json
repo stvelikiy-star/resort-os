@@ -1,0 +1,689 @@
+{
+  "schema_version": 1,
+  "product": "MARINA SMART",
+  "release_id": "MARINA_INTEGRATION_367_20261105",
+  "status": "DRAFT_INTERNAL_STAGING_ACCEPTED_EXTERNAL_ACCEPTANCE_PENDING",
+  "pull_request": 367,
+  "source_branch": "marina-smart/integrate-main-rc8-20261105",
+  "application_source_commit": "54b126fa8fdd1ed3ccc9d79e803f5919b906dd09",
+  "evidence_scope": "Isolated synthetic hotels; Chromium HTTPS -> API -> disposable PostgreSQL. No customer deployment acceptance.",
+  "ci_evidence": {
+    "commit": "54b126fa8fdd1ed3ccc9d79e803f5919b906dd09",
+    "event": "pull_request",
+    "pagination_complete": true,
+    "total_runs": 107,
+    "success": 107,
+    "failed": 0,
+    "pending": 0,
+    "runs": [
+      {
+        "id": 41998582111,
+        "name": "MARINA Direct WhatsApp Adapter CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582111"
+      },
+      {
+        "id": 41998583799,
+        "name": "Guest OS Core CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583799"
+      },
+      {
+        "id": 41998582100,
+        "name": "MARINA Ubuntu Baseline Upgrade Rehearsal",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582100"
+      },
+      {
+        "id": 41998583375,
+        "name": "No Payment Launch Profile CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583375"
+      },
+      {
+        "id": 41998583283,
+        "name": "MARINA Isolation Gate Regression Tests",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583283"
+      },
+      {
+        "id": 41998583792,
+        "name": "MARINA zz113 Isolated Rollback Rehearsal",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583792"
+      },
+      {
+        "id": 41998583679,
+        "name": "n8n Resort Core Contract CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583679"
+      },
+      {
+        "id": 41998583926,
+        "name": "Browser Realtime Topology CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583926"
+      },
+      {
+        "id": 41998582087,
+        "name": "Owner Growth Control CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582087"
+      },
+      {
+        "id": 41998582042,
+        "name": "MARINA Shared Live Browser PostgreSQL CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582042"
+      },
+      {
+        "id": 41998583751,
+        "name": "Staff Auth Security CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583751"
+      },
+      {
+        "id": 41998583253,
+        "name": "Guest Concierge V2 CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583253"
+      },
+      {
+        "id": 41998583763,
+        "name": "MARINA SMART Isolated PostgreSQL API Smoke",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583763"
+      },
+      {
+        "id": 41998582041,
+        "name": "Management Final Acceptance CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582041"
+      },
+      {
+        "id": 41998583925,
+        "name": "Telegram Sales CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583925"
+      },
+      {
+        "id": 41998583169,
+        "name": "MARINA Shared Auth Preview CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583169"
+      },
+      {
+        "id": 41998582057,
+        "name": "Management Control CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582057"
+      },
+      {
+        "id": 41998583404,
+        "name": "PMS Final Acceptance CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583404"
+      },
+      {
+        "id": 41998583678,
+        "name": "Owner Dashboard Analytics CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583678"
+      },
+      {
+        "id": 41998582518,
+        "name": "MARINA WhatsApp Workspace CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582518"
+      },
+      {
+        "id": 41998582047,
+        "name": "MARINA Manual Payments No QR CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582047"
+      },
+      {
+        "id": 41998582036,
+        "name": "Guest CRM CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582036"
+      },
+      {
+        "id": 41998582992,
+        "name": "Pre-Cutover Backup Gate CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582992"
+      },
+      {
+        "id": 41998582061,
+        "name": "MARINA Shared GREEN-API RC7 Two-Hotel Webhook CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582061"
+      },
+      {
+        "id": 41998583215,
+        "name": "Guest OS Access CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583215"
+      },
+      {
+        "id": 41998583730,
+        "name": "MARINA P0 Runtime Inventory Safety CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583730"
+      },
+      {
+        "id": 41998582776,
+        "name": "Three Crowns Full Staging Gate",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582776"
+      },
+      {
+        "id": 41998583195,
+        "name": "Marketing Consent Automation CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583195"
+      },
+      {
+        "id": 41998583285,
+        "name": "WebSocket Origin Security CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583285"
+      },
+      {
+        "id": 41998583487,
+        "name": "MARINA Ubuntu Hotel Fleet CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583487"
+      },
+      {
+        "id": 41998582956,
+        "name": "Staff Voice CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582956"
+      },
+      {
+        "id": 41998583611,
+        "name": "Launch Acceptance CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583611"
+      },
+      {
+        "id": 41998583689,
+        "name": "Owner Corrections Truth CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583689"
+      },
+      {
+        "id": 41998583533,
+        "name": "MARINA SMART AK BERMET CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583533"
+      },
+      {
+        "id": 41998583104,
+        "name": "AI Sales Draft CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583104"
+      },
+      {
+        "id": 41998582110,
+        "name": "AI Unified Communications CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582110"
+      },
+      {
+        "id": 41998583393,
+        "name": "Marketing Site Consent CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583393"
+      },
+      {
+        "id": 41998583361,
+        "name": "Release RC Truth CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583361"
+      },
+      {
+        "id": 41998582352,
+        "name": "Owner Control V2 CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582352"
+      },
+      {
+        "id": 41998583845,
+        "name": "Kitchen Operations CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583845"
+      },
+      {
+        "id": 41998583272,
+        "name": "Finance Control CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583272"
+      },
+      {
+        "id": 41998583555,
+        "name": "MARINA SMART Ubuntu Production Package CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583555"
+      },
+      {
+        "id": 41998583362,
+        "name": "Data Intake Integrity CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583362"
+      },
+      {
+        "id": 41998583335,
+        "name": "Physical Room Import CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583335"
+      },
+      {
+        "id": 41998583504,
+        "name": "Automation Contract CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583504"
+      },
+      {
+        "id": 41998583825,
+        "name": "MARINA Hotel AI Knowledge CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583825"
+      },
+      {
+        "id": 41998583029,
+        "name": "Runtime Security Pins CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583029"
+      },
+      {
+        "id": 41998582349,
+        "name": "MARINA Local Demo Docker Compose CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582349"
+      },
+      {
+        "id": 41998583718,
+        "name": "Owner Ops Corrections CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583718"
+      },
+      {
+        "id": 41998583339,
+        "name": "Guest OS Requests CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583339"
+      },
+      {
+        "id": 41998583954,
+        "name": "Management Kitchen Guest CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583954"
+      },
+      {
+        "id": 41998583645,
+        "name": "PMS Chessboard Mutation CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583645"
+      },
+      {
+        "id": 41998583471,
+        "name": "Resort OS Release Gate",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583471"
+      },
+      {
+        "id": 41998583587,
+        "name": "Guest Services Center CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583587"
+      },
+      {
+        "id": 41998583574,
+        "name": "Resort Core CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583574"
+      },
+      {
+        "id": 41998583584,
+        "name": "Service Point QR CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998583584"
+      },
+      {
+        "id": 41998581172,
+        "name": "MARINA HOLD Contract CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581172"
+      },
+      {
+        "id": 41998581604,
+        "name": "PostgreSQL Backup Restore CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581604"
+      },
+      {
+        "id": 41998581972,
+        "name": "MARINA Shared GreenAPI Owner QR RC6 CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581972"
+      },
+      {
+        "id": 41998581146,
+        "name": "MARINA RC1 Source Lock and Regression CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581146"
+      },
+      {
+        "id": 41998581058,
+        "name": "MARINA SMART API Image CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581058"
+      },
+      {
+        "id": 41998581600,
+        "name": "MARINA Booking Acquiring Preflight CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581600"
+      },
+      {
+        "id": 41998581296,
+        "name": "MARINA Room Wayfinding CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581296"
+      },
+      {
+        "id": 41998581638,
+        "name": "MARINA Shared RC3 Source Integrity CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581638"
+      },
+      {
+        "id": 41998582014,
+        "name": "MARINA Shared Server Mobile Task Contracts CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582014"
+      },
+      {
+        "id": 41998581302,
+        "name": "Production Migration Baseline CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581302"
+      },
+      {
+        "id": 41998581581,
+        "name": "MARINA HOLD zz114 Migration and Rollback CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581581"
+      },
+      {
+        "id": 41998581786,
+        "name": "Payment Idempotency CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581786"
+      },
+      {
+        "id": 41998581091,
+        "name": "MARINA SMART Staging Readiness Contract CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581091"
+      },
+      {
+        "id": 41998581920,
+        "name": "MARINA Two-Hotel Guest QR HTTPS CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581920"
+      },
+      {
+        "id": 41998581963,
+        "name": "Public Site Truth CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581963"
+      },
+      {
+        "id": 41998581933,
+        "name": "DNS Rollback Gate CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581933"
+      },
+      {
+        "id": 41998581744,
+        "name": "MARINA Shared Inbox RC5 Two-Hotel HTTPS CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581744"
+      },
+      {
+        "id": 41998581722,
+        "name": "Admin Runtime Truth CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581722"
+      },
+      {
+        "id": 41998581684,
+        "name": "Admin Guest PIN and i18n CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581684"
+      },
+      {
+        "id": 41998581934,
+        "name": "Three Crowns AI Administrator CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581934"
+      },
+      {
+        "id": 41998581903,
+        "name": "MARINA Shared GREEN-API RC8 Human Outbound CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581903"
+      },
+      {
+        "id": 41998581782,
+        "name": "Unified Inbox CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581782"
+      },
+      {
+        "id": 41998581525,
+        "name": "Staff Roles CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581525"
+      },
+      {
+        "id": 41998581624,
+        "name": "MARINA Shared Operations RBAC CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581624"
+      },
+      {
+        "id": 41998581629,
+        "name": "Public Browser Acceptance CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581629"
+      },
+      {
+        "id": 41998581609,
+        "name": "MARINA SMART Hotel Setup CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581609"
+      },
+      {
+        "id": 41998581693,
+        "name": "Workflow Branch Truth CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581693"
+      },
+      {
+        "id": 41998582020,
+        "name": "Production Monitoring Contract CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582020"
+      },
+      {
+        "id": 41998581613,
+        "name": "MARINA QR Guest Review CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581613"
+      },
+      {
+        "id": 41998581514,
+        "name": "MARINA Shared WhatsApp Workspace Browser CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581514"
+      },
+      {
+        "id": 41998582090,
+        "name": "MARINA Shared Guest RC4 Compose Rollback CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582090"
+      },
+      {
+        "id": 41998581876,
+        "name": "MARINA Shared HOLD P0 Two-Hotel TTL and Expiry CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581876"
+      },
+      {
+        "id": 41998581749,
+        "name": "MARINA Shared HTTPS Staging Compose CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581749"
+      },
+      {
+        "id": 41998581414,
+        "name": "Hotel Business Date CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581414"
+      },
+      {
+        "id": 41998581262,
+        "name": "Beget Production Hardening CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581262"
+      },
+      {
+        "id": 41998581976,
+        "name": "Three Crowns Dependency Security Inspection",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581976"
+      },
+      {
+        "id": 41998581913,
+        "name": "Owner Intelligence CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581913"
+      },
+      {
+        "id": 41998581737,
+        "name": "NFC Deferred Scope CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581737"
+      },
+      {
+        "id": 41998581951,
+        "name": "MARINA SMART Full Stack Synthetic Smoke",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581951"
+      },
+      {
+        "id": 41998581779,
+        "name": "Site Content Runtime CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581779"
+      },
+      {
+        "id": 41998581762,
+        "name": "PMS Owner Grid CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581762"
+      },
+      {
+        "id": 41998581795,
+        "name": "MARINA Shared Third Hotel Additive Onboarding CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581795"
+      },
+      {
+        "id": 41998581819,
+        "name": "Database Dependency Security CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581819"
+      },
+      {
+        "id": 41998582000,
+        "name": "MARINA Shared Staff P0 Two-Hotel Lifecycle CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998582000"
+      },
+      {
+        "id": 41998581997,
+        "name": "Realtime PMS and Dining CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581997"
+      },
+      {
+        "id": 41998581634,
+        "name": "MARINA Two-Property Isolation and Restore CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581634"
+      },
+      {
+        "id": 41998581865,
+        "name": "marina-ai-embedded-ci",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581865"
+      },
+      {
+        "id": 41998581895,
+        "name": "Reception PMS RBAC CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581895"
+      },
+      {
+        "id": 41998581848,
+        "name": "Hotel Operations CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581848"
+      },
+      {
+        "id": 41998581998,
+        "name": "Control Center Monorepo Contract CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581998"
+      },
+      {
+        "id": 41998581496,
+        "name": "Three Crowns Single Server Production Package CI",
+        "conclusion": "success",
+        "url": "https://github.com/stvelikiy-star/resort-os/actions/runs/41998581496"
+      }
+    ]
+  },
+  "accepted_isolated_staging": [
+    "RECEPTION core-rate booking",
+    "RECEPTION opted-in CASH recording and idempotency",
+    "COOK to assigned WAITER service lifecycle",
+    "AGENT same-hotel active company binding, booking, revocation and inactive-grid denial",
+    "two-hotel browser resource and role isolation"
+  ],
+  "historical_source_locks": [
+    "release/marina-smart-current-candidate.json",
+    "release/marina-smart-shared-rc3.json"
+  ],
+  "historical_lock_policy": "Historical RC2/RC3 manifests and migration checksums remain immutable. This integration evidence does not rebaseline either source lock.",
+  "external_staging_verified": false,
+  "backup_restore_target_verified": false,
+  "production_cutover_authorized": false,
+  "production_deployed": false,
+  "real_whatsapp_ai_verified": false,
+  "remaining_launch_gaps": [
+    "Remaining shared-role workspaces and complete guest request/order/folio lifecycle",
+    "Real GREEN-API delivery and reconnect on two hotel instances",
+    "MARINA AI per-hotel knowledge and human handoff",
+    "Live acceptance of launch-required external integrations",
+    "Target Ubuntu permanent HTTPS, monitoring, backup restore and rollback",
+    "Final single-version acceptance and explicit production decision"
+  ],
+  "metadata_policy": "application_source_commit identifies tested code before this documentation commit. CI results must never be copied onto a later code revision."
+}

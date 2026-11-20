@@ -1,0 +1,136 @@
+/* MARINA SMART Future Luxury 2.0 — actual OWNER Core finance.
+   Presentation only: all Core financial figures and read-only controls remain. */
+html[data-marina-ui="future-luxury"] .hotel-finance-shell{
+  --f-bg:#0c2b3d;--f-raised:#174052;--f-line:rgba(78,200,216,.30);
+  --f-ink:#f0fbff;--f-muted:#bdd5de;
+  max-width:none;box-sizing:border-box;
+  padding:clamp(13px,1.7vw,25px);gap:clamp(13px,1.3vw,19px);
+  color:var(--f-ink);
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell>.work-head{
+  background:linear-gradient(115deg,#09283c,#135263);
+  border:1px solid var(--f-line);border-radius:21px;
+  padding:clamp(20px,2.3vw,31px);box-shadow:0 15px 35px rgba(0,8,24,.12);
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell>.work-head h1{
+  color:#f5fcff;font-size:clamp(27px,2.7vw,38px);letter-spacing:-.04em;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell>.work-head .eyebrow{color:#e8c587}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell>.work-head .subtitle{
+  color:#c7dce5;line-height:1.6;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-notice{
+  background:#443b2e;border:1px solid #a48957;border-radius:14px;
+  color:#ffebc6;padding:15px 18px;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-notice :is(span,strong){color:#ffebc6}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-filters{
+  display:flex;align-items:center;flex-wrap:wrap;gap:12px;
+  background:var(--f-bg);border:1px solid var(--f-line);
+  padding:15px;border-radius:15px;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-filters :is(input,select){
+  min-height:44px;color:var(--f-ink);background:var(--f-raised);
+  border:1px solid var(--f-line);border-radius:10px;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-filters :is(small,span){color:var(--f-muted)}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis>article,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-section{
+  min-width:0;box-sizing:border-box;padding:clamp(15px,1.5vw,22px);
+  border:1px solid var(--f-line);border-radius:17px;
+  color:var(--f-ink);background:linear-gradient(153deg,#14384b,#0b2839);
+  box-shadow:0 11px 25px rgba(0,9,24,.1);
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis>article{
+  min-height:110px;border-top:3px solid #35cfd4;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis strong,
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-state-grid strong{
+  color:var(--f-ink);font-variant-numeric:tabular-nums;
+  font-size:clamp(20px,1.9vw,28px);overflow-wrap:anywhere;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell :is(.finance-kpis,.finance-state-grid) :is(span,small),
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .section-head>span{color:var(--f-muted);font-size:11px}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-split-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .section-head{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+  gap:12px;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--f-line);
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .section-head h2{
+  color:var(--f-ink);font-size:clamp(18px,1.5vw,22px);
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-state-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;padding:0;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-state-grid>div{
+  background:var(--f-raised);border:1px solid var(--f-line);
+  padding:13px;border-radius:11px;min-width:0;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .transaction-table-wrap{
+  max-width:100%;overflow:auto;border:1px solid var(--f-line);border-radius:12px;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .transaction-table{
+  min-width:680px;width:100%;font-variant-numeric:tabular-nums;border-collapse:collapse;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .transaction-table th{
+  background:#1b495c;color:#d7eef0;border-bottom:1px solid var(--f-line);
+  padding:13px 12px;font-size:10px;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .transaction-table td{
+  color:var(--f-ink);border-bottom:1px solid var(--f-line);padding:12px;font-size:12px;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell :is(.finance-method-list,.finance-day-list)>div{
+  background:var(--f-raised);border:1px solid var(--f-line);
+  padding:11px;border-radius:10px;margin-bottom:7px;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell :is(.finance-method-list,.finance-day-list) :is(span,b){color:var(--f-ink)}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-footnote{color:var(--f-muted);border-color:var(--f-line)}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell :is(button,input,select):focus-visible{
+  outline:3px solid #eac585;outline-offset:2px;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell{
+  --f-bg:#fff;--f-raised:#eef8fa;--f-line:#c7e0e8;--f-ink:#123a4d;--f-muted:#507181;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell>.work-head{
+  background:linear-gradient(110deg,#fff,#e8f5f9);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell>.work-head h1{color:var(--f-ink)}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell>.work-head .eyebrow{color:#895b19}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell>.work-head .subtitle{color:var(--f-muted)}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-notice{
+  background:#fff4df;color:#71511b;border-color:#d7bc84;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-notice :is(span,strong){color:#71511b}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell :is(.finance-kpis>article,.finance-section){
+  background:linear-gradient(160deg,#fff,#f1f9fb);border-color:var(--f-line);color:var(--f-ink);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .finance-filters :is(input,select){background:#fff;color:var(--f-ink)}
+html[data-marina-ui="future-luxury"][data-fl2-theme="light"] .hotel-finance-shell .transaction-table th{background:#e5f3f6;color:#315b6b}
+@media(max-width:1050px){
+  html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-split-grid{grid-template-columns:1fr}
+}
+@media(max-width:550px){
+  html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis{grid-template-columns:1fr}
+  html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-state-grid{grid-template-columns:1fr}
+  html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-filters :is(input,select,button){width:100%}
+}
+@media(prefers-reduced-motion:reduce){
+  html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-section{animation:none!important;transition:none!important}
+}
+/* Financial actions must remain easy to tap in dense desktop/mobile layouts. */
+html[data-marina-ui="future-luxury"] .hotel-finance-shell :is(.work-head,.finance-filters) button{
+  min-height:44px;
+  border-radius:11px;
+}
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-filters .btn.primary:not(:disabled){
+  background:linear-gradient(105deg,#16bdc6,#4bdfd9);
+  color:#082c37;
+  border-color:#32cbd1;
+  font-weight:850;
+}

@@ -1,0 +1,1365 @@
+import { StockReceipt, StockReceiptAck, stockReceipt, stockReceiptAck, receiptUuid } from './stockReceipt';
+import { AGENT_SERVICES, AgentServiceCode, AgentServiceDraft, agentServiceDraft, agentServiceList } from './agentServices';
+import { kitchenRecipe, ingredientRequirements } from './kitchenRecipes';
+import type { KitchenRecipe, IngredientRequirements, RecipeInput } from './kitchenRecipes';
+import { clientSessionGuard } from './unauthorizedSession';
+import { useMemo } from 'react';
+import { useSession } from '../state/session';
+import { isTrustedHotelOrigin } from './hotels';
+import { createHotelHttpClient, HttpMethod } from './http';
+import { ApiError } from './types';
+import type { AuthMode } from './types';
+import { safeRouteId, safeIsoDate } from './routeId';
+import { diningStaysResponse, diningStayEntitlementsResponse, diningMealPlanAck, diningProductionSnapshotsResponse, stayAck, kitchenStatusAck, conversationStatusAck, conversationClaimAck, noteAck, waiterClaimAck, objectResponse, kitchenOrdersResponse, diningFloorResponse, assistantCapabilitiesResponse, assistantAnswerResponse, receptionResponse, dashboardResponse, gridResponse, inboxListResponse, conversationResponse, bookingPreviewResponse, bookingCommitResponse, holdListResponse, holdCreateResponse, holdReleaseResponse, financeSummaryResponse } from './contractValidation';
+import { CONFIRMED_BACKEND_FEATURES } from './features';
+export { AGENT_SERVICES } from './agentServices';
+export type { AgentServiceCode } from './agentServices';
+
+export type WhatsAppDeliveryStatus = 'QUEUED' | 'SENT' | 'DELIVERED' | 'READ';
+export interface OutboundCapabilities { whatsapp: { configured: boolean; human_only: boolean; queued_only: boolean; max_text_length: number } }
+export interface OutboundAck { conversation_id: string; message_id: string; delivery_status: WhatsAppDeliveryStatus; idempotent_replay: boolean; counts_as_response: boolean; auto_sent: false }
+export type ConversationStatus = 'OPEN' | 'WAITING_GUEST' | 'WAITING_STAFF' | 'RESOLVED' | 'ARCHIVED';
+export interface Conversation {
+  id: string; channel_kind: string; channel_name: string | null; status: ConversationStatus;
+  contact_name: string | null; contact_phone: string | null; assigned_to_id: string | null;
+  assigned_to_name: string | null; last_message_text: string | null; last_message_at: string | null;
+  needs_reply: boolean; waiting_seconds: number | null;
+}
+export interface ConversationMessage {
+  id: string; direction: 'INBOUND' | 'OUTBOUND' | 'INTERNAL'; text: string | null;
+  created_at: string; delivery_status?: string | null;
+}
+export interface ConversationDetail { conversation: Conversation; messages: ConversationMessage[] }
+export interface ReceptionReservation {
+  id: string; bookingNumber: string; status: string; checkIn: string; checkOut: string;
+  firstName: string | null; phone: string | null; room_code: string | null;
+  room_state: string | null; totalKgs: number; paidKgs: number; remainingKgs: number;
+}
+export interface ReceptionList { local_date: string; items: ReceptionReservation[] }
+export interface GridBlock {
+  id: string; type: string; start: string; end: string; reservation_id: string | null;
+  booking_number: string | null; guest_name: string | null;
+}
+export interface GridRoom {
+  id: string; code: string; name: string | null; room_type_name: string;
+  operational_state: string; blocks: GridBlock[];
+}
+export interface Grid { property: string; start: string; end: string; rooms: GridRoom[] }
+export interface Dashboard {
+  property: { name: string; local_date: string; currency: string };
+  rooms: { total: number; clean: number; dirty: number; in_inspection: number; tech_block: number };
+  stays: { occupancy_percent: number; occupied_rooms: number; arrivals_today: number; departures_today: number };
+  communications: { active: number; needs_reply: number };
+  finance: { confirmed_payments_today_kgs: number; active_reservations_remaining_kgs: number };
+  tasks: { urgent_active: number; housekeeping_active: number; maintenance_active: number };
+  today: { arrivals: { id: string; booking_number: string; guest_name: string | null; room_code: string | null }[];
+    departures: { id: string; booking_number: string; guest_name: string | null; room_code: string | null }[] };
+  attention_tasks: { id: string; title: string; priority: string; room_code: string | null }[];
+}
+export interface BookingPreview {
+  room: { id: string; code: string; room_type_name: string };
+  check_in: string; check_out: string; nights: number; can_commit: boolean;
+  conflicts: { block_type: string; start: string; end: string }[];
+  pricing: { source: 'CORE_RATE' | 'MANAGER_OVERRIDE'; sellable: boolean; total_kgs: number | null; discount_percent: number; reason?: string | null };
+}
+export interface ScheduleSegment { room_id: string; start: string; end: string }
+export interface SchedulePreview {
+  reservation: { version: string }; can_commit: boolean;
+  proposed_check_in: string; proposed_check_out: string;
+  conflicts: unknown[]; pricing: { suggested_total_kgs: number | null; delta_kgs: number | null };
+}
+export interface ScheduleCommitAck { ok: true; reservation_id: string; version: string; check_in: string; check_out: string }
+export interface BookingDraft {
+  room_id: string; check_in: string; check_out: string; adults: number; children: number;
+  guest_phone: string;
+}
+export interface BookingCommit extends BookingDraft {
+  guest_name: string; phone: string; expected_total_kgs: number; expected_pricing_source: 'CORE_RATE' | 'MANAGER_OVERRIDE';
+}
+export interface Hold {
+  id: string; roomId: string; checkIn: string; checkOut: string; guestName: string; expiresAt: string;
+}
+export interface KitchenAvailabilityItem {
+  id: string; code: string; name_ru: string; name_kg: string; name_kz: string;
+  name_en: string; is_available: boolean;
+}
+export interface KitchenAvailabilityAck {
+  id: string; is_available: boolean; already_set: boolean; reason: string;
+}
+export interface KitchenStockItem {
+  id:string; name:string; unit:'KG'|'L'|'PCS'; cost_per_unit_kgs:string; is_sample:boolean; balance:string;
+}
+export interface KitchenStockSnapshot {
+  items:KitchenStockItem[]; production_cost_kgs:string;
+  inventory_deducted_only_on_explicit_consume:true;
+  new_loss_movement_id?:string;
+  new_receipt_movement_id?:string;
+}
+export interface KitchenProcurementNeed {
+  stock_item_id:string|null; name:string; unit:'KG'|'L'|'PCS';
+  remaining_needed:string; balance:string; shortage:string;
+  pending_requests:string; approved_inbound:string; shortage_after_pipeline:string; estimated_unit_cost_kgs:string|null;
+}
+export interface KitchenProcurementNeeds {
+  service_date:string; basis:'APPROVED_NON_SAMPLE_REMAINING_PRODUCTION';
+  is_complete:boolean; missing_recipes:{menu_item_id:string;name_ru:string}[];
+  excluded_sample_targets:number; inventory_deducted:false; payment_created:false;
+  items:KitchenProcurementNeed[];
+}
+export interface KitchenSupplierSource {
+  id:string;stock_item_id:string;document_id:string;
+  supplier_name:string;document_reference:string;unit_cost_kgs:string;remaining_quantity:string;
+}
+export type KitchenProcurementStatus='REQUESTED'|'APPROVED'|'PARTIAL'|'RECEIVED';
+export interface KitchenProcurementRow {
+  id:string;stock_item_id:string;stock_name:string;unit:'KG'|'L'|'PCS';
+  is_sample:boolean;quantity:string;received_quantity:string;status:KitchenProcurementStatus;
+  service_date:string|null;notes:string|null;requested_by_id:string|null;
+  approved_by_id:string|null;created_at:string;
+}
+export interface KitchenProcurementList {
+  items:KitchenProcurementRow[]; payment_created:false;
+  new_request_id:string;new_receipt_id:string;
+}
+export type KitchenLossKind = 'WASTE'|'SPOILAGE';
+export interface KitchenLossRecord {
+  id:string;stock_item_id:string;stock_name:string;unit:'KG'|'L'|'PCS';
+  is_sample:boolean;kind:KitchenLossKind;quantity:string;unit_cost_kgs:string;
+  cost_kgs:string;reason:string;created_by_id:string|null;created_at:string;
+}
+export interface KitchenLossMutation {
+  movement_id:string;stock_item_id:string;kind:KitchenLossKind;quantity:string;reason:string;
+}
+export interface KitchenLossAcknowledgment {
+  id:string;already_processed:boolean;quantity:string;cost_kgs:string;payment_created:false;
+}
+export interface KitchenStockConsumeAck {
+  consumed_portions:number; already_processed:boolean; cost_kgs:string; payment_created:false;
+}
+export interface OwnerDeliveredRevenueSources {
+  scope:'OWNER_ONLY_PROPERTY_SCOPED';
+  period:{from:string;to:string;timezone:string;currency:'KGS'};
+  accommodation:{
+    qualified_reservations:number;delivered_booked_nights_count:number;
+    allocated_booking_face_value_kgs:string;night_preview_limit:number;
+    night_preview_truncated:boolean;
+    night_preview:{reservation_id:string;service_date:string;allocated_booking_face_value_kgs:string}[];
+    excluded_reservations_count:number;
+    exclusion_reasons:Record<string,number>;
+    qualified_source:'CHECKED_OUT_RESERVATION_WITH_MATCHED_ACTUAL_STAY';
+    rate_quality:'BOOKING_TOTAL_DISTRIBUTED_EVENLY_NOT_APPROVED_NIGHTLY_RATE';
+  };
+  dining:{
+    served_orders_count:number;served_orders_face_value_kgs:string;
+    served_with_matching_folio_count:number;single_source_folio_linked_candidate_kgs:string;
+    excluded_orders_count:number;exclusion_reasons:Record<string,number>;
+    non_dining_active_folio_charges:number;non_dining_folio_face_value_kgs:string;
+    non_dining_undated_folio_count:number;
+    kitchen_and_folio_double_counted:false;
+  };
+  recognition:{
+    recognized_lodging_revenue_kgs:null;recognized_dining_revenue_kgs:null;
+    recognized_other_services_revenue_kgs:null;recognized_total_revenue_kgs:null;
+    status:'SERVICE_DELIVERY_CANDIDATES_NOT_ACCOUNTING_POSTINGS';
+    requires_rate_package_tax_discount_and_refund_reconciliation:true;
+    requires_approved_immutable_revenue_journal:true;
+    cash_received_as_revenue:false;
+    automatic_posting:false;
+  };
+}
+export interface OwnerAccrualReadiness {
+  documented_source_corrections:{
+    recorded_corrections_count:number;
+    reversed_corrections_count:number;
+    active_by_kind_kgs:Record<'DISCOUNT'|'PACKAGE_SPLIT'|'CANCELLATION'|'REFUND'|'TAX_COMPONENT',string>;
+    metadata_only_documents_not_independently_verified:true;
+    server_verified_document_bytes_count:number;
+    missing_document_bytes_count:number;
+    all_recorded_document_bytes_available:boolean;
+    document_issuer_authenticity_independently_verified:false;
+    refunds_are_cash_evidence_not_recognized_revenue:true;
+    tax_and_packages_are_classifications_not_expenses:true;
+    recognized_revenue_kgs:null;recognized_profit_kgs:null;
+    status:'SOURCE_CORRECTIONS_NOT_ACCOUNTING_POSTINGS';
+  };
+  source_approval_journal:{
+    approval_events_count:number;
+    reversal_events_count:number;
+    active_room_nights_count:number;
+    active_served_dining_count:number;
+    active_source_face_value_kgs:string;
+    status:'SOURCE_APPROVAL_NOT_ACCOUNTING_RECOGNITION';
+    recognized_revenue_kgs:null;
+    recognized_profit_kgs:null;
+  };
+  delivered_revenue_sources:OwnerDeliveredRevenueSources;
+  scope:'OWNER_ONLY_PROPERTY_SCOPED';
+  period:{from:string;to:string;timezone:string;currency:'KGS'};
+  posted_owner_obligations:{
+    posted_total_kgs:string;non_stock_obligations_candidate_kgs:string;
+    stock_overlap_review_kgs:string;posted_count:number;
+    categories_kgs:Record<string,string>;
+    status:'CLASSIFICATION_REQUIRED'|'POSTED_NOT_RECOGNIZED';
+    matching_supplier_invoice_count:number;matching_supplier_invoice_kgs:string;
+  };
+  kitchen_cost_movements:{
+    production_cost_candidate_kgs:string;loss_cost_candidate_kgs:string;
+    receipt_inventory_inflow_kgs:string;supplier_return_inventory_debit_kgs:string;
+    sample_movement_gross_kgs:string;costs_are_reconciled_to_revenue:false;
+  };
+  revenue_source_candidates:{
+    served_dining_orders_count:number;served_dining_face_value_kgs:string;
+    served_without_linked_folio_count:number;served_without_linked_folio_kgs:string;
+    served_with_active_folio_count:number;served_with_active_folio_kgs:string;
+    disputed_dining_folio_count:number;
+    manual_folio_active_count:number;manual_folio_face_value_kgs:string;
+    manual_folio_without_service_date_count:number;
+    checked_out_reservations_count:number;checked_out_booked_total_kgs:string;
+    amounts_are_not_additive_or_recognized:true;
+  };
+  source_valuation:{
+    inventory_valuation_status:'MOVEMENT_BASED'|'RECONCILIATION_REQUIRED';
+    source_mismatch_count:number;supplier_return_credit_minus_stock_cost_kgs:string;
+    supplier_payables_outstanding_kgs:string;
+  };
+  recognition:{
+    status:'REQUIRES_APPROVED_RECOGNITION_LEDGER';
+    blockers:string[];
+    recognized_revenue_kgs:null;recognized_expenses_kgs:null;recognized_profit_kgs:null;
+    completeness_verified:false;customer_payments_are_revenue:false;
+    supplier_settlements_are_expenses:false;receipts_are_expenses:false;
+    source_candidates_are_recognized:false;
+  };
+}
+export interface FinanceSummary {
+  owner_accrual_readiness_snapshot?:OwnerAccrualReadiness;
+  kitchen_stock_cost?: {real_production_cost_kgs: string; sample_production_cost_kgs: string;
+    movement_count: number; basis: 'EXPLICIT_STOCK_CONSUMPTION_NOT_PAYMENT_OR_PROFIT'};
+  range: { from: string; to: string; currency: string };
+  period_payments: { received_kgs: number; pending_created_kgs: number; received_count: number;
+    pending_created_count?: number; failed_count?: number; cancelled_count?: number };
+  receivables_snapshot: { outstanding_kgs: number; debtor_count: number;
+    checked_out_count?: number; checked_out_kgs?: number; in_house_count?: number; in_house_kgs?: number;
+    pre_arrival_count?: number; pre_arrival_kgs?: number };
+  active_reservations_snapshot: { reservation_count: number; outstanding_kgs: number;
+    booked_total_kgs?: number; received_kgs?: number };
+  /** Optional to support older server versions. Current RC409 supplies all of these.
+   * Missing fields must be omitted from UI, NEVER replaced by invented zero values. */
+  received_by_method?: { method: string; amount_kgs: number; payment_count: number }[];
+  received_by_day?: { local_date: string; amount_kgs: number; payment_count: number }[];
+  awaiting_prepayment_snapshot?: { request_count: number; required_kgs: number;
+    received_kgs: number; remaining_kgs: number };
+  refunded_snapshot_all_time?: { amount_kgs: number; payment_count: number };
+  finance_exceptions?: { snapshot: { overpaid_count: number; overpaid_kgs: number;
+    cancelled_with_received_count: number; cancelled_with_received_kgs: number } };
+  debtors?: { reservation_id: string; booking_number: string; status: string;
+    guest_name?: string | null; room_code?: string | null; remaining_kgs: number }[];
+  recent_payments?: { id: string; amount_kgs: number; method: string; status: string;
+    booking_number?: string | null; guest_name?: string | null }[];
+}
+export type KitchenCostMovementKind='RECEIPT'|'PRODUCTION'|'WASTE'|'SPOILAGE'|'SUPPLIER_RETURN';
+export interface OwnerKitchenCostSegment {cost_kgs:string;movement_count:number}
+export type OwnerKitchenCostKinds=Record<KitchenCostMovementKind,OwnerKitchenCostSegment>;
+export interface OwnerKitchenSourceReconciliation {
+  inventory:{
+    real_book_inventory_value_kgs:string|null;
+    sample_book_inventory_value_kgs:string|null;
+    real_catalog_estimate_kgs:string;
+    sample_catalog_estimate_kgs:string;
+    valuation_status:'MOVEMENT_BASED'|'RECONCILIATION_REQUIRED';
+    invalid_item_count:number;item_count:number;as_of:'CURRENT_SNAPSHOT_NOT_PERIOD_END';
+    linked_source:{
+      receipt_count:number;original_stock_cost_kgs:string;invoice_source_cost_kgs:string;
+      legacy_invoice_vs_stock_cost_delta_kgs:string;source_mismatch_count:number;
+      source_status:'REVIEW_LEGACY_LINKED_RECEIPT_COST'|'LINKED_MOVEMENTS_MATCH_INVOICE';
+    };
+  };
+  supplier_documents:{
+    document_count:number;gross_obligations_kgs:string;manual_settlements_kgs:string;
+    credit_notes_kgs:string;outstanding_payables_kgs:string;
+    return_count:number;return_stock_carrying_cost_kgs:string;
+    return_credit_minus_stock_cost_kgs:string;
+    payables_status:'RECONCILIATION_REQUIRED'|'RECORDED_OBLIGATIONS_BALANCED';
+  };
+  financial_truth:{
+    recognized_revenue_kgs:null;recognized_profit_kgs:null;
+    is_recognized_profit_complete:false;
+    supplier_settlements_are_customer_payments:false;stock_receipts_are_expenses:false;
+    stock_return_credit_difference_recognized:false;
+    scope:'CURRENT_PROPERTY_POSTED_FACTS_NOT_PERIOD_END';
+  };
+}
+export interface OwnerKitchenManagementReport {
+  scope:'OWNER_ONLY_PROPERTY_SCOPED';
+  period:{from:string;to:string;timezone:string};
+  real_inventory_movements:OwnerKitchenCostKinds;
+  sample_inventory_movements:OwnerKitchenCostKinds;
+  real_production_cost_kgs:string;
+  real_loss_cost_kgs:string;
+  real_total_consumption_and_loss_cost_kgs:string;
+  real_supplier_return_stock_debit_kgs:string;
+  source_reconciliation:OwnerKitchenSourceReconciliation;
+  current_stock:{
+    real_value_at_current_item_cost_kgs:string;
+    sample_value_at_current_item_cost_kgs:string;
+    real_book_inventory_value_kgs:string|null;
+    sample_book_inventory_value_kgs:string|null;
+    valuation_status:'MOVEMENT_BASED'|'RECONCILIATION_REQUIRED';
+    invalid_item_count:number;
+    negative_balance_items:number;item_count:number;valuation_as_of:'CURRENT_NOT_PERIOD_END';
+  };
+  procurement_exposure:{
+    approved_unreceived_at_current_item_cost_kgs:string;
+    unapproved_requests_at_current_item_cost_kgs:string;
+    approved_open_request_count:number;pending_approval_count:number;
+    settled_supplier_payables_kgs:string;
+    gross_supplier_obligations_kgs:string;
+    credited_supplier_payables_kgs:string;
+    outstanding_supplier_payables_kgs:string;
+  };
+  truth:{report_type:'MANAGEMENT_OPERATIONAL_COSTS_NOT_ACCOUNTING';
+    payment_created:false;profit:'NOT_AVAILABLE_WITHOUT_RECOGNIZED_REVENUE_AND_EXPENSE_LEDGER';
+    receipt:string;consumption:string;procurement:string;inventory:string;returns:string};
+}
+export type OwnerExpenseCategory='SUPPLIES'|'UTILITIES'|'PAYROLL'|'MAINTENANCE'|'RENT'|'MARKETING'|'OTHER';
+export type OwnerExpenseMethod='CASH'|'BANK_TRANSFER'|'CARD'|'OTHER';
+export interface OwnerExpenseRow {
+ id:string;expense_date:string;category:OwnerExpenseCategory;title:string;amount_kgs:number;
+ settled_kgs:number;outstanding_kgs:number;status:'POSTED'|'VOID';
+ supplier_name:string|null;document_reference:string|null;notes:string|null;
+ created_by_id:string|null;void_reason:string|null;created_at:string;
+}
+export interface OwnerExpenseLedger {
+ items:OwnerExpenseRow[];preview_limit:500;preview_truncated:boolean;
+ new_expense_id:string;new_settlement_id:string;
+ totals:{posted_expenses_kgs:number;settled_against_period_expenses_kgs:number;
+   outstanding_kgs:number;posted_count:number};
+ scope:'OWNER_ONLY_PROPERTY_SCOPED';payment_created:false;
+ truth:'POSTED_OBLIGATION_NOT_AUTOMATIC_PAYMENT_OR_PROFIT';
+}
+export interface OwnerRecordedCashMovements {
+ scope:'OWNER_ONLY_PROPERTY_SCOPED';
+ period:{from:string;to:string;currency:string;timezone:string};
+ customer_payments_received_kgs:number;customer_payments_received_count:number;
+ owner_expense_manual_settlements_kgs:number;owner_expense_manual_settlements_count:number;
+ observed_recorded_difference_kgs:number;
+ owner_expenses_posted_for_period_kgs:number;owner_expenses_posted_count:number;
+ all_time_unsettled_expenses_kgs:number;
+ truth:{report_type:'OBSERVED_CASH_RECORDS_NOT_RECOGNIZED_PROFIT';
+  recognized_profit_kgs:null;verified_bank_balance_kgs:null;
+  refunds_reconciled:false;completeness_verified:false;payment_created:false;reason:string};
+}
+export interface AssistantMessage { role: 'user' | 'assistant'; content: string }
+export interface AssistantCapabilities { configured: boolean; read_only: boolean; can_mutate: boolean; live_read_only: boolean; role: string; property_code: string }
+export interface AssistantAnswer { answer: string; read_only: true; live_context_available: boolean; hotel_rules_version: number; property_code: string; role: string; current_screen: string }
+export type KitchenStatus = 'NEW' | 'ACCEPTED' | 'COOKING' | 'READY' | 'SERVED' | 'CANCELLED';
+export interface KitchenOrderItem {
+  id?: string; name?: string; name_ru?: string; name_kg?: string;
+  name_en?: string; name_kz?: string | null; quantity?: number;
+}
+export interface KitchenOrder {
+  id: string; order_number: string; status: KitchenStatus;
+  table_code: string | null; room_code: string | null; total_kgs: number;
+  source?: string; meal_type?: string | null; guest_count?: number;
+  notes: string | null; items: KitchenOrderItem[];
+}
+/** GET /api/v1/dining/production-snapshots: explicit *included* portions,
+ * separate from à-la-carte orders. A frozen baseline is never silently rewritten. */
+export const KITCHEN_MENU_CATEGORIES = ['BREAKFAST', 'SOUP', 'SALAD', 'MAIN', 'SIDE', 'DESSERT', 'DRINK'] as const;
+export type KitchenMenuDraft = {
+  code: string;
+  category: typeof KITCHEN_MENU_CATEGORIES[number];
+  name_ru: string;
+  name_kg: string;
+  name_en: string;
+  name_kz: string;
+  price_kgs: number;
+};
+
+export interface KitchenAuthorMenuItem extends KitchenMenuDraft {
+  id: string; is_active: boolean; is_draft: boolean; recipe: KitchenRecipe | null;
+}
+
+export interface KitchenProductionMenuItem {
+  recipe?: KitchenRecipe | null;
+  id: string; code: string; category: string;
+  name_ru: string; name_kg: string; name_en: string; name_kz: string;
+}
+export interface KitchenProductionTarget {
+  id: string; menu_item_id: string; service_date: string; meal_type: string;
+  planned_quantity: number; prepared_quantity: number; remaining_quantity: number;
+  name_ru: string; name_kg: string; name_en: string; name_kz: string; notes: string | null;
+  updated_at: string;
+}
+export interface KitchenProductionTargets {
+  from_date: string; through_date: string; items: KitchenProductionTarget[];
+  ingredient_requirements?: IngredientRequirements;
+}
+export type KitchenProductionInput = {
+  menu_item_id: string; service_date: string;
+  meal_type: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'OTHER';
+  planned_quantity: number; prepared_quantity: number;
+};
+
+export interface DiningProductionSnapshotMeal {
+  service_date: string; meal_type: 'BREAKFAST' | 'LUNCH' | 'DINNER';
+  current_adult_portions: number; current_child_portions: number;
+  current_total_portions: number; current_entitlement_count: number;
+  /** Newer Core: breakdown of verified meal portions by checked-in vs pending stays.
+   * Optional until the matching server candidate is deployed; never infer it. */
+  current_checked_in_adult_portions?: number; current_checked_in_child_portions?: number;
+  current_checked_in_total_portions?: number; current_checked_in_stay_count?: number;
+  current_expected_arrival_adult_portions?: number; current_expected_arrival_child_portions?: number;
+  current_expected_arrival_total_portions?: number; current_expected_arrival_stay_count?: number;
+  state: 'OPEN' | 'FROZEN'; cutoff_status: 'UNCONFIGURED' | 'BEFORE_CUTOFF' | 'CUTOFF_REACHED';
+  frozen_total_portions: number | null; delta_total_portions: number | null;
+  changed_since_snapshot: boolean; meal_start: string | null; cutoff_at: string | null;
+}
+export interface DiningProductionSnapshotDay {
+  service_date: string; meals: DiningProductionSnapshotMeal[];
+  /** Number of distinct stays/bookings with included meals, NOT unique guests. */
+  checked_in_stays_with_meals?: number; expected_arrival_stays_with_meals?: number;
+}
+export interface DiningProductionSnapshots { from_date: string; through_date: string; days: DiningProductionSnapshotDay[] }
+export interface DiningStay {
+  stay_id: string; stay_status: string; reservation_id: string; reservation_status: string;
+  booking_number: string; check_in: string; check_out: string;
+  adults: number; children: number; guest_name: string;
+  room_code: string | null; entitlement_count: number;
+}
+export interface DiningStays { local_date: string; items: DiningStay[] }
+export type MealType = 'BREAKFAST' | 'LUNCH' | 'DINNER';
+export interface DiningEntitlement {
+  id: string; stay_id: string; service_date: string; meal_type: MealType;
+  adult_portions: number; child_portions: number;
+  status: 'ACTIVE' | 'CANCELLED'; notes: string | null;
+}
+export interface DiningStayEntitlements {
+  stay: { id: string; booking_number: string; check_in: string; check_out: string; guest_name: string; room_code: string | null };
+  items: DiningEntitlement[];
+}
+export interface MealPlanDraft {
+  from_date: string; through_date: string; meals: MealType[];
+  adult_portions: number; child_portions: number; notes?: string | null; replace_range: false;
+}
+export interface MealPlanAck {
+  stay_id: string; updated_items: number; meals: MealType[];
+  from_date: string; through_date: string; adult_portions: number; child_portions: number;
+}
+
+export interface WaiterMenuItem {
+  id: string;
+  name_ru: string;
+  name_kg: string;
+  name_en: string;
+  name_kz: string;
+  price_kgs: number;
+}
+export interface DiningFloor {
+  tables: { id: string; code: string; name: string; status: string; seats: number }[];
+  orders: { id: string; order_number: string; status: string; table_code: string | null;
+    room_code: string | null; waiter_id: string | null; waiter_name: string | null }[];
+}
+export type DiningSeatingStatus = 'WAITING' | 'SEATED' | 'RELEASED' | 'CANCELLED';
+export interface DiningSeatingSession {
+  id: string; stay_id: string; reservation_id: string; table_id: string;
+  table_code: string; guest_name: string; room_code: string | null;
+  service_date: string; status: DiningSeatingStatus; party_size: number;
+  waiter_id: string | null; booking_number: string;
+}
+export interface DiningFolioOrder {
+  id: string; order_number: string; guest_name: string; table_code: string | null;
+  room_code: string | null; total_kgs: number; folio_charge_id: string | null;
+  eligible_to_post: boolean; financial_truth: 'FOLIO_CHARGE_NOT_PAYMENT' | 'NOT_POSTED';
+}
+export interface DiningFolioPostAck {
+  order_id: string; charge_id: string; idempotent_replay: boolean;
+  payment_created: false; financial_truth: 'OPEN_FOLIO_CHARGE_NOT_PAYMENT';
+}
+function seatingSession(value: unknown): DiningSeatingSession {
+  const row = objectResponse(value, 'dining seating session');
+  if (typeof row.id !== 'string' || typeof row.stay_id !== 'string' ||
+      typeof row.reservation_id !== 'string' || typeof row.table_id !== 'string' ||
+      typeof row.table_code !== 'string' || typeof row.guest_name !== 'string' ||
+      typeof row.booking_number !== 'string' || typeof row.service_date !== 'string' ||
+      !['WAITING','SEATED','RELEASED','CANCELLED'].includes(String(row.status)) ||
+      !Number.isSafeInteger(row.party_size) || Number(row.party_size) < 1 ||
+      !(row.waiter_id === null || typeof row.waiter_id === 'string') ||
+      !(row.room_code === null || typeof row.room_code === 'string')) {
+    throw new ApiError('UNKNOWN', 'Invalid dining seating response');
+  }
+  return { id:safeRouteId(row.id), stay_id:safeRouteId(row.stay_id),
+    reservation_id:safeRouteId(row.reservation_id), table_id:safeRouteId(row.table_id),
+    table_code:row.table_code, guest_name:row.guest_name, room_code:row.room_code,
+    service_date:safeIsoDate(row.service_date), status:row.status as DiningSeatingStatus,
+    party_size:Number(row.party_size), waiter_id:row.waiter_id === null ? null : safeRouteId(row.waiter_id),
+    booking_number:row.booking_number };
+}
+function folioOrder(value: unknown): DiningFolioOrder {
+  const row = objectResponse(value, 'dining folio order');
+  if (typeof row.id !== 'string' || typeof row.order_number !== 'string' ||
+      typeof row.guest_name !== 'string' || !Number.isSafeInteger(row.total_kgs) ||
+      Number(row.total_kgs) < 0 || typeof row.eligible_to_post !== 'boolean' ||
+      !(row.table_code === null || typeof row.table_code === 'string') ||
+      !(row.room_code === null || typeof row.room_code === 'string') ||
+      !(row.folio_charge_id === null || typeof row.folio_charge_id === 'string') ||
+      !['FOLIO_CHARGE_NOT_PAYMENT','NOT_POSTED'].includes(String(row.financial_truth))) {
+    throw new ApiError('UNKNOWN','Invalid dining folio response');
+  }
+  return { id:safeRouteId(row.id),order_number:row.order_number,
+    guest_name:row.guest_name,table_code:row.table_code,room_code:row.room_code,
+    total_kgs:Number(row.total_kgs),folio_charge_id:row.folio_charge_id,
+    eligible_to_post:row.eligible_to_post,
+    financial_truth:row.financial_truth as DiningFolioOrder['financial_truth'] };
+}
+
+export type ReceptionGuestRequest = {
+  id: string;
+  title: string;
+  description: string | null;
+  room_code: string | null;
+  service_date: string | null;
+  service_time: string | null;
+  assigned_to_id: string | null;
+  status: 'OPEN' | 'IN_PROGRESS';
+};
+
+export function createLiveModules(baseUrl: string, transport: typeof fetch = fetch, serverAuthMode: AuthMode | null = null, sessionIsActive?: () => boolean) {
+  const http = createHotelHttpClient(baseUrl, transport, sessionIsActive);
+  const request = <T,>(method: HttpMethod, path: string, body?: unknown, idempotencyKey?: string) => http.request<T>(method, path, body, idempotencyKey);
+  const p = '/api/v1';
+  const reviewGate = () => {
+    if (serverAuthMode === 'shared_auth_preview') {
+      // The reviewed server boundary returns 503 for these modules.
+      throw new ApiError('UNKNOWN', 'Workspace is unavailable in shared PMS staging');
+    }
+  };
+  return {
+    dashboard: async () => dashboardResponse(await request<unknown>('GET', p + '/admin/dashboard')),
+    financeSummary: async (from: string, to: string): Promise<FinanceSummary> => {
+      // Server OWNER/MANAGER + FINANCE permission guards remain authoritative;
+      // shared_auth_preview explicitly allows this read. No 503 bypass.
+      return financeSummaryResponse(await request<unknown>('GET', p + '/admin/finance/summary?from_date=' + safeIsoDate(from) + '&to_date=' + safeIsoDate(to)));
+    },
+    ownerKitchenManagement: async (from:string,to:string):Promise<OwnerKitchenManagementReport> => {
+      const value=objectResponse(await request<unknown>(
+        'GET',p+'/admin/finance/owner/kitchen-operations?from_date='+safeIsoDate(from)+
+        '&to_date='+safeIsoDate(to)),'owner kitchen management');
+      const money=/^(?:0|[1-9]\d*)(?:\.\d+)?$/;
+      const signed=/^-?(?:0|[1-9]\d*)(?:\.\d+)?$/;
+      const validAmount=(v:unknown,allowNegative=false):v is string=>
+        typeof v==='string'&&(allowNegative?signed:money).test(v)&&Number.isFinite(Number(v));
+      const count=(v:unknown):v is number=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0;
+      if(value.scope!=='OWNER_ONLY_PROPERTY_SCOPED'||
+         !value.real_inventory_movements||!value.sample_inventory_movements||
+         value.truth===null||typeof value.truth!=='object'||
+         (value.truth as Record<string,unknown>).report_type!=='MANAGEMENT_OPERATIONAL_COSTS_NOT_ACCOUNTING'||
+         (value.truth as Record<string,unknown>).payment_created!==false||
+         (value.truth as Record<string,unknown>).profit!=='NOT_AVAILABLE_WITHOUT_RECOGNIZED_REVENUE_AND_EXPENSE_LEDGER')
+         throw new ApiError('UNKNOWN','Invalid owner kitchen finance truth');
+      for(const field of ['real_inventory_movements','sample_inventory_movements']){
+        const set=objectResponse(value[field],field);
+        for(const kind of ['RECEIPT','PRODUCTION','WASTE','SPOILAGE','SUPPLIER_RETURN']){
+          const segment=objectResponse(set[kind],field+' '+kind);
+          if(!validAmount(segment.cost_kgs)||!count(segment.movement_count))
+            throw new ApiError('UNKNOWN','Invalid kitchen cost row');
+        }
+      }
+      for(const field of ['real_production_cost_kgs','real_loss_cost_kgs',
+        'real_total_consumption_and_loss_cost_kgs','real_supplier_return_stock_debit_kgs']){
+        if(!validAmount(value[field]))
+          throw new ApiError('UNKNOWN','Invalid kitchen cost total');
+      }
+      const exposure=objectResponse(value.procurement_exposure,'procurement exposure');
+      const stock=objectResponse(value.current_stock,'current inventory');
+      const reconciliation=objectResponse(value.source_reconciliation,'owner stock reconciliation');
+      const inventory=objectResponse(reconciliation.inventory,'movement valued inventory');
+      const linked=objectResponse(inventory.linked_source,'invoice source links');
+      const suppliers=objectResponse(reconciliation.supplier_documents,'supplier obligations');
+      const truth=objectResponse(reconciliation.financial_truth,'owner reconciliation truth');
+      if(stock.valuation_as_of!=='CURRENT_NOT_PERIOD_END'||
+         inventory.as_of!=='CURRENT_SNAPSHOT_NOT_PERIOD_END'||
+         !['MOVEMENT_BASED','RECONCILIATION_REQUIRED'].includes(String(inventory.valuation_status))||
+         stock.valuation_status!==inventory.valuation_status||
+         !count(inventory.invalid_item_count)||!count(inventory.item_count)||
+         inventory.invalid_item_count>inventory.item_count||
+         !count(stock.invalid_item_count)||stock.invalid_item_count!==inventory.invalid_item_count||
+         !count(stock.negative_balance_items)||!count(stock.item_count)||
+         stock.item_count!==inventory.item_count)
+         throw new ApiError('UNKNOWN','Invalid owner inventory valuation status');
+      for(const field of ['real_value_at_current_item_cost_kgs',
+        'sample_value_at_current_item_cost_kgs']){
+        if(!validAmount(stock[field],true))
+          throw new ApiError('UNKNOWN','Invalid legacy stock estimate');
+      }
+      for(const field of ['real_catalog_estimate_kgs','sample_catalog_estimate_kgs'])
+        if(!validAmount(inventory[field],true))
+          throw new ApiError('UNKNOWN','Invalid catalog estimate');
+      for(const field of ['real_book_inventory_value_kgs','sample_book_inventory_value_kgs']){
+        const valueAt=inventory[field];
+        if((valueAt!==null&&!validAmount(valueAt))||
+           stock[field]!==valueAt||
+           (inventory.valuation_status==='MOVEMENT_BASED'&&valueAt===null)||
+           (inventory.valuation_status==='RECONCILIATION_REQUIRED'&&valueAt!==null))
+          throw new ApiError('UNKNOWN','Invalid movement stock value');
+      }
+      if(!count(linked.receipt_count)||!count(linked.source_mismatch_count)||
+         linked.source_mismatch_count>linked.receipt_count||
+         !validAmount(linked.original_stock_cost_kgs)||
+         !validAmount(linked.invoice_source_cost_kgs)||
+         !validAmount(linked.legacy_invoice_vs_stock_cost_delta_kgs,true)||
+         !['REVIEW_LEGACY_LINKED_RECEIPT_COST','LINKED_MOVEMENTS_MATCH_INVOICE'].includes(String(linked.source_status))||
+         ((linked.source_mismatch_count>0)!==(linked.source_status==='REVIEW_LEGACY_LINKED_RECEIPT_COST')))
+         throw new ApiError('UNKNOWN','Invalid invoice source reconciliation');
+      for(const field of ['approved_unreceived_at_current_item_cost_kgs',
+        'unapproved_requests_at_current_item_cost_kgs',
+        'settled_supplier_payables_kgs','gross_supplier_obligations_kgs',
+        'credited_supplier_payables_kgs']){
+        if(!validAmount(exposure[field]))
+          throw new ApiError('UNKNOWN','Invalid owner procurement exposure');
+      }
+      if(!validAmount(exposure.outstanding_supplier_payables_kgs,true)||
+         !count(exposure.approved_open_request_count)||!count(exposure.pending_approval_count))
+         throw new ApiError('UNKNOWN','Invalid procurement outstanding balance');
+      for(const field of ['document_count','return_count'])
+        if(!count(suppliers[field]))
+          throw new ApiError('UNKNOWN','Invalid supplier ledger count');
+      for(const field of ['gross_obligations_kgs','manual_settlements_kgs','credit_notes_kgs',
+        'return_stock_carrying_cost_kgs']){
+        if(!validAmount(suppliers[field]))
+          throw new ApiError('UNKNOWN','Invalid supplier ledger amount');
+      }
+      if(!validAmount(suppliers.outstanding_payables_kgs,true)||
+         !validAmount(suppliers.return_credit_minus_stock_cost_kgs,true)||
+         !['RECONCILIATION_REQUIRED','RECORDED_OBLIGATIONS_BALANCED'].includes(String(suppliers.payables_status))||
+         suppliers.outstanding_payables_kgs!==exposure.outstanding_supplier_payables_kgs||
+         suppliers.manual_settlements_kgs!==exposure.settled_supplier_payables_kgs||
+         suppliers.credit_notes_kgs!==exposure.credited_supplier_payables_kgs||
+         suppliers.gross_obligations_kgs!==exposure.gross_supplier_obligations_kgs||
+         ((Number(suppliers.outstanding_payables_kgs)<0)!==
+          (suppliers.payables_status==='RECONCILIATION_REQUIRED')))
+         throw new ApiError('UNKNOWN','Invalid supplier payable reconciliation');
+      const difference=Number(suppliers.gross_obligations_kgs)-
+        Number(suppliers.manual_settlements_kgs)-Number(suppliers.credit_notes_kgs);
+      if(!Number.isFinite(difference)||
+         Math.abs(difference-Number(suppliers.outstanding_payables_kgs))>0.00011)
+         throw new ApiError('UNKNOWN','Supplier payable ledger does not reconcile');
+      if(truth.recognized_revenue_kgs!==null||truth.recognized_profit_kgs!==null||
+         truth.is_recognized_profit_complete!==false||
+         truth.supplier_settlements_are_customer_payments!==false||
+         truth.stock_receipts_are_expenses!==false||
+         truth.stock_return_credit_difference_recognized!==false||
+         truth.scope!=='CURRENT_PROPERTY_POSTED_FACTS_NOT_PERIOD_END')
+         throw new ApiError('UNKNOWN','Incomplete OWNER profit may not be claimed');
+      return value as unknown as OwnerKitchenManagementReport;
+    },
+    ownerExpenses: async (from:string,to:string):Promise<OwnerExpenseLedger> => {
+      const data=objectResponse(await request<unknown>('GET',p+'/admin/finance/owner/expenses?from_date='+
+        safeIsoDate(from)+'&to_date='+safeIsoDate(to)),'owner expenses');
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if(data.scope!=='OWNER_ONLY_PROPERTY_SCOPED'||data.payment_created!==false||
+        data.truth!=='POSTED_OBLIGATION_NOT_AUTOMATIC_PAYMENT_OR_PROFIT'||
+        !Array.isArray(data.items)||!uuid.test(String(data.new_expense_id))||
+        !uuid.test(String(data.new_settlement_id))||
+        typeof data.preview_truncated!=='boolean')
+        throw new ApiError('UNKNOWN','Invalid OWNER expense ledger');
+      const totals=objectResponse(data.totals,'owner expense totals');
+      for(const key of ['posted_expenses_kgs','settled_against_period_expenses_kgs','outstanding_kgs','posted_count']){
+        const amount=totals[key];
+        if(typeof amount!=='number'||!Number.isSafeInteger(amount)||amount<0)
+          throw new ApiError('UNKNOWN','Invalid expense total');
+      }
+      for(const raw of data.items){
+        const row=objectResponse(raw,'owner expense row');
+        if(!uuid.test(String(row.id))||typeof row.title!=='string'||
+          !['POSTED','VOID'].includes(String(row.status))||
+          typeof row.amount_kgs!=='number'||typeof row.settled_kgs!=='number'||
+          typeof row.outstanding_kgs!=='number'||
+          !Number.isSafeInteger(row.amount_kgs)||!Number.isSafeInteger(row.settled_kgs)||
+          !Number.isSafeInteger(row.outstanding_kgs)||
+          Number(row.amount_kgs)<=0||Number(row.settled_kgs)<0||
+          Number(row.outstanding_kgs)<0||
+          Number(row.amount_kgs)!==Number(row.settled_kgs)+Number(row.outstanding_kgs))
+          throw new ApiError('UNKNOWN','Invalid expense row amounts');
+      }
+      return data as unknown as OwnerExpenseLedger;
+    },
+    postOwnerExpense: async (payload:{id:string;expense_date:string;category:OwnerExpenseCategory;
+      title:string;amount_kgs:number;supplier_name:string|null;
+      document_reference:string|null;notes:string|null}) => {
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if(!uuid.test(payload.id)||!Number.isSafeInteger(payload.amount_kgs)||
+        payload.amount_kgs<=0||payload.amount_kgs>2000000000||
+        !payload.title.trim()||payload.title.length>150||
+        !['SUPPLIES','UTILITIES','PAYROLL','MAINTENANCE','RENT','MARKETING','OTHER'].includes(payload.category))
+        throw new ApiError('BAD_REQUEST','Invalid OWNER expense');
+      const reply=objectResponse(await request<unknown>('POST',p+'/admin/finance/owner/expenses',
+        {...payload,expense_date:safeIsoDate(payload.expense_date)}),'expense acknowledgment');
+      if(reply.id!==payload.id||typeof reply.already_processed!=='boolean'||
+        !['POSTED','VOID'].includes(String(reply.status))||reply.payment_created!==false)
+        throw new ApiError('UNKNOWN','Invalid expense acknowledgement');
+      return reply as {id:string;already_processed:boolean;status:'POSTED'|'VOID';payment_created:false};
+    },
+    settleOwnerExpense: async (expenseId:string,payload:{id:string;amount_kgs:number;
+      paid_on:string;method:OwnerExpenseMethod;reference:string|null}) => {
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if(!uuid.test(expenseId)||!uuid.test(payload.id)||
+        !Number.isSafeInteger(payload.amount_kgs)||payload.amount_kgs<=0||
+        payload.amount_kgs>2000000000||
+        !['CASH','BANK_TRANSFER','CARD','OTHER'].includes(payload.method))
+        throw new ApiError('BAD_REQUEST','Invalid manual expense payment');
+      const reply=objectResponse(await request<unknown>('POST',
+        p+'/admin/finance/owner/expenses/'+safeRouteId(expenseId)+'/settlements',
+        {...payload,paid_on:safeIsoDate(payload.paid_on)}),'manual settlement');
+      if(reply.id!==payload.id||reply.expense_id!==expenseId||
+        typeof reply.already_processed!=='boolean'||reply.payment_created!==false||
+        reply.source!=='MANUAL_EXPENSE_SETTLEMENT_FACT')
+        throw new ApiError('UNKNOWN','Invalid expense payment acknowledgment');
+      return reply as {id:string;expense_id:string;already_processed:boolean;payment_created:false;
+        source:'MANUAL_EXPENSE_SETTLEMENT_FACT'};
+    },
+    ownerRecordedCashMovements: async (from:string,to:string):Promise<OwnerRecordedCashMovements> => {
+      const response=objectResponse(await request<unknown>(
+        'GET',p+'/admin/finance/owner/recorded-cash-movements?from_date='+
+          safeIsoDate(from)+'&to_date='+safeIsoDate(to)),'owner recorded cash movements');
+      const truth=objectResponse(response.truth,'cash movements truth');
+      if(response.scope!=='OWNER_ONLY_PROPERTY_SCOPED'||
+        truth.report_type!=='OBSERVED_CASH_RECORDS_NOT_RECOGNIZED_PROFIT'||
+        truth.recognized_profit_kgs!==null||truth.verified_bank_balance_kgs!==null||
+        truth.refunds_reconciled!==false||truth.completeness_verified!==false||
+        truth.payment_created!==false)
+        throw new ApiError('UNKNOWN','Invalid owner cash reconciliation truth');
+      for(const field of [
+        'customer_payments_received_kgs','customer_payments_received_count',
+        'owner_expense_manual_settlements_kgs','owner_expense_manual_settlements_count',
+        'owner_expenses_posted_for_period_kgs','owner_expenses_posted_count',
+        'all_time_unsettled_expenses_kgs']){
+        if(!Number.isSafeInteger(response[field])||Number(response[field])<0)
+          throw new ApiError('UNKNOWN','Invalid owner cash amount');
+      }
+      if(!Number.isSafeInteger(response.observed_recorded_difference_kgs)||
+         Number(response.observed_recorded_difference_kgs)!==
+          Number(response.customer_payments_received_kgs)-
+          Number(response.owner_expense_manual_settlements_kgs))
+        throw new ApiError('UNKNOWN','Invalid observed cash difference');
+      return response as unknown as OwnerRecordedCashMovements;
+    },
+    reception: async () => {
+      const value = await request<ReceptionList>('GET', p + '/admin/reception/reservations');
+      return receptionResponse(value);
+    },
+    receptionGuestRequests: async (): Promise<ReceptionGuestRequest[]> => {
+      reviewGate();
+      const queue = objectResponse(await request<unknown>('GET', p + '/ops/guest-requests?status=ACTIVE&limit=200'), 'guest requests');
+      if (!Array.isArray(queue.items)) throw new ApiError('UNKNOWN', 'Invalid guest request queue');
+      return queue.items.map(value => {
+        const item = objectResponse(value, 'guest request');
+        const nullableString = (field: string): string | null => {
+          const value = item[field];
+          if (value === null || typeof value === 'string') return value;
+          throw new ApiError('UNKNOWN', 'Invalid guest request field: ' + field);
+        };
+        if (typeof item.id !== 'string' || typeof item.title !== 'string' ||
+            (item.status !== 'OPEN' && item.status !== 'IN_PROGRESS')) {
+          throw new ApiError('UNKNOWN', 'Invalid guest request');
+        }
+        return {
+          id: safeRouteId(item.id), title: item.title, status: item.status,
+          description: nullableString('description'), room_code: nullableString('room_code'),
+          service_date: nullableString('service_date'), service_time: nullableString('service_time'),
+          assigned_to_id: nullableString('assigned_to_id'),
+        };
+      });
+    },
+    updateReceptionGuestRequest: async (id: string, action: 'claim' | 'complete', userId: string) => {
+      reviewGate();
+      const key = safeRouteId(id);
+      const result = objectResponse(await request<unknown>('POST', p + '/ops/guest-requests/' + key + '/' + action), 'guest request action');
+      const status = action === 'claim' ? 'IN_PROGRESS' : 'DONE';
+      if (result.id !== key || result.status !== status ||
+          (action === 'claim' && result.assigned_to_id !== userId)) {
+        throw new ApiError('UNKNOWN', 'Invalid guest request acknowledgement');
+      }
+      return status;
+    },
+    reservation: async (id: string) => objectResponse(await request<unknown>('GET', p + '/admin/reception/reservations/' + safeRouteId(id)), 'reservation'),
+    checkIn: async (id: string) => stayAck(await request<unknown>('POST', p + '/admin/stays/reservations/' + safeRouteId(id) + '/check-in'), id, 'CHECKED_IN'),
+    checkOut: async (id: string) => stayAck(await request<unknown>('POST', p + '/admin/stays/reservations/' + safeRouteId(id) + '/check-out'), id, 'CHECKED_OUT'),
+    schedulePreview: async (id: string, segments: ScheduleSegment[]): Promise<SchedulePreview> => {
+      if (segments.length !== 1) throw new ApiError('BAD_REQUEST', 'Only one-room date changes are enabled on mobile');
+      const segment = segments[0];
+      if (segment.start >= segment.end) throw new ApiError('BAD_REQUEST', 'Invalid reservation dates');
+      const payload = { segments: [{ room_id: safeRouteId(segment.room_id), start: safeIsoDate(segment.start), end: safeIsoDate(segment.end) }] };
+      const value = await request<unknown>('POST', p + '/admin/pms/reservations/' + safeRouteId(id) + '/schedule/preview', payload);
+      if (!value || typeof value !== 'object') throw new ApiError('UNKNOWN', 'Invalid schedule preview');
+      const x = value as Record<string, unknown>, reservation = x.reservation as Record<string, unknown> | null;
+      if (!reservation || typeof reservation.version !== 'string' || typeof x.can_commit !== 'boolean' ||
+          !Array.isArray(x.conflicts) || typeof x.proposed_check_in !== 'string' || typeof x.proposed_check_out !== 'string' ||
+          !x.pricing || typeof x.pricing !== 'object')
+        throw new ApiError('UNKNOWN', 'Invalid schedule preview');
+      return value as SchedulePreview;
+    },
+    scheduleCommit: async (id: string, segments: ScheduleSegment[], version: string): Promise<ScheduleCommitAck> => {
+      if (segments.length !== 1 || typeof version !== 'string' || version.length < 10 || version.length > 80)
+        throw new ApiError('BAD_REQUEST', 'Invalid reservation schedule');
+      const segment = segments[0];
+      if (segment.start >= segment.end) throw new ApiError('BAD_REQUEST', 'Invalid reservation dates');
+      const payload = {
+        segments: [{ room_id: safeRouteId(segment.room_id), start: safeIsoDate(segment.start), end: safeIsoDate(segment.end) }],
+        expected_version: version,
+      };
+      const value = await request<unknown>('POST', p + '/admin/pms/reservations/' + safeRouteId(id) + '/schedule/commit', payload);
+      if (!value || typeof value !== 'object') throw new ApiError('UNKNOWN', 'Invalid schedule commit acknowledgement');
+      const x = value as Record<string, unknown>;
+      if (x.ok !== true || x.reservation_id !== id || typeof x.version !== 'string' ||
+          typeof x.check_in !== 'string' || typeof x.check_out !== 'string')
+        throw new ApiError('UNKNOWN', 'Invalid schedule commit acknowledgement');
+      return value as ScheduleCommitAck;
+    },
+    bookingPreview: async (draft: BookingDraft) => bookingPreviewResponse(await request<unknown>('POST', p + '/admin/pms/reservations/new/preview', draft)),
+    bookingCommit: async (draft: BookingCommit) => bookingCommitResponse(await request<unknown>('POST', p + '/admin/pms/reservations/new/commit', draft)),
+    holds: async (): Promise<Hold[]> => {
+      if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API not accepted for mobile LIVE');
+      // Actual SQL projection in pms_holds.py uses quoted camelCase columns,
+      // NOT the snake_case format stated in the older handoff matrix.
+      return holdListResponse(await request<unknown>('GET', p + '/admin/pms/holds'));
+    },
+    createHold: async (draft: {room_id: string;check_in: string;check_out: string;guest_name: string;guest_phone: string}) => {
+      if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API not accepted for mobile LIVE');
+      // Never return a claimed 60-minute hold without the server's 201 ACK.
+      return holdCreateResponse(await request<unknown>('POST', p + '/admin/pms/holds', draft));
+    },
+    releaseHold: async (id: string) => {
+      if (!CONFIRMED_BACKEND_FEATURES.pmsHolds) throw new ApiError('NOT_FOUND','HOLD API not accepted for mobile LIVE');
+      const key = safeRouteId(id);
+      return holdReleaseResponse(await request<unknown>('DELETE', p + '/admin/pms/holds/' + key), key);
+    },
+    pmsGrid: async (start: string, end: string) => {
+      const value = await request<Grid>('GET', p + '/pms/grid?start=' + safeIsoDate(start) + '&end=' + safeIsoDate(end));
+      return gridResponse(value);
+    },
+    conversations: async (needsReply?: boolean) => {
+      return inboxListResponse(await request('GET', p + '/admin/inbox/conversations?limit=150' + (needsReply ? '&needs_reply=true' : '')));
+    },
+    conversation: async (id: string) => {
+      const value = await request<ConversationDetail>('GET', p + '/admin/inbox/conversations/' + safeRouteId(id));
+      return conversationResponse(value);
+    },
+    claimConversation: async (id: string) => {
+      return conversationClaimAck(await request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/claim'), id);
+    },
+    conversationStatus: async (id: string, status: ConversationStatus) => {
+      return conversationStatusAck(await request<unknown>('PATCH', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/status', { status }), id, status);
+    },
+    internalNote: async (id: string, text: string) => {
+      return noteAck(await request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/notes', { text }), id);
+    },
+    // RC5/RC8 remain opt-in and server-gated. A server 403/503 is authoritative.
+    outboundCapabilities: async (): Promise<OutboundCapabilities> => {
+      const value = await request<unknown>('GET', p + '/admin/inbox/outbound-capabilities');
+      if (!value || typeof value !== 'object') throw new ApiError('UNKNOWN', 'Invalid outbound capability response');
+      const w = (value as Record<string, unknown>).whatsapp;
+      if (!w || typeof w !== 'object') throw new ApiError('UNKNOWN', 'Missing WhatsApp capability');
+      const x = w as Record<string, unknown>;
+      if (typeof x.configured !== 'boolean' || typeof x.human_only !== 'boolean' || typeof x.queued_only !== 'boolean' || typeof x.max_text_length !== 'number')
+        throw new ApiError('UNKNOWN', 'Unverified WhatsApp capability');
+      return value as OutboundCapabilities;
+    },
+    sendWhatsAppText: async (id: string, text: string, key: string): Promise<OutboundAck> => {
+      if (!text.trim() || text.length > 4096) throw new ApiError('BAD_REQUEST', 'Invalid message length');
+      const value = await request<unknown>('POST', p + '/admin/inbox/conversations/' + safeRouteId(id) + '/send-text', { text: text.trim() }, key);
+      if (!value || typeof value !== 'object') throw new ApiError('UNKNOWN', 'Unverified send acknowledgement');
+      const ack = value as Record<string, unknown>;
+      if (ack.conversation_id !== id || typeof ack.message_id !== 'string' || !['QUEUED','SENT','DELIVERED','READ'].includes(String(ack.delivery_status)) ||
+          typeof ack.idempotent_replay !== 'boolean' || typeof ack.counts_as_response !== 'boolean' || ack.auto_sent !== false)
+        throw new ApiError('UNKNOWN', 'Invalid message acknowledgement');
+      return ack as unknown as OutboundAck;
+    },
+    kitchenOrders: async () => {
+      reviewGate();
+      return kitchenOrdersResponse(await request<unknown>('GET', p + '/kitchen/orders?status=ACTIVE'));
+    },
+    diningProductionSnapshots: async (from?: string, through?: string): Promise<DiningProductionSnapshots> => {
+      reviewGate();
+      // By default the backend uses the HOTEL-local date, not the phone timezone.
+      const query = from && through ? '?from_date=' + safeIsoDate(from) + '&through_date=' + safeIsoDate(through) : '';
+      return diningProductionSnapshotsResponse(await request<unknown>('GET', p + '/dining/production-snapshots' + query));
+    },
+    agentGuestServices: async (reservation: string) => {
+      reviewGate();
+      const id = safeRouteId(reservation);
+      return agentServiceList(await request<unknown>('GET', p + '/admin/guest-services?reservation_id=' + id + '&status=ALL&limit=200'), id);
+    },
+    addAgentGuestService: async (reservation: string, serviceCode: AgentServiceCode, draft: AgentServiceDraft = {}) => {
+      reviewGate();
+      if (!AGENT_SERVICES.includes(serviceCode)) throw new ApiError('BAD_REQUEST', 'Invalid agent service');
+      const reservationId = safeRouteId(reservation);
+      const task = objectResponse(await request<unknown>('POST', p + '/admin/guest-services', {
+        reservation_id: reservationId, service_code: serviceCode, ...agentServiceDraft(draft),
+      }), 'guest service');
+      if (typeof task.id !== 'string' || task.reservation_id !== reservationId || task.service_code !== serviceCode) {
+        throw new ApiError('UNKNOWN', 'Invalid guest service acknowledgement');
+      }
+    },
+    waiterMenu: async (): Promise<WaiterMenuItem[]> => {
+      reviewGate();
+      const menu = objectResponse(await request<unknown>('GET', p + '/kitchen/menu'), 'waiter menu');
+      if (!Array.isArray(menu.items)) throw new ApiError('UNKNOWN', 'Invalid waiter menu');
+      return menu.items.map(value => {
+        const item = objectResponse(value, 'menu item');
+        const { id, name_ru, name_kg, name_en, name_kz, price_kgs } = item;
+        if (typeof id !== 'string' || typeof name_ru !== 'string' || typeof name_kg !== 'string' ||
+          typeof name_en !== 'string' || typeof name_kz !== 'string' ||
+          typeof price_kgs !== 'number' || !Number.isSafeInteger(price_kgs) || price_kgs < 0) {
+          throw new ApiError('UNKNOWN', 'Invalid waiter menu item');
+        }
+        return item.is_active === true && item.is_draft === false
+          ? { id: safeRouteId(id), name_ru, name_kg, name_en, name_kz, price_kgs } : null;
+      }).filter((item): item is WaiterMenuItem => item !== null);
+    },
+    createDiningTable: async (table: { code: string; name: string; seats: number }) => {
+      reviewGate();
+      const result = objectResponse(await request<unknown>('POST', p + '/kitchen/tables', table), 'table');
+      if (typeof result.id !== 'string' || result.code !== table.code) throw new ApiError('UNKNOWN', 'Invalid table acknowledgement');
+    },
+    createDiningTableOrder: async (table: string, items: { menu_item_id: string; quantity: number }[]) => {
+      reviewGate();
+      const result = objectResponse(await request<unknown>('POST', p + '/kitchen/orders', {
+        source: 'TABLE', table_id: safeRouteId(table), items,
+      }), 'table order');
+      if (typeof result.id !== 'string' || result.status !== 'NEW') throw new ApiError('UNKNOWN', 'Invalid order acknowledgement');
+    },
+    kitchenAvailability: async (): Promise<KitchenAvailabilityItem[]> => {
+      reviewGate();
+      const payload = objectResponse(await request<unknown>('GET', p+'/kitchen/menu/availability'), 'availability');
+      if (!Array.isArray(payload.items)) throw new ApiError('UNKNOWN', 'Invalid availability list');
+      return payload.items.map(value => {
+        const row = objectResponse(value, 'availability item');
+        for (const field of ['id','code','name_ru','name_kg','name_kz','name_en']) {
+          if (typeof row[field] !== 'string') throw new ApiError('UNKNOWN', 'Invalid availability field');
+        }
+        if (typeof row.is_available !== 'boolean') throw new ApiError('UNKNOWN', 'Invalid availability status');
+        return {id:safeRouteId(row.id as string),code:row.code as string,
+          name_ru:row.name_ru as string,name_kg:row.name_kg as string,
+          name_kz:row.name_kz as string,name_en:row.name_en as string,
+          is_available:row.is_available} satisfies KitchenAvailabilityItem;
+      });
+    },
+    stopKitchenItem: async (id: string, reason: string): Promise<KitchenAvailabilityAck> => {
+      reviewGate();
+      const clean = reason.trim().replace(/\s+/g, ' ');
+      if (clean.length < 3 || clean.length > 500)
+        throw new ApiError('BAD_REQUEST', 'Reason must contain 3–500 characters');
+      const itemId = safeRouteId(id);
+      const row = objectResponse(await request<unknown>('PUT',
+        p+'/kitchen/menu/'+itemId+'/availability', {available:false,reason:clean}), 'stoplist acknowledgment');
+      if (row.id !== itemId || row.is_available !== false || typeof row.already_set !== 'boolean' ||
+          row.reason !== clean) throw new ApiError('UNKNOWN', 'Invalid stoplist acknowledgment');
+      return row as unknown as KitchenAvailabilityAck;
+    },
+    procurementNeeds: async (serviceDate:string):Promise<KitchenProcurementNeeds> => {
+      reviewGate();
+      const data=objectResponse(await request<unknown>('GET',p+'/kitchen/procurement/needs?service_date='+safeIsoDate(serviceDate)),'procurement needs');
+      if(data.basis!=='APPROVED_NON_SAMPLE_REMAINING_PRODUCTION'||
+        data.inventory_deducted!==false||data.payment_created!==false||
+        typeof data.is_complete!=='boolean'||!Array.isArray(data.items)||
+        !Array.isArray(data.missing_recipes)||typeof data.excluded_sample_targets!=='number')
+        throw new ApiError('UNKNOWN','Invalid procurement needs');
+      for(const entry of data.items){
+        const row=objectResponse(entry,'procurement need');
+        if(typeof row.name!=='string' || !['KG','L','PCS'].includes(String(row.unit)) ||
+          typeof row.approved_inbound!=='string' || typeof row.pending_requests!=='string' ||
+          typeof row.shortage_after_pipeline!=='string' ||
+          !/^\d+(?:\.\d+)?$/.test(row.approved_inbound))
+          throw new ApiError('UNKNOWN','Invalid approved procurement supply');
+      }
+      return data as unknown as KitchenProcurementNeeds;
+    },
+    procurementRequests: async ():Promise<KitchenProcurementList> => {
+      reviewGate();
+      const data=objectResponse(await request<unknown>('GET',p+'/kitchen/procurement/requests'),'procurement requests');
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if(!Array.isArray(data.items)||data.payment_created!==false||
+        typeof data.new_request_id!=='string'||!uuid.test(data.new_request_id)||
+        typeof data.new_receipt_id!=='string'||!uuid.test(data.new_receipt_id))
+        throw new ApiError('UNKNOWN','Invalid procurement ledger');
+      for(const entry of data.items){
+        const row=objectResponse(entry,'procurement entry');
+        if(typeof row.id!=='string'||typeof row.stock_item_id!=='string'||
+          !['REQUESTED','APPROVED','PARTIAL','RECEIVED'].includes(String(row.status))||
+          typeof row.stock_name!=='string'||typeof row.quantity!=='string'||
+          typeof row.received_quantity!=='string'||typeof row.is_sample!=='boolean')
+          throw new ApiError('UNKNOWN','Invalid procurement entry');
+      }
+      return data as unknown as KitchenProcurementList;
+    },
+    requestKitchenProcurement: async (payload:{request_id:string;stock_item_id:string;quantity:string;
+      service_date:string|null;notes:string|null}) => {
+      reviewGate();
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const quantity=payload.quantity.replace(',','.');
+      if(!uuid.test(payload.request_id)||!uuid.test(payload.stock_item_id)||
+        !/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(quantity)||Number(quantity)<=0||
+        (payload.notes!==null&&payload.notes.length>500))
+        throw new ApiError('BAD_REQUEST','Invalid procurement request');
+      const body={...payload,quantity,service_date:payload.service_date?safeIsoDate(payload.service_date):null};
+      const reply=objectResponse(await request<unknown>('POST',p+'/kitchen/procurement/requests',body),'procurement request ack');
+      if(reply.id!==payload.request_id||!['REQUESTED','EXISTS'].includes(String(reply.status))||
+         reply.payment_created!==false)throw new ApiError('UNKNOWN','Invalid procurement request acknowledgment');
+      return reply as {id:string;status:'REQUESTED'|'EXISTS';payment_created:false};
+    },
+    approveKitchenProcurement: async (requestId:string) => {
+      reviewGate();
+      const reply=objectResponse(await request<unknown>('POST',p+'/kitchen/procurement/requests/'+safeRouteId(requestId)+'/approve'),'procurement approval');
+      if(reply.id!==requestId||!['APPROVED','PARTIAL','RECEIVED'].includes(String(reply.status))||
+        typeof reply.already_processed!=='boolean'||reply.payment_created!==false)
+        throw new ApiError('UNKNOWN','Invalid procurement approval');
+      return reply as {id:string;status:KitchenProcurementStatus;already_processed:boolean;payment_created:false};
+    },
+    procurementSupplierLines: async ():Promise<KitchenSupplierSource[]> => {
+      reviewGate();
+      const result=objectResponse(await request<unknown>('GET',p+'/kitchen/procurement/supplier-lines'),'supplier sources');
+      if(!Array.isArray(result.items)||result.payment_created!==false||
+         result.scope!=='CURRENT_HOTEL_RECEIPT_SOURCES')throw new ApiError('UNKNOWN','Invalid supplier sources');
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      return result.items.map(entry=>{
+        const row=objectResponse(entry,'supplier source');
+        if(!['id','stock_item_id','document_id'].every(key=>uuid.test(String(row[key])))||
+           !['supplier_name','document_reference','unit_cost_kgs','remaining_quantity']
+             .every(key=>typeof row[key]==='string'))
+          throw new ApiError('UNKNOWN','Invalid supplier source row');
+        return row as unknown as KitchenSupplierSource;
+      });
+    },
+    receiveKitchenProcurement: async (requestId:string,payload:{receipt_id:string;quantity:string;document_line_id?:string|null}) => {
+      reviewGate();
+      const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const quantity=payload.quantity.replace(',','.');
+      if(!uuid.test(payload.receipt_id)||!uuid.test(requestId)||
+        !/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(quantity)||Number(quantity)<=0||
+        (payload.document_line_id!=null&&!uuid.test(payload.document_line_id)))
+        throw new ApiError('BAD_REQUEST','Invalid procurement receipt');
+      const reply=objectResponse(await request<unknown>('POST',p+'/kitchen/procurement/requests/'+safeRouteId(requestId)+'/receive',
+        {receipt_id:payload.receipt_id,quantity,...(payload.document_line_id?{document_line_id:payload.document_line_id}:{})}),'procurement receipt');
+      if(reply.id!==payload.receipt_id||reply.request_id!==requestId||
+        !['PARTIAL','RECEIVED'].includes(String(reply.status))||
+        typeof reply.already_processed!=='boolean'||reply.payment_created!==false||
+        (payload.document_line_id!=null&&reply.document_line_id!==payload.document_line_id))
+        throw new ApiError('UNKNOWN','Invalid procurement receipt acknowledgment');
+      return reply as {id:string;request_id:string;status:'PARTIAL'|'RECEIVED';already_processed:boolean;payment_created:false;document_line_id?:string|null};
+    },
+    kitchenLosses: async (): Promise<KitchenLossRecord[]> => {
+      reviewGate();
+      const result=objectResponse(await request<unknown>('GET',p+'/kitchen/stock/losses'),'stock losses');
+      if(!Array.isArray(result.items)||result.financial_truth!=='INVENTORY_LOSS_NOT_PAYMENT')
+        throw new ApiError('UNKNOWN','Invalid stock loss journal');
+      return result.items.map(entry=>{
+        const row=objectResponse(entry,'loss entry');
+        if(!['WASTE','SPOILAGE'].includes(String(row.kind)) ||
+          !['KG','L','PCS'].includes(String(row.unit)) ||
+          typeof row.reason!=='string'||typeof row.stock_name!=='string' ||
+          typeof row.is_sample!=='boolean'||typeof row.cost_kgs!=='string' ||
+          typeof row.quantity!=='string'||typeof row.created_at!=='string')
+          throw new ApiError('UNKNOWN','Invalid loss entry');
+        return {...row,id:safeRouteId(String(row.id)),
+          stock_item_id:safeRouteId(String(row.stock_item_id))} as KitchenLossRecord;
+      });
+    },
+    reportKitchenLoss: async (loss:KitchenLossMutation):Promise<KitchenLossAcknowledgment> => {
+      reviewGate();
+      const reason=loss.reason.trim().replace(/\s+/g,' ');
+      const quantity=loss.quantity.replace(',','.');
+      if(reason.length<3||reason.length>500||!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(quantity)||Number(quantity)<=0 ||
+        !['WASTE','SPOILAGE'].includes(loss.kind))
+        throw new ApiError('BAD_REQUEST','Invalid kitchen loss');
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(loss.movement_id))
+        throw new ApiError('BAD_REQUEST','Invalid loss movement UUID');
+      const id=safeRouteId(loss.movement_id);
+      const body={movement_id:id,stock_item_id:safeRouteId(loss.stock_item_id),
+        kind:loss.kind,quantity,reason};
+      const response=objectResponse(await request<unknown>('POST',p+'/kitchen/stock/losses',body),'loss acknowledgment');
+      if(response.id!==id||typeof response.already_processed!=='boolean'||response.payment_created!==false||
+        typeof response.cost_kgs!=='string'||typeof response.quantity!=='string')
+        throw new ApiError('UNKNOWN','Invalid loss acknowledgment');
+      return response as unknown as KitchenLossAcknowledgment;
+    },
+    kitchenStock: async (): Promise<KitchenStockSnapshot> => {
+      reviewGate();
+      const payload=objectResponse(await request<unknown>('GET',p+'/kitchen/stock'),'stock');
+      if(!Array.isArray(payload.items) || payload.inventory_deducted_only_on_explicit_consume!==true ||
+        typeof payload.production_cost_kgs!=='string' || !/^\d+(?:\.\d+)?$/.test(payload.production_cost_kgs))
+        throw new ApiError('UNKNOWN','Invalid stock response');
+      const rows=payload.items.map(value=>{
+        const row=objectResponse(value,'stock item');
+        if(typeof row.name!=='string'||!['KG','L','PCS'].includes(String(row.unit))||typeof row.is_sample!=='boolean'||
+          typeof row.balance!=='string'||!/^\d+(?:\.\d+)?$/.test(row.balance)||
+          typeof row.cost_per_unit_kgs!=='string'||!/^\d+(?:\.\d+)?$/.test(row.cost_per_unit_kgs))
+          throw new ApiError('UNKNOWN','Invalid stock item');
+        return {...row,id:safeRouteId(String(row.id))} as KitchenStockItem;
+      });
+      // Older LIVE servers have no loss mutation nonce. Keep read/receipt/consume working;
+      // the loss form stays disabled until a valid server-issued UUID is available.
+      const receiptId=payload.new_receipt_movement_id;
+      if(receiptId!==undefined&&!receiptUuid(receiptId))throw new ApiError('UNKNOWN','Invalid stock receipt ID');
+      const lossId=payload.new_loss_movement_id;
+      if (lossId !== undefined && (typeof lossId !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lossId)))
+        throw new ApiError('UNKNOWN','Invalid loss movement ID');
+      return {items:rows,production_cost_kgs:payload.production_cost_kgs,
+        inventory_deducted_only_on_explicit_consume:true,
+        ...(receiptId===undefined?{}:{new_receipt_movement_id:receiptId}),
+        ...(lossId === undefined ? {} : {new_loss_movement_id:safeRouteId(lossId as string)})};
+    },
+    receiveKitchenStock: async (input:StockReceipt):Promise<StockReceiptAck> => {
+      reviewGate();
+      const receipt=stockReceipt(input);
+      return stockReceiptAck(await request<unknown>('POST',p+'/kitchen/stock/receipts',receipt),receipt);
+    },
+    consumeKitchenStock: async (productionTargetId:string):Promise<KitchenStockConsumeAck> => {
+      reviewGate();
+      const payload=objectResponse(await request<unknown>('POST',p+'/kitchen/stock/consume',{
+        production_target_id:safeRouteId(productionTargetId),
+      }),'stock consumption');
+      if(!Number.isSafeInteger(payload.consumed_portions)||Number(payload.consumed_portions)<0||
+        typeof payload.already_processed!=='boolean'||payload.payment_created!==false||
+        typeof payload.cost_kgs!=='string'||!/^\d+(?:\.\d+)?$/.test(payload.cost_kgs))
+        throw new ApiError('UNKNOWN','Invalid stock consumption acknowledgment');
+      return payload as unknown as KitchenStockConsumeAck;
+    },
+    kitchenAuthorMenu: async (): Promise<KitchenAuthorMenuItem[]> => {
+      reviewGate();
+      const payload = objectResponse(await request<unknown>('GET', p + '/kitchen/menu'), 'author menu');
+      if (!Array.isArray(payload.items)) throw new ApiError('UNKNOWN', 'Invalid author menu');
+      return payload.items.map(value => {
+        const row = objectResponse(value, 'author menu item');
+        if (typeof row.id !== 'string' || typeof row.is_active !== 'boolean' ||
+            typeof row.is_draft !== 'boolean' || !Number.isSafeInteger(row.price_kgs) || Number(row.price_kgs) < 0 ||
+            !KITCHEN_MENU_CATEGORIES.includes(row.category as KitchenMenuDraft['category'])) {
+          throw new ApiError('UNKNOWN', 'Invalid author menu item');
+        }
+        for (const field of ['code', 'name_ru', 'name_kg', 'name_kz', 'name_en']) {
+          if (typeof row[field] !== 'string') throw new ApiError('UNKNOWN', 'Invalid author menu name');
+        }
+        return { ...row, id: safeRouteId(row.id), recipe: kitchenRecipe(row.recipe) } as KitchenAuthorMenuItem;
+      });
+    },
+    updateKitchenMenuDraft: async (id: string, draft: KitchenMenuDraft): Promise<string> => {
+      reviewGate();
+      // Price, publication and activation are never part of a cook's edit.
+      const { category, name_ru, name_kg, name_en, name_kz } = draft;
+      const result = objectResponse(await request<unknown>('PATCH', p + '/kitchen/menu/' + safeRouteId(id),
+        { category, name_ru, name_kg, name_en, name_kz }), 'draft update');
+      if (result.id !== id || result.is_draft !== true || result.is_active !== false ||
+          result.category !== category || result.name_ru !== name_ru || result.name_kg !== name_kg ||
+          result.name_en !== name_en || result.name_kz !== name_kz) {
+        throw new ApiError('UNKNOWN', 'Draft update acknowledgement mismatch');
+      }
+      return id;
+    },
+    publishKitchenMenuDraft: async (id:string,priceKgs:number):Promise<void> => {
+      reviewGate();
+      if(!Number.isSafeInteger(priceKgs)||priceKgs<0||priceKgs>100000)throw new ApiError('BAD_REQUEST','Invalid menu price');
+      const item=objectResponse(await request<unknown>('PATCH',p+'/kitchen/menu/'+safeRouteId(id),{
+        price_kgs:priceKgs,is_draft:false,is_active:true,
+      }),'menu publication');
+      if(item.id!==id||item.price_kgs!==priceKgs||item.is_draft!==false||item.is_active!==true)
+        throw new ApiError('UNKNOWN','Menu publication not confirmed');
+    },
+    kitchenProductionMenu: async (): Promise<KitchenProductionMenuItem[]> => {
+      reviewGate();
+      const payload = objectResponse(await request<unknown>('GET', p + '/kitchen/production-menu'), 'production menu');
+      if (!Array.isArray(payload.items)) throw new ApiError('UNKNOWN', 'Invalid production menu');
+      return payload.items.map(value => {
+        const row = objectResponse(value, 'production menu item');
+        for (const name of ['name_ru', 'name_kg', 'name_en', 'name_kz', 'code']) {
+          if (typeof row[name] !== 'string') throw new ApiError('UNKNOWN', 'Invalid menu name');
+        }
+        return { id: safeRouteId(String(row.id)), code: String(row.code), category: String(row.category),
+          name_ru: String(row.name_ru), name_kg: String(row.name_kg),
+          name_en: String(row.name_en), name_kz: String(row.name_kz), recipe: kitchenRecipe(row.recipe) };
+      });
+    },
+    kitchenProductionTargets: async (): Promise<KitchenProductionTargets> => {
+      reviewGate();
+      const payload = objectResponse(await request<unknown>('GET', p + '/kitchen/production-targets'), 'production targets');
+      if (!Array.isArray(payload.items) || typeof payload.from_date !== 'string' ||
+          typeof payload.through_date !== 'string') throw new ApiError('UNKNOWN', 'Invalid production targets');
+      const items = payload.items.map(value => {
+        const row = objectResponse(value, 'production target');
+        for (const field of ['planned_quantity', 'prepared_quantity', 'remaining_quantity']) {
+          if (!Number.isSafeInteger(row[field]) || Number(row[field]) < 0) throw new ApiError('UNKNOWN', 'Invalid production count');
+        }
+        return { ...row, id: safeRouteId(String(row.id)), menu_item_id: safeRouteId(String(row.menu_item_id)),
+          service_date: safeIsoDate(String(row.service_date)) } as KitchenProductionTarget;
+      });
+      return { from_date: String(payload.from_date), through_date: String(payload.through_date), items,
+        ingredient_requirements: ingredientRequirements(payload.ingredient_requirements) };
+    },
+    saveKitchenRecipe: async (menuItemId: string, input: RecipeInput): Promise<void> => {
+      reviewGate();
+      const response = objectResponse(await request<unknown>('PUT',
+        p + '/kitchen/menu/' + safeRouteId(menuItemId) + '/recipe', input), 'recipe');
+      const saved = kitchenRecipe(response.recipe);
+      if (!saved || saved.version !== input.expected_version + 1) {
+        throw new ApiError('UNKNOWN', 'Recipe acknowledgement mismatch');
+      }
+    },
+    saveKitchenProductionTarget: async (target: KitchenProductionInput): Promise<void> => {
+      reviewGate();
+      if (!Number.isSafeInteger(target.planned_quantity) || target.planned_quantity < 0 ||
+          target.planned_quantity > 10000 || !Number.isSafeInteger(target.prepared_quantity) ||
+          target.prepared_quantity < 0 || target.prepared_quantity > target.planned_quantity) {
+        throw new ApiError('BAD_REQUEST', 'Invalid planned/prepared servings');
+      }
+      const payload = { ...target, menu_item_id: safeRouteId(target.menu_item_id),
+        service_date: safeIsoDate(target.service_date) };
+      const result = objectResponse(await request<unknown>('PUT', p + '/kitchen/production-targets', payload), 'production target');
+      if (result.planned_quantity !== payload.planned_quantity ||
+          result.prepared_quantity !== payload.prepared_quantity ||
+          result.remaining_quantity !== payload.planned_quantity - payload.prepared_quantity) {
+        throw new ApiError('UNKNOWN', 'Production target acknowledgement mismatch');
+      }
+    },
+    createKitchenMenuDraft: async (draft: KitchenMenuDraft) => {
+      reviewGate();
+      const item = objectResponse(await request<unknown>('POST', p + '/kitchen/menu', {
+        ...draft, is_active: false, is_draft: true,
+      }), 'menu draft');
+      if (typeof item.id !== 'string' || item.is_draft !== true || item.code !== draft.code) {
+        throw new ApiError('UNKNOWN', 'Menu draft could not be verified');
+      }
+      return item.id;
+    },
+    captureDiningProduction: async (day: string, meal: DiningProductionSnapshotMeal['meal_type']) => {
+      reviewGate();
+      const serviceDate = safeIsoDate(day);
+      const path = p + '/dining/production-snapshots';
+      await request<unknown>('POST', path, { service_date: serviceDate, meal_type: meal });
+      const result = diningProductionSnapshotsResponse(await request<unknown>(
+        'GET', path + '?from_date=' + serviceDate + '&through_date=' + serviceDate,
+      ));
+      if (!result.days.some(item => item.service_date === serviceDate &&
+        item.meals.some(value => value.meal_type === meal && value.state === 'FROZEN'))) {
+        throw new ApiError('UNKNOWN', 'Production snapshot could not be verified');
+      }
+    },
+    diningStays: async (): Promise<DiningStays> => {
+      reviewGate();
+      return diningStaysResponse(await request<unknown>('GET', p + '/dining/stays'));
+    },
+    diningStayEntitlements: async (stayId: string): Promise<DiningStayEntitlements> => {
+      reviewGate();
+      return diningStayEntitlementsResponse(await request<unknown>(
+        'GET', p + '/dining/stays/' + safeRouteId(stayId) + '/entitlements'), stayId);
+    },
+    diningMealPlan: async (stayId: string, draft: MealPlanDraft): Promise<MealPlanAck> => {
+      reviewGate();
+      if (!draft.meals.length || draft.meals.length > 3 ||
+          new Set(draft.meals).size !== draft.meals.length ||
+          draft.meals.some(m => !['BREAKFAST','LUNCH','DINNER'].includes(m)) ||
+          !Number.isSafeInteger(draft.adult_portions) || draft.adult_portions < 0 ||
+          !Number.isSafeInteger(draft.child_portions) || draft.child_portions < 0 ||
+          draft.adult_portions + draft.child_portions < 1 || draft.replace_range !== false) {
+        throw new ApiError('BAD_REQUEST', 'Invalid included-meal plan');
+      }
+      const payload = { ...draft, from_date: safeIsoDate(draft.from_date), through_date: safeIsoDate(draft.through_date) };
+      if (payload.from_date > payload.through_date || payload.from_date === '' || payload.through_date === '') {
+        throw new ApiError('BAD_REQUEST', 'Invalid meal plan dates');
+      }
+      return diningMealPlanAck(await request<unknown>(
+        'PUT', p + '/dining/stays/' + safeRouteId(stayId) + '/meal-plan', payload), stayId, draft);
+    },
+    kitchenStatus: async (id: string, status: KitchenStatus) => {
+      reviewGate();
+      return kitchenStatusAck(await request<unknown>('PATCH', p + '/kitchen/orders/' + safeRouteId(id) + '/status', { status }), id, status);
+    },
+    diningFloor: async () => {
+      reviewGate();
+      return diningFloorResponse(await request<unknown>('GET', p + '/dining/floor'));
+    },
+    claimWaiterOrder: async (id: string, waiterId: string) => {
+      reviewGate();
+      return waiterClaimAck(await request<unknown>('PATCH', p + '/dining/orders/' + safeRouteId(id) + '/waiter', { waiter_id: safeRouteId(waiterId) }), id, waiterId);
+    },
+    diningSeatingSessions: async (): Promise<DiningSeatingSession[]> => {
+      reviewGate();
+      const payload = objectResponse(await request<unknown>('GET',p+'/dining/sessions?status=ACTIVE'),'dining sessions');
+      if (!Array.isArray(payload.items)) throw new ApiError('UNKNOWN','Invalid dining sessions list');
+      return payload.items.map(seatingSession);
+    },
+    createDiningSeatingSession: async (stayId:string,tableId:string,serviceDate:string):Promise<DiningSeatingSession> => {
+      reviewGate();
+      const result=await request<unknown>('POST',p+'/dining/sessions',{
+        stay_id:safeRouteId(stayId),table_id:safeRouteId(tableId),
+        service_date:safeIsoDate(serviceDate),status:'SEATED',
+      });
+      const parsed=seatingSession(result);
+      if(parsed.stay_id!==stayId||parsed.table_id!==tableId||parsed.status!=='SEATED')
+        throw new ApiError('UNKNOWN','Dining seating acknowledgement mismatch');
+      return parsed;
+    },
+    setDiningSeatingStatus: async (sessionId:string,status:'SEATED'|'RELEASED'):Promise<DiningSeatingSession> => {
+      reviewGate();
+      const id=safeRouteId(sessionId);
+      const parsed=seatingSession(await request<unknown>('PATCH',p+'/dining/sessions/'+id+'/status',{status}));
+      if(parsed.id!==id||parsed.status!==status)throw new ApiError('UNKNOWN','Dining status acknowledgement mismatch');
+      return parsed;
+    },
+    moveDiningSeatingSession: async (sessionId:string,targetTableId:string):Promise<DiningSeatingSession> => {
+      reviewGate();
+      const id=safeRouteId(sessionId), table=safeRouteId(targetTableId);
+      const parsed=seatingSession(await request<unknown>('POST',p+'/dining/sessions/'+id+'/move',{
+        target_table_id:table,waiter_mode:'KEEP',
+      }));
+      if(parsed.id!==id||parsed.table_id!==table)throw new ApiError('UNKNOWN','Dining move acknowledgement mismatch');
+      return parsed;
+    },
+    diningFolioOrders: async ():Promise<DiningFolioOrder[]> => {
+      reviewGate();
+      const payload=objectResponse(await request<unknown>('GET',p+'/dining/folio-orders'),'dining folio list');
+      if (!Array.isArray(payload.items))throw new ApiError('UNKNOWN','Invalid dining folio list');
+      return payload.items.map(folioOrder);
+    },
+    postDiningFolioCharge: async (orderId:string):Promise<DiningFolioPostAck> => {
+      reviewGate();
+      const id=safeRouteId(orderId);
+      const row=objectResponse(await request<unknown>('POST',p+'/dining/orders/'+id+'/folio'),'dining folio charge');
+      if(row.order_id!==id||typeof row.charge_id!=='string'||
+        typeof row.idempotent_replay!=='boolean'||row.payment_created!==false||
+        row.financial_truth!=='OPEN_FOLIO_CHARGE_NOT_PAYMENT')
+        throw new ApiError('UNKNOWN','Invalid folio charge acknowledgement');
+      return {order_id:id,charge_id:safeRouteId(row.charge_id),
+        idempotent_replay:row.idempotent_replay,payment_created:false,
+        financial_truth:'OPEN_FOLIO_CHARGE_NOT_PAYMENT'};
+    },
+    assistantCapabilities: async () => {
+      reviewGate();
+      return assistantCapabilitiesResponse(await request<unknown>('GET', p + '/assistant/capabilities'));
+    },
+    assistantChat: async (messages: AssistantMessage[], locale: 'ru' | 'kg' | 'en' | 'kz', currentScreen: string) => {
+      reviewGate();
+      return assistantAnswerResponse(await request<unknown>('POST', p + '/assistant/chat', {
+        messages: messages.slice(-10), locale, current_screen: currentScreen,
+      }));
+    },
+  };
+}
+export function useLiveModules() {
+  const { hotel, api, user, serverAuthMode } = useSession();
+  // A connection URL is NOT an authenticated hotel identity. In the shared
+  // multi-owner PMS a leftover OS cookie may belong to a DIFFERENT property.
+  // Never issue a module request until /auth/me verified the selected session.
+  // Recreate the module client whenever identity or its API instance changes,
+  // so dependent screens invalidate old hotel data before issuing fresh reads.
+  return useMemo(() =>
+    hotel && user && api?.mode === 'LIVE' && isTrustedHotelOrigin(hotel.baseUrl)
+      ? createLiveModules(hotel.baseUrl, fetch, serverAuthMode, clientSessionGuard(api)) : null,
+    [hotel, api, user, serverAuthMode],
+  );
+}
+
+/** Hotel-local calendar dates for the occupancy grid; do not use UTC toISOString(). */
+export function localDate(offset = 0): string {
+  const d = new Date(); d.setDate(d.getDate() + offset);
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+}

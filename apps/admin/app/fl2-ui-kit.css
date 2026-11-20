@@ -1,0 +1,97 @@
+/* MARINA SMART Future Luxury 2.0: opt-in presentation primitives only.
+   Deliberately NO global table, chessboard, modal, auth or route overrides. */
+html[data-marina-ui="future-luxury"] {
+  --fl2-bg: #061225;
+  --fl2-surface: #10213d;
+  --fl2-surface-raised: #172a49;
+  --fl2-edge: #36506c;
+  --fl2-ink: #f4f8ff;
+  --fl2-muted: #b3c6dc;
+  --fl2-accent: #00d8ff;
+  --fl2-champagne: #e6bd70;
+}
+html[data-marina-ui="future-luxury"] .fl2-card {
+  color: var(--fl2-ink);
+  background: var(--fl2-surface);
+  border: 1px solid var(--fl2-edge);
+  border-radius: 18px;
+  padding: clamp(14px, 1.5vw, 22px);
+  min-width: 0;
+  box-shadow: 0 12px 32px rgba(2, 12, 29, .16);
+  transition: border-color 180ms ease, box-shadow 220ms ease, transform 180ms ease;
+}
+html[data-marina-ui="future-luxury"] .fl2-card:focus-within {
+  border-color: var(--fl2-accent);
+}
+html[data-marina-ui="future-luxury"] .fl2-card:has(> a:hover),
+html[data-marina-ui="future-luxury"] .fl2-card:has(> button:hover) {
+  border-color: rgba(0, 216, 255, .55);
+  transform: translateY(-2px);
+}
+html[data-marina-ui="future-luxury"] .fl2-card__heading {
+  margin: 0;
+  color: var(--fl2-ink);
+  font-weight: 750;
+  letter-spacing: -.015em;
+  overflow-wrap: anywhere;
+}
+html[data-marina-ui="future-luxury"] .fl2-card__detail {
+  color: var(--fl2-muted);
+  font-size: .875rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+html[data-marina-ui="future-luxury"] .fl2-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .4em;
+  min-width: 0;
+  max-width: 100%;
+  padding: .35em .7em;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+html[data-marina-ui="future-luxury"] .fl2-badge[data-tone="success"] { color: #61dfb7; }
+html[data-marina-ui="future-luxury"] .fl2-badge[data-tone="warning"] { color: #f4cc7b; }
+html[data-marina-ui="future-luxury"] .fl2-badge[data-tone="danger"] { color: #ff9ca4; }
+html[data-marina-ui="future-luxury"] .fl2-badge[data-tone="info"] { color: #91d6ff; }
+html[data-marina-ui="future-luxury"] .fl2-badge[data-tone="neutral"] { color: var(--fl2-muted); }
+html[data-marina-ui="future-luxury"] .fl2-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .6em;
+  min-height: 44px;
+  border: 1px solid var(--fl2-accent);
+  border-radius: 12px;
+  padding: .6em 1.05em;
+  background: var(--fl2-accent);
+  color: #061225;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+  transition: filter 150ms ease, transform 150ms ease;
+}
+html[data-marina-ui="future-luxury"] .fl2-button:hover { filter: brightness(1.1); }
+html[data-marina-ui="future-luxury"] .fl2-button:active { transform: scale(.98); }
+html[data-marina-ui="future-luxury"] .fl2-button:disabled {
+  cursor: not-allowed;
+  opacity: .52;
+  transform: none;
+}
+html[data-marina-ui="future-luxury"] .fl2-button:focus-visible {
+  outline: 3px solid var(--fl2-champagne);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-marina-ui="future-luxury"] .fl2-card,
+  html[data-marina-ui="future-luxury"] .fl2-button {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}

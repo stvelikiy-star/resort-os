@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import KitchenIngredients from "./KitchenIngredients";
 import { shiftHotelDateIso } from "../lib/hotelDate";
 
 import styles from "./ChefProduction.module.css";
@@ -60,7 +61,7 @@ const localIso = (offset = 0) => shiftHotelDateIso(offset);
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : body?.detail?.code || "Ошибка Resort Core");
+  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : body?.detail?.code || "Ошибка MARINA SMART");
   return body;
 }
 
@@ -159,7 +160,7 @@ export default function ChefProduction({ userRole }: Props) {
 
   return <section className={styles.shell}>
     <header className={styles.head}>
-      <div><p>Chef OS · план производства</p><h2>Сколько готовим</h2><span>Текущий план идёт из Resort Core. После cutoff кухня фиксирует базовое количество, а все поздние изменения отображаются отдельной дельтой.</span></div>
+      <div><p>Chef OS · план производства</p><h2>Сколько готовим</h2><span>Текущий план идёт из MARINA SMART. После cutoff кухня фиксирует базовое количество, а все поздние изменения отображаются отдельной дельтой.</span></div>
       <div className={styles.controls}><label>С<input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} /></label><label>По<input type="date" value={throughDate} onChange={(e) => setThroughDate(e.target.value)} /></label><button onClick={() => void load()} disabled={loading}>↻ Обновить</button></div>
     </header>
 
@@ -173,6 +174,8 @@ export default function ChefProduction({ userRole }: Props) {
       <article><strong>{loading ? "…" : todayDay?.meals.find((m) => m.meal_type === "DINNER")?.total_portions ?? 0}</strong><span>ужин</span></article>
       <article className={departures.length ? styles.attention : ""}><strong>{loading ? "…" : departures.length}</strong><span>выездных отметок сегодня</span></article>
     </div>
+
+    <KitchenIngredients fromDate={fromDate} throughDate={throughDate} userRole={userRole}/>
 
     {loading && !data ? <div className={styles.empty}>Загружаю производственный план…</div> : <div className={styles.days}>{data?.days.map((day) => <article className={styles.day} key={day.service_date}>
       <div className={styles.dayHead}><div><small>{day.service_date === today ? "СЕГОДНЯ" : "ДАТА"}</small><h3>{day.service_date}</h3></div><b>{day.meals.reduce((sum, meal) => sum + meal.total_portions, 0)} порц.</b></div>

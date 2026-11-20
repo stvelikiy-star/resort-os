@@ -14,6 +14,8 @@ on:
       - 'apps/admin/components/PMSGridV9.tsx'
       - 'apps/web/components/GuestRequestsPanel.tsx'
       - 'scripts/verify_guest_services_center.py'
+      - 'scripts/verify_agent_services_e2e.py'
+      - 'scripts/test_marina_agent_services.py'
       - 'scripts/upsert_staff_user.py'
       - '.github/workflows/guest-services-ci.yml'
   push:
@@ -30,6 +32,8 @@ on:
       - 'apps/admin/components/PMSGridV9.tsx'
       - 'apps/web/components/GuestRequestsPanel.tsx'
       - 'scripts/verify_guest_services_center.py'
+      - 'scripts/verify_agent_services_e2e.py'
+      - 'scripts/test_marina_agent_services.py'
       - 'scripts/upsert_staff_user.py'
       - '.github/workflows/guest-services-ci.yml'
   workflow_dispatch:
@@ -109,6 +113,9 @@ jobs:
           pip install -r services/api/requirements.txt
           python -m compileall services/api/app scripts/verify_guest_services_center.py scripts/upsert_staff_user.py
 
+      - name: Test agent service security boundaries
+        run: python scripts/test_marina_agent_services.py
+
       - name: Seed Three Crowns and bootstrap OWNER
         run: |
           python scripts/seed_from_intake.py
@@ -117,7 +124,7 @@ jobs:
       - name: Prove current RBAC roles are reproducible by staff helper
         run: |
           STAFF_USERNAME=ci-reception STAFF_PASSWORD=CI-Reception-Password-2026 STAFF_DISPLAY_NAME='CI Reception' STAFF_ROLE=RECEPTION python scripts/upsert_staff_user.py
-          STAFF_USERNAME=ci-dining STAFF_PASSWORD=CI-Dining-Password-2026 STAFF_DISPLAY_NAME='CI Dining' STAFF_ROLE=DINING_STAFF python scripts/upsert_staff_user.py
+          STAFF_USERNAME=ci-cook STAFF_PASSWORD=CI-Cook-Password-2026 STAFF_DISPLAY_NAME='CI Cook' STAFF_ROLE=COOK python scripts/upsert_staff_user.py
           STAFF_USERNAME=ci-store STAFF_PASSWORD=CI-Store-Password-2026 STAFF_DISPLAY_NAME='CI Store' STAFF_ROLE=STORE_STAFF python scripts/upsert_staff_user.py
           STAFF_USERNAME=ci-content STAFF_PASSWORD=CI-Content-Password-2026 STAFF_DISPLAY_NAME='CI Content' STAFF_ROLE=CONTENT_MANAGER python scripts/upsert_staff_user.py
 
@@ -133,6 +140,11 @@ jobs:
 
       - name: Run unified Guest Services Center E2E
         run: python scripts/verify_guest_services_center.py
+
+      - name: Verify own-agent requests in disposable PostgreSQL
+        env:
+          ALLOW_AGENT_SERVICE_TEST_WRITES: '1'
+        run: python scripts/verify_agent_services_e2e.py
 
       - name: Show Core logs on failure
         if: failure()

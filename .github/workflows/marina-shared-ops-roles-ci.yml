@@ -1,0 +1,32 @@
+name: MARINA Shared Operations RBAC CI
+
+on:
+  pull_request:
+    paths:
+      - 'release/marina-smart-shared-rc3.json'
+      - 'services/api/app/auth.py'
+      - 'services/api/app/operations.py'
+      - 'services/api/app/section_permissions.py'
+      - 'services/api/app/shared_auth_preview.py'
+      - 'scripts/test_marina_shared_ops_roles.py'
+      - '.github/workflows/marina-shared-ops-roles-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  role-ceiling:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install canonical API requirements
+        run: python -m pip install -r services/api/requirements.txt
+      - name: Check role ceiling across default, custom and revoked grants
+        run: PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s scripts -p 'test_marina_shared_ops_roles.py' -v
+      - name: Syntax check operations permission boundary
+        run: python -m py_compile services/api/app/operations.py services/api/app/section_permissions.py services/api/app/shared_auth_preview.py

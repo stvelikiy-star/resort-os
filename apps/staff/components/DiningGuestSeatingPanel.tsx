@@ -46,15 +46,16 @@ export default function DiningGuestSeatingPanel() {
       const [me, staysBody, tablesBody, sessionsBody] = await Promise.all([
         api("/core/api/v1/auth/me"),
         api("/core/api/v1/dining/stays?include_future_days=3"),
-        api("/core/api/v1/kitchen/tables"),
+        api("/core/api/v1/dining/floor"),
         api(`/core/api/v1/dining/sessions?service_date=${todayIso()}&status=ACTIVE`),
       ]);
       setUser(me);
       setStays(staysBody.items ?? []);
-      setTables((tablesBody.items ?? []).map((item: any) => ({ ...item, zone_label: item.zone_label ?? item.zoneLabel ?? null })));
+      // Dining floor only returns active property tables and permits WAITER access.
+      setTables((tablesBody.tables ?? []).map((item: any) => ({ ...item, is_active: true, zone_label: item.zone_label ?? item.zoneLabel ?? null })));
       setSessions(sessionsBody.items ?? []);
       setStayId((current) => current || staysBody.items?.[0]?.stay_id || "");
-      setTableId((current) => current || tablesBody.items?.find((item: any) => item.is_active && item.status !== "OUT_OF_SERVICE")?.id || "");
+      setTableId((current) => current || tablesBody.tables?.find((item: any) => item.status !== "OUT_OF_SERVICE")?.id || "");
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось загрузить посадку");
@@ -82,7 +83,7 @@ export default function DiningGuestSeatingPanel() {
     try {
       await api("/core/api/v1/dining/sessions", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ stay_id: stayId, table_id: tableId, service_date: todayIso(), meal_type: meal, waiter_id: user.role === "DINING_STAFF" ? user.id : null, status: "WAITING" }),
+        body: JSON.stringify({ stay_id: stayId, table_id: tableId, service_date: todayIso(), meal_type: meal, waiter_id: user.role === "WAITER" ? user.id : null, status: "WAITING" }),
       });
       setNotice("Гость закреплён за столом и ожидается.");
       await load();

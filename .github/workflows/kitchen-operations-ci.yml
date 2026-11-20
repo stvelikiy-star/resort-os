@@ -6,6 +6,66 @@ on:
       - 'packages/database/prisma/migrations/7_kitchen_operations/**'
       - 'services/api/app/kitchen.py'
       - 'services/api/app/kitchen_menu_management.py'
+      - 'services/api/app/kitchen_recipes.py'
+      - 'services/api/app/kitchen_stock.py'
+      - 'services/api/app/kitchen_procurement.py'
+      - 'services/api/app/owner_kitchen_management.py'
+      - 'services/api/app/owner_kitchen_reconciliation.py'
+      - 'services/api/app/owner_accrual_readiness.py'
+      - 'services/api/app/owner_delivered_revenue.py'
+      - 'services/api/app/owner_revenue_source_journal.py'
+      - 'services/api/app/owner_revenue_corrections.py'
+      - 'services/api/app/owner_revenue_evidence.py'
+      - 'services/api/app/owner_accounting_journal.py'
+      - 'services/api/app/owner_expenses.py'
+      - 'services/api/app/owner_supplier_documents.py'
+      - 'services/api/app/owner_supplier_returns.py'
+      - 'services/api/app/owner_cash_reconciliation.py'
+      - 'services/api/app/hotel_finance.py'
+      - 'packages/database/prisma/migrations/zz120_marina_owner_expenses_20261115/**'
+      - 'packages/database/prisma/migrations/zz121_marina_supplier_documents_20261116/**'
+      - 'packages/database/prisma/migrations/zz122_marina_supplier_returns_20261116/**'
+      - 'packages/database/prisma/migrations/zz123_marina_owner_revenue_source_events_20261116/**'
+      - 'packages/database/prisma/migrations/zz124_marina_owner_revenue_corrections_20261116/**'
+      - 'packages/database/prisma/migrations/zz125_marina_owner_revenue_evidence_bytes_20261116/**'
+      - 'packages/database/prisma/migrations/zz126_marina_owner_accounting_journal_proposals_20261116/**'
+      - 'scripts/verify_supplier_document_e2e.py'
+      - 'scripts/verify_supplier_returns_e2e.py'
+      - 'scripts/verify_owner_expenses_e2e.py'
+      - 'scripts/test_marina_owner_finance_roles.py'
+      - 'scripts/test_marina_owner_inventory_reconciliation.py'
+      - 'scripts/test_owner_accrual_readiness.py'
+      - 'scripts/test_owner_delivered_revenue.py'
+      - 'scripts/verify_owner_delivered_revenue_e2e.py'
+      - 'scripts/verify_owner_revenue_source_journal_e2e.py'
+      - 'scripts/test_owner_revenue_corrections.py'
+      - 'scripts/test_owner_revenue_evidence_bytes.py'
+      - 'scripts/test_owner_accounting_journal_proposals.py'
+      - 'scripts/verify_owner_accounting_journal_e2e.py'
+      - 'services/api/app/staff_task_reports.py'
+      - 'scripts/verify_mobile_staff_reports_e2e.py'
+      - 'scripts/verify_mobile_menu_publication_e2e.py'
+      - 'packages/database/prisma/migrations/zz119_marina_kitchen_procurement_20261115/**'
+      - 'scripts/verify_kitchen_procurement_e2e.py'
+      - 'scripts/verify_procurement_recovery_e2e.py'
+      - 'scripts/procurement_journal_process_e2e.cjs'
+      - 'apps/mobile/src/lib/pendingProcurement.ts'
+      - 'apps/mobile/src/components/KitchenProcurement.tsx'
+      - 'packages/database/prisma/migrations/zz117_marina_kitchen_stock_20261111/**'
+      - 'scripts/test_marina_kitchen_stock.py'
+      - 'scripts/test_marina_stock_receipts.py'
+      - 'scripts/verify_stock_receipt_idempotency_e2e.py'
+      - 'scripts/stock_receipt_staff_browser_e2e.mjs'
+      - 'apps/staff/components/DirectStockReceipt.tsx'
+      - 'apps/staff/components/StoreStaffStock.tsx'
+      - 'apps/staff/components/KitchenStock.tsx'
+      - 'apps/staff/lib/directStockReceipt.ts'
+      - 'scripts/verify_kitchen_losses_e2e.py'
+      - 'packages/database/prisma/migrations/zz118_marina_kitchen_waste_spoilage_20261115/**'
+      - 'packages/database/prisma/migrations/zz116_marina_kitchen_recipes_20261111/**'
+      - 'scripts/test_marina_kitchen_recipes.py'
+      - 'scripts/verify_kitchen_recipes.py'
+      - 'apps/staff/components/KitchenIngredients.tsx'
       - 'services/api/app/kitchen_arrivals.py'
       - 'services/api/app/app_entry.py'
       - 'apps/staff/app/kitchen/**'
@@ -15,7 +75,12 @@ on:
       - 'apps/staff/components/KitchenAdmin.module.css'
       - 'apps/staff/components/StaffRoleGateway.tsx'
       - 'scripts/verify_kitchen_operations.py'
+      - 'scripts/verify_waiter_serve_e2e.py'
+      - 'scripts/verify_restaurant_full_cycle_e2e.py'
       - 'scripts/verify_kitchen_menu_management.py'
+      - 'scripts/verify_kitchen_stoplist_e2e.py'
+      - 'services/api/app/kitchen_menu_management.py'
+      - 'scripts/test_kitchen_draft_authoring.py'
       - '.github/workflows/kitchen-operations-ci.yml'
   workflow_dispatch:
 
@@ -85,6 +150,30 @@ jobs:
           pip install -r services/api/requirements.txt
           python -m compileall services/api/app scripts/verify_kitchen_operations.py scripts/verify_kitchen_menu_management.py
 
+      - name: Test strict OWNER financial role boundaries
+        run: python scripts/test_marina_owner_finance_roles.py
+
+      - name: Test OWNER weighted inventory reconciliation and legacy anomaly flags
+        run: PYTHONPATH=. python scripts/test_marina_owner_inventory_reconciliation.py
+
+      - name: Test OWNER accrual-readiness classification and no fabricated profit
+        run: PYTHONPATH=. python scripts/test_owner_accrual_readiness.py
+
+      - name: Test nightly revenue candidate allocation and folio source dedup
+        run: PYTHONPATH=. python scripts/test_owner_delivered_revenue.py
+
+      - name: Test documented OWNER correction and package/tax/refund boundaries
+        run: PYTHONPATH=. python scripts/test_owner_revenue_corrections.py
+
+      - name: Test OWNER evidence byte integrity, media signatures and size bounds
+        run: PYTHONPATH=. python scripts/test_owner_revenue_evidence_bytes.py
+
+      - name: Verify balanced accounting proposal contracts (no P&L)
+        run: PYTHONPATH=. python scripts/test_owner_accounting_journal_proposals.py
+
+      - name: Test cook draft authoring and management authority
+        run: PYTHONPATH=. python scripts/test_kitchen_draft_authoring.py
+
       - name: Seed canonical hotel and owner
         run: |
           python scripts/seed_from_intake.py
@@ -100,7 +189,43 @@ jobs:
           )"
           echo "KITCHEN_MENU_DINING_USERNAME=$DINING_USERNAME" >> "$GITHUB_ENV"
           echo "KITCHEN_MENU_DINING_PASSWORD=$DINING_PASSWORD" >> "$GITHUB_ENV"
-          STAFF_USERNAME="$DINING_USERNAME" STAFF_PASSWORD="$DINING_PASSWORD" STAFF_DISPLAY_NAME="Kitchen Menu Dining CI" STAFF_ROLE="DINING_STAFF" python scripts/upsert_staff_user.py
+          STAFF_USERNAME="$DINING_USERNAME" STAFF_PASSWORD="$DINING_PASSWORD" STAFF_DISPLAY_NAME="Kitchen Menu Cook CI" STAFF_ROLE="COOK" python scripts/upsert_staff_user.py
+
+      - name: Provision isolated WAITER credential for serve E2E
+        run: |
+          WAITER_USERNAME="kitchen-serve-waiter-ci"
+          WAITER_PASSWORD="$(python - <<'PY'
+          import secrets
+          print('Ws-' + secrets.token_urlsafe(24))
+          PY
+          )"
+          echo "WAITER_SERVE_E2E_USERNAME=$WAITER_USERNAME" >> "$GITHUB_ENV"
+          echo "WAITER_SERVE_E2E_PASSWORD=$WAITER_PASSWORD" >> "$GITHUB_ENV"
+          STAFF_USERNAME="$WAITER_USERNAME" STAFF_PASSWORD="$WAITER_PASSWORD" STAFF_DISPLAY_NAME="Serve Waiter CI" STAFF_ROLE="WAITER" python scripts/upsert_staff_user.py
+
+      - name: Provision second isolated WAITER for assignment denial E2E
+        run: |
+          OTHER_USERNAME="kitchen-other-waiter-ci"
+          OTHER_PASSWORD="$(python - <<'PY'
+          import secrets
+          print('Wo-' + secrets.token_urlsafe(24))
+          PY
+          )"
+          echo "WAITER_OTHER_E2E_USERNAME=$OTHER_USERNAME" >> "$GITHUB_ENV"
+          echo "WAITER_OTHER_E2E_PASSWORD=$OTHER_PASSWORD" >> "$GITHUB_ENV"
+          STAFF_USERNAME="$OTHER_USERNAME" STAFF_PASSWORD="$OTHER_PASSWORD" STAFF_DISPLAY_NAME="Other Waiter CI" STAFF_ROLE="WAITER" python scripts/upsert_staff_user.py
+
+      - name: Provision isolated STORE_STAFF for procurement E2E
+        run: |
+          STORE_USERNAME="kitchen-proc-store-ci"
+          STORE_PASSWORD="$(python - <<'PY'
+          import secrets
+          print('Ks-' + secrets.token_urlsafe(24))
+          PY
+          )"
+          echo "PROC_STORE_USERNAME=$STORE_USERNAME" >> "$GITHUB_ENV"
+          echo "PROC_STORE_PASSWORD=$STORE_PASSWORD" >> "$GITHUB_ENV"
+          STAFF_USERNAME="$STORE_USERNAME" STAFF_PASSWORD="$STORE_PASSWORD" STAFF_DISPLAY_NAME="Kitchen Procurement Store CI" STAFF_ROLE="STORE_STAFF" python scripts/upsert_staff_user.py
 
       - name: Typecheck and build Kitchen Admin host app
         working-directory: apps/staff
@@ -123,8 +248,101 @@ jobs:
       - name: Run Kitchen Operations E2E
         run: python scripts/verify_kitchen_operations.py
 
+      - name: Run assigned waiter serve PostgreSQL E2E
+        run: python scripts/verify_waiter_serve_e2e.py
+
+      - name: Run full restaurant seating-to-folio PostgreSQL E2E
+        run: python scripts/verify_restaurant_full_cycle_e2e.py
+
       - name: Run Kitchen Menu Management E2E
         run: python scripts/verify_kitchen_menu_management.py
+
+      - name: Run kitchen stop-list PostgreSQL E2E
+        run: python scripts/verify_kitchen_stoplist_e2e.py
+
+      - name: Test kitchen stock contracts
+        run: |
+          PYTHONPATH=. python scripts/test_marina_kitchen_stock.py
+          python scripts/test_marina_stock_receipts.py
+
+      - name: Verify direct receipts with PostgreSQL, concurrency and API restart
+        env:
+          ALLOW_STOCK_RECEIPT_TEST_WRITES: '1'
+        run: python scripts/verify_stock_receipt_idempotency_e2e.py
+
+      - name: P0 Mobile STORE_STAFF real screen -> Core -> disposable PostgreSQL
+        env:
+          RUN_MARINA_REAL_SCREEN_E2E: '1'
+        run: |
+          npm ci --prefix apps/mobile --no-audit --no-fund
+          npm --prefix apps/mobile test -- --ci --runInBand --runTestsByPath __tests__/store-real-postgres-screen.e2e.test.tsx
+
+      - name: Verify Staff Web lost acknowledgement and browser reload
+        env:
+          ALLOW_STOCK_RECEIPT_TEST_WRITES: '1'
+        run: |
+          npm install --prefix /tmp/marina-receipt-browser playwright --no-audit --no-fund
+          node scripts/stock_receipt_staff_browser_e2e.mjs
+          python scripts/verify_stock_receipt_idempotency_e2e.py --verify-browser
+
+      - name: Run kitchen loss and spoilage PostgreSQL E2E
+        run: python scripts/verify_kitchen_losses_e2e.py
+
+      - name: Test recipe validation and exact ingredient totals
+        run: PYTHONPATH=. python scripts/test_marina_kitchen_recipes.py
+
+      - name: Verify recipe storage, permissions and concurrent updates
+        run: ALLOW_KITCHEN_RECIPE_TEST_WRITES=1 python scripts/verify_kitchen_recipes.py
+
+      - name: Run kitchen procurement real PostgreSQL E2E
+        env:
+          ALLOW_KITCHEN_PROCUREMENT_TEST_WRITES: '1'
+        run: python scripts/verify_kitchen_procurement_e2e.py
+
+      - name: Verify procurement concurrency and mobile journal process restart
+        env:
+          ALLOW_PROCUREMENT_RECOVERY_TEST_WRITES: '1'
+        run: python scripts/verify_procurement_recovery_e2e.py
+
+      - name: Run owner expense obligations and manual settlements PostgreSQL E2E
+        env:
+          ALLOW_OWNER_EXPENSE_TEST_WRITES: '1'
+        run: python scripts/verify_owner_expenses_e2e.py
+
+      - name: Verify delivered stay nights and served folio sources PostgreSQL E2E
+        env:
+          ALLOW_OWNER_EXPENSE_TEST_WRITES: '1'
+        run: python scripts/verify_owner_delivered_revenue_e2e.py
+
+      - name: Verify supplier invoice receipts and manual payable settlements PostgreSQL E2E
+        env:
+          ALLOW_SUPPLIER_DOCUMENT_TEST_WRITES: '1'
+        run: python scripts/verify_supplier_document_e2e.py
+
+      - name: Verify supplier return credit and inventory debit PostgreSQL E2E
+        env:
+          ALLOW_SUPPLIER_DOCUMENT_TEST_WRITES: '1'
+        run: python scripts/verify_supplier_returns_e2e.py
+
+      - name: Verify mobile repair DTO through repair, cleaning and inspection
+        env:
+          ALLOW_STAFF_REPORT_TEST_WRITES: '1'
+        run: python scripts/verify_mobile_staff_reports_e2e.py
+
+      - name: Verify mobile OWNER/MANAGER publication DTO and cook restrictions
+        env:
+          ALLOW_MOBILE_MENU_TEST_WRITES: '1'
+        run: python scripts/verify_mobile_menu_publication_e2e.py
+
+      - name: Verify immutable OWNER source approvals and reversals PostgreSQL E2E
+        env:
+          ALLOW_REVENUE_JOURNAL_SYNTHETIC_CI: '1'
+        run: python scripts/verify_owner_revenue_source_journal_e2e.py
+
+      - name: Verify balanced immutable OWNER accounting proposals on real PostgreSQL
+        env:
+          ALLOW_REVENUE_JOURNAL_SYNTHETIC_CI: '1'
+        run: python scripts/verify_owner_accounting_journal_e2e.py
 
       - name: Show Core logs on failure
         if: failure()

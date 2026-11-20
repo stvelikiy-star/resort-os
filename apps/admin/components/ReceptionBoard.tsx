@@ -179,7 +179,7 @@ export default function ReceptionBoard() {
 
   return <main className="work-shell reception-shell">
     <div className="work-head">
-      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Одна бронь — одна строка, даже после переселения. Текущий номер, оплаты, folio, агент и история размещения берутся из Resort Core.</p></div>
+      <div><p className="eyebrow">PMS · ресепшен</p><h1>Брони и проживание</h1><p className="subtitle">Одна бронь — одна строка, даже после переселения. Текущий номер, оплаты, folio, агент и история размещения берутся из MARINA SMART.</p></div>
       <button className="btn" onClick={load}>Обновить</button>
     </div>
 

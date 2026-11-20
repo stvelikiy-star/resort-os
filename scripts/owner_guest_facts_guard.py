@@ -16,6 +16,7 @@ PUBLIC_I18N = ROOT / "apps/web/components/PublicUiI18nRuntime.tsx"
 HOME = ROOT / "apps/web/app/page.tsx"
 RULES = ROOT / "apps/web/app/rules/page.tsx"
 LAYOUT = ROOT / "apps/web/app/layout.tsx"
+PUBLIC_RUNTIME = ROOT / "apps/web/components/PublicSiteRuntime.tsx"
 
 REQUIRED_FACT_SNIPPETS = [
     "70000001027860639/tab/reviews",
@@ -81,6 +82,9 @@ def main() -> int:
     home = read(HOME, errors)
     rules = read(RULES, errors)
     layout = read(LAYOUT, errors)
+    public_runtime = read(PUBLIC_RUNTIME, errors)
+    if "<PublicSiteRuntime />" not in layout:
+        errors.append("PublicSiteRuntime is not mounted in the root layout")
 
     for snippet in REQUIRED_FACT_SNIPPETS:
         if snippet not in facts:
@@ -109,17 +113,17 @@ def main() -> int:
         transfer_positions.append(transfer)
         excursions_positions.append(excursions)
         offset = excursions + 1
-    if len(transfer_positions) != 3 or len(excursions_positions) != 3:
-        errors.append(f"expected TRANSFER/EXCURSIONS ordering in 3 locales, found {len(transfer_positions)}/{len(excursions_positions)}")
+    if len(transfer_positions) != 4 or len(excursions_positions) != 4:
+        errors.append(f"expected TRANSFER/EXCURSIONS ordering in 4 locales, found {len(transfer_positions)}/{len(excursions_positions)}")
     elif any(transfer > excursions for transfer, excursions in zip(transfer_positions, excursions_positions)):
         errors.append("TRANSFER must render before EXCURSIONS in every public locale")
 
-    if "GuestServicesRuntime" not in layout:
+    if "GuestServicesRuntime" not in public_runtime:
         errors.append("GuestServicesRuntime is not mounted in public layout")
-    if "PublicUiI18nRuntime" not in layout:
+    if "PublicUiI18nRuntime" not in public_runtime:
         errors.append("PublicUiI18nRuntime is not mounted in public layout")
-    public_i18n_mount = layout.find("<PublicUiI18nRuntime />")
-    guest_facts_mount = layout.find("<GuestServicesRuntime />")
+    public_i18n_mount = public_runtime.find("<PublicUiI18nRuntime />")
+    guest_facts_mount = public_runtime.find("<GuestServicesRuntime />")
     if public_i18n_mount == -1 or guest_facts_mount == -1 or public_i18n_mount > guest_facts_mount:
         errors.append("GuestServicesRuntime must mount after PublicUiI18nRuntime so canonical facts win hydration")
 
@@ -154,7 +158,7 @@ def main() -> int:
     print(f"FACT: required_guest_fact_snippets={len(REQUIRED_FACT_SNIPPETS)}")
     print(f"FACT: forbidden_stale_amenities={len(FORBIDDEN_STALE_AMENITIES)}")
     print(f"FACT: required_rule_snippets={len(REQUIRED_RULE_SNIPPETS)}")
-    print(f"FACT: localized_transfer_before_tours={len(transfer_positions) == 3 and all(t < e for t, e in zip(transfer_positions, excursions_positions))}")
+    print(f"FACT: localized_transfer_before_tours={len(transfer_positions) == 4 and all(t < e for t, e in zip(transfer_positions, excursions_positions))}")
     print(f"FACT: ssr_guest_facts={'ownerApprovedGuestFacts' in home}")
 
     if errors:

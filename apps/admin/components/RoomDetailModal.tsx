@@ -1,6 +1,9 @@
 "use client";
 
+import { usePmsDialog } from "./hooks/usePmsDialog";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
+import RoomWayfindingPanel from "./RoomWayfindingPanel";
 
 type RoomDetail = {
   room: {
@@ -81,6 +84,7 @@ export default function RoomDetailModal({ roomId, onClose, onUpdated }: { roomId
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busyState, setBusyState] = useState<RoomState | null>(null);
+  const dialogRef = usePmsDialog(onClose, busyState !== null);
   const [section, setSection] = useState<"TASKS" | "BLOCKS">("TASKS");
 
   const load = useCallback(async () => {
@@ -141,12 +145,13 @@ export default function RoomDetailModal({ roomId, onClose, onUpdated }: { roomId
   }
 
   return <div className="room-detail-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section className="room-detail-modal" role="dialog" aria-modal="true">
-      {loading && !data ? <div className="loading">Загрузка номера…</div> : error && !data ? <div className="error-box">{error}</div> : data && <>
+    <section ref={dialogRef} tabIndex={-1} className="room-detail-modal" role="dialog" aria-modal="true" aria-label="Карточка номера">
         <header className="room-detail-head">
-          <div><p className="eyebrow">Карточка номера</p><h2>№ {data.room.code}</h2><p>{data.room.room_type_name}</p></div>
+          <div><p className="eyebrow">Карточка номера</p><h2>№ {data?.room.code || "—"}</h2><p>{data?.room.room_type_name || ""}</p></div>
           <button className="btn" onClick={onClose}>Закрыть</button>
         </header>
+      {loading && !data ? <div className="loading">Загрузка номера…</div> : error && !data ? <div className="error-box">{error}</div> : data && <>
+
 
         <div className="room-detail-status">
           <span className={`badge ${data.room.operational_state}`}>{stateLabel[data.room.operational_state] || data.room.operational_state}</span>
@@ -155,7 +160,7 @@ export default function RoomDetailModal({ roomId, onClose, onUpdated }: { roomId
         </div>
 
         <section className="room-readiness-control" aria-label="Готовность номера">
-          <div className="room-readiness-head"><div><small>Быстрый статус</small><strong>Готовность номера</strong></div><span>Изменение сразу сохраняется в Resort Core</span></div>
+          <div className="room-readiness-head"><div><small>Быстрый статус</small><strong>Готовность номера</strong></div><span>Изменение сразу сохраняется в MARINA SMART</span></div>
           <div className="room-readiness-actions">
             {readinessActions.map((action) => <button key={action.state} type="button" className={`room-readiness-button ${action.state} ${data.room.operational_state === action.state ? "active" : ""}`} disabled={busyState !== null} onClick={() => void setReadiness(action.state)}><strong>{busyState === action.state ? "Сохраняю…" : action.label}</strong><small>{action.note}</small></button>)}
           </div>
@@ -200,7 +205,9 @@ export default function RoomDetailModal({ roomId, onClose, onUpdated }: { roomId
           </article>)}
         </div>}
 
-        <p className="room-detail-truth">Карточка показывает только сохранённые данные Resort Core. Пустые корпус, этаж, площадь или конфигурация не заполняются предположениями.</p>
+        <RoomWayfindingPanel roomId={roomId} />
+
+        <p className="room-detail-truth">Карточка показывает только сохранённые данные MARINA SMART. Пустые корпус, этаж, площадь или конфигурация не заполняются предположениями.</p>
       </>}
     </section>
   </div>;

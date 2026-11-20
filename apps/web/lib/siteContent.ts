@@ -14,7 +14,8 @@ export type SiteContent = {
   seo?: Record<string, string>;
 };
 
-type SiteContentResponse = {
+export type SiteContentResponse = {
+  property?: string;
   locale: SiteLocale;
   content: SiteContent;
   published_version: number;
@@ -81,6 +82,10 @@ export const fallbackSiteContent: Record<SiteLocale, SiteContent> = {
   },
 };
 
+export function isThreeCrownsPublishedContent(payload: SiteContentResponse | null): payload is SiteContentResponse {
+  return payload?.property === "THREE_CROWNS" && payload.source === "DATABASE" && Boolean(payload.content);
+}
+
 export async function getPublishedSiteContent(locale: SiteLocale = "ru"): Promise<SiteContentResponse> {
   const fallback: SiteContentResponse = { locale, content: fallbackSiteContent[locale], published_version: 0, source: "DEFAULT" };
   const baseUrl = (process.env.CORE_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
@@ -88,7 +93,7 @@ export async function getPublishedSiteContent(locale: SiteLocale = "ru"): Promis
     const response = await fetch(`${baseUrl}/api/v1/site/content?locale=${locale}`, { next: { revalidate: 60 } });
     if (!response.ok) return fallback;
     const payload = (await response.json()) as SiteContentResponse;
-    return payload?.content ? payload : fallback;
+    return isThreeCrownsPublishedContent(payload) ? payload : fallback;
   } catch {
     return fallback;
   }

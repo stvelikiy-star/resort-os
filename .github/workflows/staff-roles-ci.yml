@@ -3,13 +3,18 @@ name: Staff Roles CI
 on:
   pull_request:
     paths:
+      - 'release/marina-smart-current-candidate.json'
       - 'apps/staff/app/page.tsx'
+      - 'apps/staff/app/layout.tsx'
+      - 'apps/staff/components/StaffLocaleRuntime.tsx'
       - 'apps/staff/components/StaffRoleGateway.tsx'
       - 'apps/staff/components/GuestRequestShiftPanel.tsx'
       - 'services/api/app/staff_guest_requests.py'
       - 'services/api/app/auth.py'
       - 'services/api/app/telegram_auth.py'
       - 'scripts/verify_staff_roles.py'
+      - 'scripts/test_marina_staff_legacy_dining_preservation.py'
+      - 'scripts/verify_guest_request_role_ceiling.py'
       - '.github/workflows/staff-roles-ci.yml'
   workflow_dispatch:
 
@@ -49,6 +54,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Guard Admin and Staff locale residuals
+        run: python3 scripts/marina_admin_i18n_residual_guard.py
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -75,6 +83,12 @@ jobs:
         run: |
           pip install -r services/api/requirements.txt
           python -m compileall services/api/app scripts/verify_staff_roles.py
+
+      - name: Preserve legacy DINING_STAFF portal without shared-role escalation
+        run: python3 scripts/test_marina_staff_legacy_dining_preservation.py
+
+      - name: Check guest-request role ceilings without database mutations
+        run: python3 scripts/verify_guest_request_role_ceiling.py
 
       - name: Seed canonical hotel
         run: python scripts/seed_from_intake.py

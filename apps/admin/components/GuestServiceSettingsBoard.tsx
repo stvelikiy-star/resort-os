@@ -69,7 +69,7 @@ export default function GuestServiceSettingsBoard() {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : body?.detail?.code || `HTTP ${response.status}`);
       setData(body as Settings);
-      setNotice("Настройки сохранены в Resort Core. Guest OS использует их сразу для новых заказов и заявок.");
+      setNotice("Настройки сохранены в MARINA SMART. Guest OS использует их сразу для новых заказов и заявок.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Не удалось сохранить настройки");
     } finally { setSaving(false); }
@@ -80,7 +80,7 @@ export default function GuestServiceSettingsBoard() {
 
   return <main className="service-settings">
     <header className="service-settings-head">
-      <div><p className="eyebrow">Resort Core · правила сервиса</p><h1>Настройки услуг гостя</h1><p>Единые операционные правила для Guest OS, кухни и housekeeping. Время и цены меняются здесь — без правки кода.</p></div>
+      <div><p className="eyebrow">MARINA SMART · правила сервиса</p><h1>Настройки услуг гостя</h1><p>Единые операционные правила для Guest OS, кухни и housekeeping. Время и цены меняются здесь — без правки кода.</p></div>
       <button className="btn" type="button" onClick={() => void load()}>↻ Обновить</button>
     </header>
 

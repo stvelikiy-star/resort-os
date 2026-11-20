@@ -23,7 +23,7 @@ const dateOffset = (days: number) => shiftHotelDateIso(days);
 async function api(path: string, init?: RequestInit) {
   const response = await fetch(path, { cache: "no-store", ...init });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : body?.detail?.message || body?.detail?.code || "Ошибка Resort Core");
+  if (!response.ok) throw new Error(typeof body?.detail === "string" ? body.detail : body?.detail?.message || body?.detail?.code || "Ошибка MARINA SMART");
   return body;
 }
 
@@ -133,7 +133,7 @@ export default function GroupBookingBoard({ userRole }: Props) {
   }
 
   return <main className={styles.shell}>
-    <header className={styles.head}><div><p>PMS · Group Booking</p><h1>Групповая бронь</h1><span>Один фильтр → несколько номеров → одна атомарная операция. Если доступность изменилась, группа не создаётся частично.</span></div><button onClick={() => void loadGroups()}>↻ История</button></header>
+    <header className={styles.head}><div><p>PMS · Групповая бронь</p><h1>Групповая бронь</h1><span>Один фильтр → несколько номеров → одна атомарная операция. Если доступность изменилась, группа не создаётся частично.</span></div><button onClick={() => void loadGroups()}>↻ История</button></header>
     {!canOverrideRates && <div className={styles.notice}>Режим ресепшен: групповую бронь можно создать по действующим Core-тарифам. Изменение цены доступно только OWNER / MANAGER.</div>}
     {error && <div className={styles.error}>{error}</div>}{notice && <div className={styles.notice}>{notice}</div>}
 
@@ -151,7 +151,7 @@ export default function GroupBookingBoard({ userRole }: Props) {
           const childCapacity = room.children_capacity_confirmed ? String(room.capacity_children ?? 0) : "не подтверждено";
           return <article key={room.room_id} className={selected.has(room.room_id) ? styles.selected : ""}>
             <label className={styles.roomMain}><input type="checkbox" checked={selected.has(room.room_id)} onChange={() => toggle(room.room_id)} /><span><strong>№ {room.code}</strong><b>{room.room_type_name}</b><small>{room.building_or_zone || "—"} · {room.floor || "—"} · взрослых до {room.capacity_adults} · дети: {childCapacity}</small></span></label>
-            <div className={styles.price}>{needsOverride ? <>{canOverrideRates ? <><span>Цена требует решения</span><input type="number" min="1" value={override} onChange={(e) => setOverrides((current) => ({ ...current, [room.room_id]: e.target.value }))} placeholder="Ручная цена" /></> : <span>Нет подтверждённой Core-цены</span>}</> : <><span>Core rate</span><strong>{money(Number(room.pricing!.total_kgs))}</strong>{canOverrideRates && selected.has(room.room_id) && <input type="number" min="1" value={override} onChange={(e) => setOverrides((current) => ({ ...current, [room.room_id]: e.target.value }))} placeholder="или override" />}</>}</div>
+            <div className={styles.price}>{needsOverride ? <>{canOverrideRates ? <><span>Цена требует решения</span><input type="number" min="1" value={override} onChange={(e) => setOverrides((current) => ({ ...current, [room.room_id]: e.target.value }))} placeholder="Ручная цена" /></> : <span>Нет подтверждённой Core-цены</span>}</> : <><span>Тариф гостиницы</span><strong>{money(Number(room.pricing!.total_kgs))}</strong>{canOverrideRates && selected.has(room.room_id) && <input type="number" min="1" value={override} onChange={(e) => setOverrides((current) => ({ ...current, [room.room_id]: e.target.value }))} placeholder="или override" />}</>}</div>
           </article>;
         })}</div>
       </section>

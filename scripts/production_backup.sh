@@ -42,8 +42,9 @@ bool_true() {
   esac
 }
 
-mkdir -p "${TARGET}"
-chmod 700 "${BACKUP_DIR}" "${TARGET}"
+mkdir -p "${BACKUP_DIR}"
+chmod 700 "${BACKUP_DIR}"
+mkdir -m 700 "${TARGET}"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
   echo "Missing production env: ${ENV_FILE}" >&2
@@ -97,7 +98,8 @@ if [[ -d "${ROOT_DIR}/data/n8n" ]]; then
   tar -C "${ROOT_DIR}/data" -czf "${TARGET}/n8n.tar.gz" n8n
 fi
 
-sha256sum "${TARGET}"/* > "${TARGET}/SHA256SUMS"
+(cd "${TARGET}" && sha256sum *) > "${TARGET}/.SHA256SUMS"
+mv "${TARGET}/.SHA256SUMS" "${TARGET}/SHA256SUMS"
 
 find "${BACKUP_DIR}" -mindepth 1 -maxdepth 1 -type d -mtime "+${RETENTION_DAYS}" -exec rm -rf {} +
 
@@ -108,6 +110,8 @@ S3_BUCKET="$(setting S3_BACKUP_BUCKET)"
 S3_PREFIX="$(setting S3_BACKUP_PREFIX three-crowns)"
 S3_ACCESS_KEY_ID="$(setting S3_ACCESS_KEY_ID)"
 S3_SECRET_ACCESS_KEY="$(setting S3_SECRET_ACCESS_KEY)"
+MARINA_INSTANCE_SLUG="$(setting MARINA_INSTANCE_SLUG)"
+S3_BACKUP_ENCRYPTION_RECIPIENT="$(setting S3_BACKUP_ENCRYPTION_RECIPIENT)"
 OFFSITE_STATUS="LOCAL_ONLY"
 OFFSITE_PREFIX=""
 
@@ -137,9 +141,22 @@ else
   S3_ENDPOINT_URL="${S3_ENDPOINT_URL%/}"
   S3_PREFIX="${S3_PREFIX#/}"
   S3_PREFIX="${S3_PREFIX%/}"
+  if [[ -n "${MARINA_INSTANCE_SLUG}" ]]; then
+    expected_prefix="marina/${MARINA_INSTANCE_SLUG}"
+    if [[ "${S3_PREFIX}" != "${expected_prefix}" && "${S3_PREFIX}" != "${expected_prefix}/"* ]] ||
+       [[ "/${S3_PREFIX}/" == */../* || "/${S3_PREFIX}/" == */./* ]]; then
+      echo "S3_BACKUP_PREFIX must stay beneath marina/MARINA_INSTANCE_SLUG" >&2
+      exit 1
+    fi
+  fi
   CURL_CONFIG="$(mktemp)"
   chmod 600 "${CURL_CONFIG}"
-  trap 'rm -f "${CURL_CONFIG}"' EXIT
+  TRANSFER_DIR=""
+  cleanup_transfer() {
+    rm -f "${CURL_CONFIG}"
+    if [[ -n "${TRANSFER_DIR}" ]]; then rm -rf "${TRANSFER_DIR}"; fi
+  }
+  trap cleanup_transfer EXIT
   cat > "${CURL_CONFIG}" <<EOF
 silent
 show-error
@@ -148,13 +165,32 @@ aws-sigv4 = "aws:amz:${S3_REGION}:s3"
 user = "${S3_ACCESS_KEY_ID}:${S3_SECRET_ACCESS_KEY}"
 EOF
 
-  for file in "${TARGET}"/*; do
-    name="$(basename "${file}")"
-    object_url="${S3_ENDPOINT_URL}/${S3_BUCKET}/${S3_PREFIX}/${STAMP}/${name}"
-    curl --config "${CURL_CONFIG}" --upload-file "${file}" "${object_url}"
-    curl --config "${CURL_CONFIG}" --head "${object_url}" >/dev/null
-  done
-  rm -f "${CURL_CONFIG}"
+  if [[ -n "${MARINA_INSTANCE_SLUG}" || "${S3_PREFIX}" == marina || "${S3_PREFIX}" == marina/* || -n "${S3_BACKUP_ENCRYPTION_RECIPIENT}" ]]; then
+    if [[ ! "${S3_BACKUP_ENCRYPTION_RECIPIENT}" =~ ^[[:xdigit:]]{40}$ ]] || ! command -v gpg >/dev/null 2>&1; then
+      echo "Encrypted off-site backup requires GPG and S3_BACKUP_ENCRYPTION_RECIPIENT (public key fingerprint)" >&2
+      exit 1
+    fi
+    if [[ "${S3_ENDPOINT_URL}" != https://* ]]; then
+      echo "Encrypted off-site backup requires an HTTPS S3 endpoint" >&2
+      exit 1
+    fi
+    TRANSFER_DIR="$(mktemp -d)"
+    archive="${TRANSFER_DIR}/backup.tar.gpg"
+    tar -C "${TARGET}" -cf - . | gpg --batch --trust-model always --encrypt \
+      --recipient "${S3_BACKUP_ENCRYPTION_RECIPIENT}" --output "${archive}"
+    object_url="${S3_ENDPOINT_URL}/${S3_BUCKET}/${S3_PREFIX}/${STAMP}/backup.tar.gpg"
+    curl --config "${CURL_CONFIG}" --upload-file "${archive}" "${object_url}"
+    curl --config "${CURL_CONFIG}" --output "${TRANSFER_DIR}/download.gpg" "${object_url}"
+    cmp "${archive}" "${TRANSFER_DIR}/download.gpg"
+  else
+    for file in "${TARGET}"/*; do
+      name="$(basename "${file}")"
+      object_url="${S3_ENDPOINT_URL}/${S3_BUCKET}/${S3_PREFIX}/${STAMP}/${name}"
+      curl --config "${CURL_CONFIG}" --upload-file "${file}" "${object_url}"
+      curl --config "${CURL_CONFIG}" --head "${object_url}" >/dev/null
+    done
+  fi
+  cleanup_transfer
   trap - EXIT
   OFFSITE_STATUS="VERIFIED_UPLOAD"
   OFFSITE_PREFIX="s3://${S3_BUCKET}/${S3_PREFIX}/${STAMP}/"

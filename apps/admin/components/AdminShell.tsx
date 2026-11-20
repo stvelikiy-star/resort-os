@@ -1,6 +1,7 @@
 "use client";
+import FutureLuxuryAppearance from "./FutureLuxuryAppearance";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import AgentsBoard from "./AgentsBoard";
 import DashboardBoard from "./DashboardBoard";
 import DiningManagementBoard from "./DiningManagementBoard";
@@ -11,7 +12,10 @@ import GuestOffersBoard from "./GuestOffersBoard";
 import GuestServicesCenter from "./GuestServicesCenter";
 import GuestServiceSettingsBoard from "./GuestServiceSettingsBoard";
 import HotelFinanceBoard from "./HotelFinanceBoard";
+import HotelSetupBoard from "./HotelSetupBoard";
+import HotelRulesBoard from "./HotelRulesBoard";
 import InboxBoard from "./InboxBoard";
+import WhatsAppWorkspace from "./WhatsAppWorkspace";
 import MarketingBoard from "./MarketingBoard";
 import OperationsBoard from "./OperationsBoard";
 import PMSGrid from "./PMSGridV9";
@@ -24,6 +28,11 @@ import ServicePointsBoard from "./ServicePointsBoard";
 import SiteContentBoard from "./SiteContentBoard";
 import StaffBoard from "./StaffBoard";
 import MarinaAiAssistant from "./MarinaAiAssistant";
+import ChannelManagerBoard from "./ChannelManagerBoard";
+import { readMarinaUiPreference, writeMarinaUiPreference, type MarinaUiPreference } from "../lib/marina-ui-preference";
+import { readFl2Theme, writeFl2Theme, type Fl2Theme } from "../lib/fl2-appearance";
+
+import { Activity, BedDouble, CalendarDays, ChartNoAxesCombined, CircleDollarSign, ClipboardList, ContactRound, DoorOpen, FileChartColumn, Globe, Handshake, House, Inbox, LayoutGrid, Megaphone, Menu, MessageCircle, NotebookText, QrCode, Settings, SlidersHorizontal, Sparkles, Tags, Users, Utensils, Wrench, X, type LucideIcon } from "lucide-react";
 
 type User = {
   id: string;
@@ -31,23 +40,75 @@ type User = {
   display_name: string;
   role: string;
   property_code: string;
+  module_permissions: string[];
+  module_permissions_custom: boolean;
 };
 
-type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "OPS" | "STAFF";
+type Tab = "DASHBOARD" | "PMS" | "RATES" | "GROUPS" | "REQUESTS" | "AGENTS" | "RESERVATIONS" | "SERVICES" | "DINING" | "SERVICE_SETTINGS" | "GUESTS" | "OFFERS" | "MARKETING" | "GROWTH" | "FINANCE" | "REPORTS" | "CONTENT" | "ROOM_QR" | "POINT_QR" | "INBOX" | "WHATSAPP" | "OPS" | "STAFF" | "SETTINGS" | "HOTEL_RULES" | "CHANNELS";
 
-const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID", "TECHNICIAN"]);
+const ADMIN_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "AGENT", "MAID", "TECHNICIAN"]);
 const HOUSEKEEPING_SYNC_ROLES = new Set(["OWNER", "MANAGER", "RECEPTION", "MAID"]);
 const SESSION_CHECK_INTERVAL_MS = 30_000;
+const DEFAULT_ENABLED_MODULES = ["GROUPS", "AGENTS", "MARKETING", "DINING", "OFFERS", "GROWTH", "CONTENT", "ROOM_QR", "POINT_QR", "INBOX"];
 
-function canEnterAdmin(role?: string | null): boolean {
-  return Boolean(role && ADMIN_ROLES.has(role));
+function canEnterAdmin(role?: string | null, permissions?: string[] | null, customPermissions = false): boolean {
+  return Boolean((role && ADMIN_ROLES.has(role)) || (customPermissions && permissions?.length));
 }
 
-function initialTab(role?: string | null): Tab {
-  if (["OWNER", "MANAGER"].includes(role || "")) return "DASHBOARD";
-  if (role === "RECEPTION") return "RESERVATIONS";
-  if (["MAID", "TECHNICIAN"].includes(role || "")) return "OPS";
-  return "DASHBOARD";
+const MODULE_TABS: Record<string, Tab> = {
+  DASHBOARD: "DASHBOARD", PMS: "PMS", RATES: "RATES", GROUPS: "GROUPS", REQUESTS: "REQUESTS",
+  AGENTS: "AGENTS", RESERVATIONS: "RESERVATIONS", SERVICES: "SERVICES", DINING: "DINING",
+  SERVICE_SETTINGS: "SERVICE_SETTINGS", GUESTS: "GUESTS", OFFERS: "OFFERS", MARKETING: "MARKETING",
+  GROWTH: "GROWTH", FINANCE: "FINANCE", REPORTS: "REPORTS", CONTENT: "CONTENT", ROOM_QR: "ROOM_QR",
+  POINT_QR: "POINT_QR", INBOX: "INBOX", WHATSAPP: "WHATSAPP", OPS: "OPS", STAFF: "STAFF",
+  SETTINGS: "SETTINGS", HOTEL_RULES: "HOTEL_RULES", CHANNELS: "CHANNELS",
+};
+
+// Presentation only. module gates mirror the unchanged Legacy navigation below.
+const FL2_NAV_GROUPS: { title: string; items: { tab: Tab; label: string; icon: LucideIcon; module?: string }[] }[] = [
+  { title: "Операции", items: [
+    { tab: "DASHBOARD", label: "Главная", icon: House },
+    { tab: "PMS", label: "Шахматка", icon: LayoutGrid },
+    { tab: "RESERVATIONS", label: "Ресепшен", icon: DoorOpen },
+    { tab: "REQUESTS", label: "Заявки", icon: ClipboardList },
+    { tab: "RATES", label: "Цены / Сезоны", icon: CalendarDays },
+    { tab: "GROUPS", label: "Групповая бронь", icon: BedDouble, module: "GROUPS" },
+    { tab: "CHANNELS", label: "Booking / Каналы продаж", icon: Globe },
+    { tab: "DINING", label: "Питание / Ресторан", icon: Utensils, module: "DINING" },
+  ] },
+  { title: "Гости", items: [
+    { tab: "GUESTS", label: "Гости / История", icon: ContactRound },
+    { tab: "SERVICES", label: "Сервис гостя", icon: Sparkles },
+    { tab: "INBOX", label: "Все сообщения", icon: Inbox, module: "INBOX" },
+    { tab: "WHATSAPP", label: "WhatsApp / AI", icon: MessageCircle },
+  ] },
+  { title: "Финансы", items: [
+    { tab: "FINANCE", label: "Финансы", icon: CircleDollarSign },
+    { tab: "REPORTS", label: "Отчёты / Аналитика", icon: FileChartColumn },
+  ] },
+  { title: "Команда", items: [
+    { tab: "OPS", label: "Уборка / Ремонт", icon: Wrench },
+    { tab: "STAFF", label: "Персонал", icon: Users },
+  ] },
+  { title: "Развитие", items: [
+    { tab: "AGENTS", label: "Агентства", icon: Handshake, module: "AGENTS" },
+    { tab: "MARKETING", label: "Маркетинг", icon: Megaphone, module: "MARKETING" },
+    { tab: "OFFERS", label: "Предложения гостям", icon: Tags, module: "OFFERS" },
+    { tab: "GROWTH", label: "Отзывы / Рост", icon: ChartNoAxesCombined, module: "GROWTH" },
+    { tab: "CONTENT", label: "Сайт / Контент", icon: Globe, module: "CONTENT" },
+  ] },
+  { title: "Настройки", items: [
+    { tab: "SETTINGS", label: "Настройки гостиницы", icon: Settings },
+    { tab: "HOTEL_RULES", label: "Знания отеля / MARINA AI", icon: NotebookText },
+    { tab: "SERVICE_SETTINGS", label: "Настройки услуг", icon: SlidersHorizontal },
+    { tab: "ROOM_QR", label: "QR номеров", icon: QrCode, module: "ROOM_QR" },
+    { tab: "POINT_QR", label: "QR зон", icon: QrCode, module: "POINT_QR" },
+  ] },
+];
+
+function initialTab(role?: string | null, permissions: string[] = []): Tab {
+  const preferred: Tab = ["OWNER", "MANAGER"].includes(role || "") ? "DASHBOARD" : role === "RECEPTION" ? "RESERVATIONS" : role === "AGENT" ? "PMS" : ["MAID", "TECHNICIAN"].includes(role || "") ? "OPS" : "DASHBOARD";
+  return permissions.includes(preferred) ? preferred : (permissions.map((item) => MODULE_TABS[item]).find(Boolean) || preferred);
 }
 
 function coreApiRequest(input: RequestInfo | URL): boolean {
@@ -68,24 +129,79 @@ export default function AdminShell() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [tab, setTab] = useState<Tab>("DASHBOARD");
+  const [enabledModules, setEnabledModules] = useState<string[]>(DEFAULT_ENABLED_MODULES);
+  const [hotelName, setHotelName] = useState<string>("");
+  const [hotelLogoUrl, setHotelLogoUrl] = useState<string>("");
+  const [uiPreference, setUiPreference] = useState<MarinaUiPreference>("legacy");
+  const [fl2Theme, setFl2Theme] = useState<Fl2Theme>("dark");
+  const [navigationOpen, setNavigationOpen] = useState(false);
+  const navigationRef = useRef<HTMLElement>(null);
+  const navigationToggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    fetch("/core/api/v1/auth/me", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        return (await response.json()) as User;
-      })
-      .then((payload) => {
-        if (payload && !canEnterAdmin(payload.role)) {
+    if (uiPreference !== "future-luxury") return;
+    const nav = navigationRef.current;
+    const current = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !current) return;
+    // Scroll only the navigation, never jump the working page on a data refresh.
+    const outer = nav.getBoundingClientRect();
+    const inner = current.getBoundingClientRect();
+    if (inner.top < outer.top) nav.scrollTop += inner.top - outer.top;
+    else if (inner.bottom > outer.bottom) nav.scrollTop += inner.bottom - outer.bottom;
+  }, [tab, uiPreference, navigationOpen]);
+
+  useEffect(() => {
+    setUiPreference(readMarinaUiPreference());
+    setFl2Theme(readFl2Theme());
+  }, []);
+
+  useEffect(() => {
+    if (user && uiPreference === "future-luxury") {
+      document.documentElement.dataset.marinaUi = "future-luxury";
+      document.documentElement.dataset.fl2Theme = fl2Theme;
+    } else {
+      document.documentElement.removeAttribute("data-marina-ui");
+      document.documentElement.removeAttribute("data-fl2-theme");
+    }
+  }, [uiPreference, user, fl2Theme]);
+
+  useEffect(() => {
+    let disposed = false;
+    void (async () => {
+      try {
+        // Shared preview requires a hotel selector: the legacy login form cannot authenticate it.
+        // This check is read-only and preserves the existing single-property DEMO login flow.
+        const modeResponse = await fetch("/core/api/v1/auth/mode", { cache: "no-store" });
+        if (disposed) return;
+        if (modeResponse.ok) {
+          const mode = await modeResponse.json() as { mode?: string };
+          if (mode.mode === "shared_auth_preview") {
+            window.location.replace("/shared-auth-preview");
+            return;
+          }
+        }
+        const response = await fetch("/core/api/v1/auth/me", { cache: "no-store" });
+        if (disposed) return;
+        if (!response.ok) {
+          setUser(null);
+          return;
+        }
+        const payload = await response.json() as User;
+        if (disposed) return;
+        if (payload && !canEnterAdmin(payload.role, payload.module_permissions, payload.module_permissions_custom)) {
           void fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
           setUser(null);
           return;
         }
         setUser(payload);
-        setTab(initialTab(payload?.role));
-      })
-      .catch(() => setUser(null))
-      .finally(() => setChecking(false));
+        setTab(initialTab(payload.role, payload.module_permissions));
+      } catch {
+        if (!disposed) setUser(null);
+      } finally {
+        if (!disposed) setChecking(false);
+      }
+    })();
+    return () => { disposed = true; };
   }, []);
 
   useEffect(() => {
@@ -95,7 +211,7 @@ export default function AdminShell() {
     const authAwareFetch: typeof window.fetch = async (...args) => {
       const response = await nativeFetch(...args);
       const input = args[0];
-      if ((response.status === 401 || response.status === 403) && coreApiRequest(input)) {
+      if (response.status === 401 && coreApiRequest(input)) {
         setUser(null);
       }
       return response;
@@ -121,11 +237,11 @@ export default function AdminShell() {
         }
         if (!response.ok) return;
         const payload = (await response.json()) as User;
-        if (!canEnterAdmin(payload.role)) {
+        if (!canEnterAdmin(payload.role, payload.module_permissions, payload.module_permissions_custom)) {
           setUser(null);
           return;
         }
-        if (payload.id !== user.id || payload.role !== user.role || payload.display_name !== user.display_name) {
+        if (payload.id !== user.id || payload.role !== user.role || payload.display_name !== user.display_name || payload.module_permissions.join("|") !== user.module_permissions.join("|") || payload.module_permissions_custom !== user.module_permissions_custom) {
           setUser(payload);
         }
       } catch {
@@ -154,6 +270,25 @@ export default function AdminShell() {
     void fetch("/core/api/v1/ops/housekeeping/schedule/ensure", { method: "POST" }).catch(() => undefined);
   }, [user?.id, user?.role]);
 
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    fetch("/core/api/v1/admin/hotel-setup/modules", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return await response.json() as { enabled_modules?: string[]; hotel_name?: string; property_name?: string; hotel_logo_url?: string | null };
+      })
+      .then((body) => {
+        if (cancelled || !body) return;
+        if (body.enabled_modules) setEnabledModules(body.enabled_modules);
+        setHotelName(body.hotel_name || body.property_name || "");
+        setHotelLogoUrl(body.hotel_logo_url || "");
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [user?.id, user?.role]);
+
+
   async function login(event: FormEvent) {
     event.preventDefault();
     setSubmitting(true);
@@ -165,21 +300,31 @@ export default function AdminShell() {
         body: JSON.stringify({ username, password }),
       });
       if (!response.ok) {
-        setError("Неверный логин или пароль.");
+        // Cloudflare Access and reverse proxies may reject the HTTP request
+        // before it reaches MARINA Core. Do not mislabel their 401 as bad credentials.
+        const contentType = response.headers.get("content-type") || "";
+        const serverJson = contentType.includes("application/json");
+        if (!serverJson) {
+          setError("Внешний шлюз не пропустил запрос входа. Проверьте Cloudflare Access или откройте локальный адрес.");
+        } else if (response.status === 401) {
+          setError("Неверный логин или пароль.");
+        } else {
+          setError(`Не удалось войти: ошибка сервера (${response.status}). Попробуйте снова или обратитесь к администратору.`);
+        }
         return;
       }
       const payload = (await response.json()) as User;
-      if (!canEnterAdmin(payload.role)) {
+      if (!canEnterAdmin(payload.role, payload.module_permissions, payload.module_permissions_custom)) {
         await fetch("/core/api/v1/auth/logout", { method: "POST" }).catch(() => undefined);
         setUser(null);
         setError("Эта роль работает в интерфейсе «Моя смена», а не в Admin/PMS.");
         return;
       }
       setUser(payload);
-      setTab(initialTab(payload.role));
+      setTab(initialTab(payload.role, payload.module_permissions || []));
       setPassword("");
     } catch {
-      setError("Сервис входа недоступен. Проверьте Resort Core.");
+      setError("Сервис входа MARINA SMART недоступен. Проверьте API.");
     } finally {
       setSubmitting(false);
     }
@@ -194,19 +339,30 @@ export default function AdminShell() {
     }
   }
 
+  function chooseUiPreference(nextPreference: MarinaUiPreference) {
+    setUiPreference(nextPreference);
+    writeMarinaUiPreference(nextPreference);
+  }
+
+  function chooseFl2Theme(nextTheme: Fl2Theme) {
+    setFl2Theme(nextTheme);
+    writeFl2Theme(nextTheme);
+  }
+
   if (checking) {
-    return <main className="login-screen"><div className="login-card"><p className="eyebrow">Resort OS</p><h1>Проверяю доступ…</h1></div></main>;
+    return <main className="login-screen"><div className="login-card"><img className="marina-brand-logo" src="/marina-smart-approved.png" alt="MARINA SMART" /><p className="eyebrow">MARINA SMART · Hotel OS</p><h1>Проверяю доступ…</h1></div></main>;
   }
 
   if (!user) {
     return (
       <main className="login-screen">
         <form className="login-card" onSubmit={login}>
-          <p className="eyebrow">Три Короны · Resort OS</p>
+          <img className="marina-brand-logo" src="/marina-smart-approved.png" alt="MARINA SMART" />
+          <p className="eyebrow">MARINA SMART · Hotel OS</p>
           <h1>Вход в управление</h1>
           <p className="login-copy">Шахматка, CRM, бронирования и операционные данные доступны только сотрудникам.</p>
           <label><span>Логин</span><input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} minLength={2} required autoFocus /></label>
-          <label><span>Пароль</span><input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required /></label>
+          <label><span>Пароль</span><input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={3} required /></label>
           {error && <div className="login-error">{error}</div>}
           <button className="btn primary login-button" disabled={submitting}>{submitting ? "Входим…" : "Войти"}</button>
         </form>
@@ -214,65 +370,136 @@ export default function AdminShell() {
     );
   }
 
-  const isManager = ["OWNER", "MANAGER"].includes(user.role);
+  const canAccess = (section: string) => user.module_permissions.includes(section);
   const isReception = user.role === "RECEPTION";
-  const canUseReception = isManager || isReception;
-  const canManageRoomQr = ["OWNER", "MANAGER", "RECEPTION"].includes(user.role);
-  const canUseOps = isManager || ["MAID", "TECHNICIAN"].includes(user.role);
+  const isAgent = user.role === "AGENT";
+  const canManageRoomQr = canAccess("ROOM_QR");
+  const canUseOps = canAccess("OPS");
+  const moduleEnabled = (module: string) => enabledModules.includes(module);
+
+  const visibleGroups = FL2_NAV_GROUPS.map(group => ({ ...group, items: group.items.filter(item => canAccess(item.tab) && (!item.module || moduleEnabled(item.module))) })).filter(group => group.items.length);
+  const currentItem = visibleGroups.flatMap(group => group.items).find(item => item.tab === tab);
+  const currentLabel = currentItem ? (isAgent && tab === "PMS" ? "Шахматка / Брони" : currentItem.label) : "Раздел недоступен";
+
+  const appearanceControls = <>
+<div className="shell-theme-toggle" role="group" aria-label="Внешний вид интерфейса">
+            <button type="button" aria-pressed={uiPreference === "legacy"} onClick={() => chooseUiPreference("legacy")}>Legacy</button>
+            <button type="button" aria-pressed={uiPreference === "future-luxury"} onClick={() => chooseUiPreference("future-luxury")}>Future Luxury</button>
+          </div>
+          {uiPreference === "future-luxury" && <div className="fl2-theme-switch" role="group" aria-label="Цветовая тема Future Luxury">
+            <button type="button" aria-label="Тёмная тема" aria-pressed={fl2Theme === "dark"} onClick={() => chooseFl2Theme("dark")}>☾ Dark</button>
+            <button type="button" aria-label="Светлая тема" aria-pressed={fl2Theme === "light"} onClick={() => chooseFl2Theme("light")}>☀ Light</button>
+          </div>}
+  </>;
 
   return (
     <>
-      <div className="auth-toolbar admin-nav">
-        <div className="admin-identity"><strong>Три Короны · Resort OS</strong><span>{user.display_name} · {user.role}</span></div>
-        <nav className="admin-tabs">
-          {isManager && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
-          {isManager && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>Супершахматка</button>}
-          {isManager && <button className={tab === "RATES" ? "active" : ""} onClick={() => setTab("RATES")}>Цены / Сезоны</button>}
-          {canUseReception && <button className={tab === "GROUPS" ? "active" : ""} onClick={() => setTab("GROUPS")}>Групповая бронь</button>}
-          {isManager && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>CRM / Заявки</button>}
-          {isManager && <button className={tab === "AGENTS" ? "active" : ""} onClick={() => setTab("AGENTS")}>Агенты</button>}
-          {isManager && <button className={tab === "MARKETING" ? "active" : ""} onClick={() => setTab("MARKETING")}>Маркетинг</button>}
-          {canUseReception && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен / Брони</button>}
-          {canUseReception && <button className={tab === "SERVICES" ? "active" : ""} onClick={() => setTab("SERVICES")}>Сервис гостя</button>}
-          {canUseReception && <button className={tab === "DINING" ? "active" : ""} onClick={() => setTab("DINING")}>Питание / Ресторан</button>}
-          {isManager && <button className={tab === "SERVICE_SETTINGS" ? "active" : ""} onClick={() => setTab("SERVICE_SETTINGS")}>Настройки услуг</button>}
-          {isManager && <button className={tab === "GUESTS" ? "active" : ""} onClick={() => setTab("GUESTS")}>Гости / История</button>}
-          {isManager && <button className={tab === "OFFERS" ? "active" : ""} onClick={() => setTab("OFFERS")}>Офферы гостю</button>}
-          {canManageRoomQr && <button className={tab === "ROOM_QR" ? "active" : ""} onClick={() => setTab("ROOM_QR")}>QR номеров</button>}
-          {isManager && <button className={tab === "POINT_QR" ? "active" : ""} onClick={() => setTab("POINT_QR")}>QR зон</button>}
-          {isManager && <button className={tab === "GROWTH" ? "active" : ""} onClick={() => setTab("GROWTH")}>Рост / Отзывы</button>}
-          {isManager && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
-          {isManager && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
-          {isManager && <button className={tab === "CONTENT" ? "active" : ""} onClick={() => setTab("CONTENT")}>Сайт / Контент</button>}
+      <div className="auth-toolbar admin-nav" data-fl2-shell={uiPreference === "future-luxury" ? "true" : undefined}>
+        <div className="admin-identity">
+          <img className="marina-brand-logo-small" src="/marina-smart-approved.png" alt="MARINA SMART" />
+          {hotelLogoUrl && <img className="hotel-brand-logo-small" src={hotelLogoUrl} alt={hotelName || "Логотип отеля"} />}
+          <div><strong>MARINA SMART · Hotel OS</strong><span>{hotelName ? `${hotelName} · ` : ""}{user.display_name} · {user.role}</span></div>
+        </div>
+        {uiPreference === "future-luxury" ? <>
+          <div className="fl2-current-section">
+            <span className="fl2-current-label"><Activity size={18} aria-hidden="true" /><strong>{currentLabel}</strong></span>
+            <button ref={navigationToggleRef} className="fl2-navigation-toggle" type="button" aria-label={navigationOpen ? "Закрыть разделы" : "Открыть разделы"} aria-expanded={navigationOpen} aria-controls="fl2-section-navigation" onClick={() => setNavigationOpen(value => !value)}>
+              {navigationOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}<span>Разделы</span>
+            </button>
+          </div>
+          <nav id="fl2-section-navigation" className="fl2-grouped-navigation" ref={navigationRef} data-open={navigationOpen} aria-label="Разделы MARINA SMART" onKeyDown={event => {
+            if (event.key === "Escape") { setNavigationOpen(false); navigationToggleRef.current?.focus(); }
+          }}>
+            {visibleGroups.map((group, index) => <section className="fl2-nav-group" key={group.title} aria-labelledby={`fl2-nav-group-${index}`}>
+              <h2 id={`fl2-nav-group-${index}`}>{group.title}</h2>
+              {group.items.map(({ tab: destination, label, icon: Icon }) => <button key={destination} type="button" data-section={destination} aria-current={tab === destination ? "page" : undefined} onClick={() => { setTab(destination); setNavigationOpen(false); if (window.matchMedia("(max-width: 1100px)").matches) navigationToggleRef.current?.focus(); }}>
+                <Icon size={19} strokeWidth={1.7} aria-hidden="true" /><span>{isAgent && destination === "PMS" ? "Шахматка / Брони" : label}</span>
+              </button>)}
+            </section>)}
+          </nav>
+        </> : <nav className="admin-tabs" aria-label="Разделы MARINA SMART">
+          {canAccess("WHATSAPP") && <button className={tab === "WHATSAPP" ? "active" : ""} onClick={() => setTab("WHATSAPP")}>WhatsApp / AI</button>}
+          {canAccess("PMS") && <button className={tab === "PMS" ? "active" : ""} onClick={() => setTab("PMS")}>{isAgent ? "Шахматка / Брони" : "Шахматка"}</button>}
+          {canAccess("RESERVATIONS") && <button className={tab === "RESERVATIONS" ? "active" : ""} onClick={() => setTab("RESERVATIONS")}>Ресепшен</button>}
+          {canAccess("REQUESTS") && <button className={tab === "REQUESTS" ? "active" : ""} onClick={() => setTab("REQUESTS")}>Заявки</button>}
+          {canAccess("RATES") && <button className={tab === "RATES" ? "active" : ""} onClick={() => setTab("RATES")}>Цены / Сезоны</button>}
+          {canAccess("SERVICES") && <button className={tab === "SERVICES" ? "active" : ""} onClick={() => setTab("SERVICES")}>Сервис гостя</button>}
           {canUseOps && <button className={tab === "OPS" ? "active" : ""} onClick={() => setTab("OPS")}>Уборка / Ремонт</button>}
-          {isManager && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
-          {isManager && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Сообщения</button>}
-        </nav>
-        <button className="logout-button" onClick={logout}>Выйти</button>
+          {canAccess("DASHBOARD") && <button className={tab === "DASHBOARD" ? "active" : ""} onClick={() => setTab("DASHBOARD")}>Главная</button>}
+          {canAccess("FINANCE") && <button className={tab === "FINANCE" ? "active" : ""} onClick={() => setTab("FINANCE")}>Финансы</button>}
+          {user.module_permissions.length > 0 && <details className="admin-more-menu">
+            <summary>Все разделы</summary>
+            <div className="admin-more-panel" onClick={(event) => {
+              if (event.target instanceof Element && event.target.closest("button")) {
+                (event.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open");
+              }
+            }}>
+              {canAccess("GROUPS") && <p className="admin-nav-section-label">Бронирования и продажи</p>}
+              {canAccess("GROUPS") && moduleEnabled("GROUPS") && <button className={tab === "GROUPS" ? "active" : ""} onClick={() => setTab("GROUPS")}>Групповая бронь</button>}
+              {canAccess("CHANNELS") && <button className={tab === "CHANNELS" ? "active" : ""} onClick={() => setTab("CHANNELS")}>Booking / Каналы продаж</button>}
+              {canAccess("AGENTS") && moduleEnabled("AGENTS") && <button className={tab === "AGENTS" ? "active" : ""} onClick={() => setTab("AGENTS")}>Агентства</button>}
+              {canAccess("INBOX") && moduleEnabled("INBOX") && <button className={tab === "INBOX" ? "active" : ""} onClick={() => setTab("INBOX")}>Все сообщения</button>}
+              {canAccess("GUESTS") && <button className={tab === "GUESTS" ? "active" : ""} onClick={() => setTab("GUESTS")}>Гости / История</button>}
+              {canAccess("MARKETING") && moduleEnabled("MARKETING") && <button className={tab === "MARKETING" ? "active" : ""} onClick={() => setTab("MARKETING")}>Маркетинг</button>}
+              {canAccess("OFFERS") && moduleEnabled("OFFERS") && <button className={tab === "OFFERS" ? "active" : ""} onClick={() => setTab("OFFERS")}>Предложения гостям</button>}
+              {canAccess("GROWTH") && moduleEnabled("GROWTH") && <button className={tab === "GROWTH" ? "active" : ""} onClick={() => setTab("GROWTH")}>Отзывы / Рост</button>}
+              {canAccess("DINING") && <p className="admin-nav-section-label">Работа гостиницы</p>}
+              {canAccess("DINING") && moduleEnabled("DINING") && <button className={tab === "DINING" ? "active" : ""} onClick={() => setTab("DINING")}>Питание / Ресторан</button>}
+              {canManageRoomQr && moduleEnabled("ROOM_QR") && <button className={tab === "ROOM_QR" ? "active" : ""} onClick={() => setTab("ROOM_QR")}>QR номеров</button>}
+              {canAccess("POINT_QR") && moduleEnabled("POINT_QR") && <button className={tab === "POINT_QR" ? "active" : ""} onClick={() => setTab("POINT_QR")}>QR зон</button>}
+              {(canAccess("REPORTS") || canAccess("STAFF") || canAccess("HOTEL_RULES") || canAccess("SERVICE_SETTINGS") || canAccess("CONTENT") || canAccess("SETTINGS")) && <p className="admin-nav-section-label">Управление и настройки</p>}
+              {canAccess("REPORTS") && <button className={tab === "REPORTS" ? "active" : ""} onClick={() => setTab("REPORTS")}>Отчёты / Аналитика</button>}
+              {canAccess("STAFF") && <button className={tab === "STAFF" ? "active" : ""} onClick={() => setTab("STAFF")}>Персонал</button>}
+              {canAccess("HOTEL_RULES") && <button className={tab === "HOTEL_RULES" ? "active" : ""} onClick={() => setTab("HOTEL_RULES")}>Знания отеля / MARINA AI</button>}
+              {canAccess("SERVICE_SETTINGS") && <button className={tab === "SERVICE_SETTINGS" ? "active" : ""} onClick={() => setTab("SERVICE_SETTINGS")}>Настройки услуг</button>}
+              {canAccess("CONTENT") && moduleEnabled("CONTENT") && <button className={tab === "CONTENT" ? "active" : ""} onClick={() => setTab("CONTENT")}>Сайт / Контент</button>}
+              {canAccess("SETTINGS") && <button className={tab === "SETTINGS" ? "active" : ""} onClick={() => setTab("SETTINGS")}>Настройки гостиницы</button>}
+            </div>
+          </details>}
+        </nav>}
+        <div className="admin-shell-actions">
+          {uiPreference === "future-luxury" ? <details className="fl2-style-options" onKeyDown={event => {
+            if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); }
+          }}>
+            <summary><SlidersHorizontal size={18} aria-hidden="true" /><span>Оформление</span></summary>
+            <div className="fl2-style-panel">{appearanceControls}</div>
+          </details> : appearanceControls}
+          {uiPreference === "future-luxury" && <div className="fl2-assistant-dock"><MarinaAiAssistant screen={tab} role={user.role} onNavigate={(destination) => { setTab(destination as Tab); setNavigationOpen(false); }} /></div>}
+          <button className="logout-button" onClick={logout}>Выйти</button>
+        </div>
       </div>
-      {tab === "DASHBOARD" && isManager && <DashboardBoard onNavigate={(destination) => setTab(destination as Tab)} />}
-      {tab === "PMS" && isManager && <PMSGrid />}
-      {tab === "RATES" && isManager && <RateManagementBoard />}
-      {tab === "GROUPS" && canUseReception && <GroupBookingBoard userRole={user.role} />}
-      {tab === "REQUESTS" && isManager && <RequestsBoard />}
-      {tab === "AGENTS" && isManager && <AgentsBoard />}
-      {tab === "MARKETING" && isManager && <MarketingBoard />}
-      {tab === "RESERVATIONS" && canUseReception && <ReceptionWorkspace userRole={user.role} onNavigate={(destination) => setTab(destination as Tab)} />}
-      {tab === "SERVICES" && canUseReception && <GuestServicesCenter user={{ id: user.id, role: user.role }} />}
-      {tab === "DINING" && canUseReception && <DiningManagementBoard />}
-      {tab === "SERVICE_SETTINGS" && isManager && <GuestServiceSettingsBoard />}
-      {tab === "GUESTS" && isManager && <GuestHistoryBoard />}
-      {tab === "OFFERS" && isManager && <GuestOffersBoard />}
-      {tab === "ROOM_QR" && canManageRoomQr && <RoomQrBoard />}
-      {tab === "POINT_QR" && isManager && <ServicePointsBoard />}
-      {tab === "GROWTH" && isManager && <GrowthControlBoard />}
-      {tab === "FINANCE" && isManager && <HotelFinanceBoard />}
-      {tab === "REPORTS" && isManager && <ReportsBoard />}
-      {tab === "CONTENT" && isManager && <SiteContentBoard />}
+      {user.module_permissions.length === 0 && <main className="management-shell"><section className="management-truth"><strong>Доступ к разделам отключён.</strong> Попросите собственника MARINA SMART выдать нужные разделы.</section></main>}
+      {tab === "DASHBOARD" && canAccess("DASHBOARD") && <DashboardBoard isOwner={user.role === "OWNER"} fl2={uiPreference === "future-luxury"} onNavigate={(destination) => setTab(destination as Tab)} />}
+      {tab === "PMS" && canAccess("PMS") && <PMSGrid agentMode={isAgent} readOnlyMode={isReception} />}
+      {tab === "RATES" && canAccess("RATES") && <RateManagementBoard />}
+      {tab === "GROUPS" && canAccess("GROUPS") && moduleEnabled("GROUPS") && <GroupBookingBoard userRole={user.role} />}
+      {tab === "REQUESTS" && canAccess("REQUESTS") && <RequestsBoard />}
+      {tab === "CHANNELS" && canAccess("CHANNELS") && <ChannelManagerBoard />}
+      {tab === "AGENTS" && canAccess("AGENTS") && moduleEnabled("AGENTS") && <AgentsBoard userRole={user.role} />}
+      {tab === "MARKETING" && canAccess("MARKETING") && moduleEnabled("MARKETING") && <MarketingBoard />}
+      {tab === "RESERVATIONS" && canAccess("RESERVATIONS") && <ReceptionWorkspace userRole={user.role} onNavigate={(destination) => setTab(destination as Tab)} />}
+      {tab === "SERVICES" && canAccess("SERVICES") && <GuestServicesCenter user={{ id: user.id, role: user.role }} />}
+      {tab === "DINING" && canAccess("DINING") && moduleEnabled("DINING") && <DiningManagementBoard />}
+      {tab === "SERVICE_SETTINGS" && canAccess("SERVICE_SETTINGS") && <GuestServiceSettingsBoard />}
+      {tab === "GUESTS" && canAccess("GUESTS") && <GuestHistoryBoard />}
+      {tab === "OFFERS" && canAccess("OFFERS") && moduleEnabled("OFFERS") && <GuestOffersBoard />}
+      {tab === "ROOM_QR" && canAccess("ROOM_QR") && moduleEnabled("ROOM_QR") && <RoomQrBoard />}
+      {tab === "POINT_QR" && canAccess("POINT_QR") && moduleEnabled("POINT_QR") && <ServicePointsBoard />}
+      {tab === "GROWTH" && canAccess("GROWTH") && moduleEnabled("GROWTH") && <GrowthControlBoard />}
+      {tab === "FINANCE" && canAccess("FINANCE") && <HotelFinanceBoard />}
+      {tab === "REPORTS" && canAccess("REPORTS") && <ReportsBoard />}
+      {tab === "CONTENT" && canAccess("CONTENT") && moduleEnabled("CONTENT") && <SiteContentBoard />}
       {tab === "OPS" && canUseOps && <OperationsBoard user={user} />}
-      {tab === "STAFF" && isManager && <StaffBoard userRole={user.role} />}
-      {tab === "INBOX" && isManager && <InboxBoard />}
-      <MarinaAiAssistant screen={tab} role={user.role} />
+      {tab === "STAFF" && canAccess("STAFF") && <StaffBoard userRole={user.role} propertyCode={user.property_code} />}
+      {tab === "INBOX" && canAccess("INBOX") && moduleEnabled("INBOX") && <InboxBoard />}
+      {tab === "WHATSAPP" && canAccess("WHATSAPP") && <WhatsAppWorkspace role={user.role} onNavigate={(destination) => setTab(destination)} />}
+      {tab === "HOTEL_RULES" && canAccess("HOTEL_RULES") && <HotelRulesBoard />}
+      {tab === "SETTINGS" && canAccess("SETTINGS") && <HotelSetupBoard
+        onModulesChanged={setEnabledModules}
+        onNavigate={(destination) => setTab(destination)}
+        onIdentityChanged={(identity) => { setHotelName(identity.name); setHotelLogoUrl(identity.logo_url || ""); }}
+      />}
+      {uiPreference === "legacy" && <MarinaAiAssistant screen={tab} role={user.role} onNavigate={(destination) => setTab(destination as Tab)} />}
     </>
   );
 }

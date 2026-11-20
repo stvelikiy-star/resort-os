@@ -1,0 +1,430 @@
+{
+  "schema_version": 2,
+  "product": "MARINA SMART",
+  "property": "AK BERMET",
+  "release_id": "MARINA_SMART_INTERNAL_RC_2026-10-07",
+  "status": "INTERNAL_CI_AND_EXTERNAL_STAGING_PARTIAL",
+  "source_repository": "stvelikiy-star/resort-os",
+  "source_branch": "marina-smart/live-base-20260925",
+  "merged_head": "4249b39c1ed28046482c95af3fd1b01dbb015576",
+  "verified_tree": "812351dfee971c11227a4ccca499772156b78c7e",
+  "verified_tree_source_commit": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+  "tree_equivalent_to_verified_commit": true,
+  "pull_requests": [
+    211,
+    186,
+    213,
+    219,
+    220,
+    223,
+    224,
+    225,
+    226,
+    227,
+    228,
+    229
+  ],
+  "evidence_observed_on": "2026-10-07",
+  "production_cutover_authorized": false,
+  "legacy_release_manifest": "release/current-rc.json",
+  "legacy_manifest_applies_to_marina": false,
+  "database": {
+    "migration_count": 30,
+    "critical_constraint_count": 93,
+    "migration_contract_source": "scripts/release_contract.py",
+    "latest_marina_migrations": [
+      "zz101_marina_product_settings_20260926",
+      "zz102_marina_full_modules_20260927",
+      "zz103_agent_access_20260927",
+      "zz104_public_kz_20260929",
+      "zz105_guest_dynamic_kz_20260929",
+      "zz106_marina_split_cook_waiter_20261007"
+    ]
+  },
+  "ci_fixture": {
+    "property_code": "AK_BERMET_TEST",
+    "rooms": 169,
+    "room_types": 16,
+    "clean_rooms": 137,
+    "tech_block_rooms": 32,
+    "public_available_rooms": 137,
+    "source": ".github/workflows/marina-smart-ak-bermet-ci.yml",
+    "production_inventory_verified": false
+  },
+  "ci_evidence": {
+    "post_merge_tree_workflows_triggered": 54,
+    "post_merge_tree_workflows_success": 54,
+    "post_merge_tree_workflows_failures": 0,
+    "post_merge_tree_source_commit": "65bc6da53c7e2aedbfe8f4da77f40d76f14a2be1",
+    "key_runs": {
+      "marina_ak_bermet": {
+        "run_id": 37620305597,
+        "job_id": 112788585616,
+        "conclusion": "success"
+      },
+      "release_gate": {
+        "run_id": 37620305647,
+        "job_id": 112788596687,
+        "conclusion": "success"
+      },
+      "resort_core": {
+        "run_id": 37620306079,
+        "job_id": 112788590561,
+        "conclusion": "success"
+      },
+      "public_browser": {
+        "run_id": 37620305921,
+        "job_id": 112788586294,
+        "conclusion": "success"
+      },
+      "staff_roles": {
+        "run_id": 37620305717,
+        "job_id": 112788586523,
+        "conclusion": "success"
+      },
+      "admin_guest_pin_i18n": {
+        "run_id": 37620305845,
+        "job_id": 112788586139,
+        "conclusion": "success"
+      }
+    },
+    "verified_scope": [
+      "clean PostgreSQL migrations",
+      "30-migration Marina release contract",
+      "AK BERMET 169-room inventory assertions",
+      "169-room chessboard browser acceptance",
+      "owner navigation browser acceptance",
+      "MARINA AI role-scoped runtime context",
+      "public MARINA brand and RU/KG/KZ/EN contract",
+      "agent role isolation and agency scope",
+      "COOK and WAITER server-side separation",
+      "Guest OS and client role cycle",
+      "Resort Core booking, payment idempotency, check-in/out and housekeeping lifecycle",
+      "backup/restore, security and release-gate contracts"
+    ],
+    "runtime_fix_ci": {
+      "pull_request": 213,
+      "commit": "c13cffbaf0af7c44d8cc19b8648d8cd20acc2485",
+      "checks_triggered": 5,
+      "checks_success": 5,
+      "failures": 0,
+      "marina_ak_bermet_run": 37623759437,
+      "conclusion": "success"
+    }
+  },
+  "external_acceptance": {
+    "deployed_commit_verified": true,
+    "target_database_migrations_verified": false,
+    "target_backup_restore_verified": false,
+    "https_wss_verified": true,
+    "real_staff_devices_verified": false,
+    "live_ai_provider_verified": true,
+    "manual_translation_review_verified": false,
+    "restart_verified": true,
+    "public_ai_capability_contract_verified": true,
+    "safe_ai_contract_verified": {
+      "verified": true,
+      "source_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+      "source_files": [
+        "services/api/app/public_ai_admin.py",
+        "services/api/app/marina_assistant.py"
+      ],
+      "public_ai": {
+        "availability_from_core": true,
+        "collects_payment": false,
+        "creates_confirmed_reservation": false,
+        "manager_handles_prepayment": true,
+        "sensitive_data_requests_blocked": true,
+        "provider_failure_mode": "fail_closed"
+      },
+      "staff_ai": {
+        "read_only": true,
+        "can_mutate": false,
+        "role_and_property_scoped": true,
+        "provider_failure_mode": "fail_closed"
+      },
+      "verification_type": "read-only source review against deployed API commit"
+    }
+  },
+  "remaining_gates": [
+    "Verify target database migration ledger and target backup/restore on Railway",
+    "Run browser/API acceptance on the target for all staff and guest flows",
+    "Verify real iPhone, Android and desktop staff devices",
+    "Review provider response content and data-handling evidence under the owner gate",
+    "Complete manual RU/KG/KZ/EN translation review",
+    "Record immutable deployment linkage and rollback evidence",
+    "No production cutover, DNS, payments or provider activation without owner gate"
+  ],
+  "notes": [
+    "The CI inventory is a test fixture and must not be reported as live occupancy.",
+    "The 54/54 post-merge checks were executed against the verified tree; the squash merge kept the tree identical.",
+    "Green repository CI is not proof of external production runtime.",
+    "No production approval, DNS switch, payment activation, NFC, TTLock or provider activation is implied.",
+    "External Marina staging is healthy with a mixed runtime: API runs the public-AI fallback on 778d8f2, Web runs the verified guest-landing i18n fix on 4249b39, and Admin/Staff remain on the verified baseline 419bee7; Railway service health and HTTPS/login smoke passed on 2026-10-07.",
+    "The external staging project has a legacy Three Crowns project name, but its inspected sources, variables, property code and domains are Marina-specific; no Three Crowns runtime was modified.",
+    "External staging WSS, session-cookie flags, CORS preflight/rejection and API restart recovery were verified on 2026-10-07; no token values were recorded.",
+    "Read-only external smoke passed on 2026-10-07: API health/live/ready/OpenAPI, Admin/Staff/Web roots and all seven staging role logins.",
+    "WSS access-control smoke passed on 2026-10-07: anonymous and AGENT clients received HTTP 403 for the PMS grid websocket.",
+    "Public read-only smoke passed on 2026-10-07 for RU/KG/KZ/EN site content and availability; public AI capabilities report configured=true and provider telemetry confirms api.openai.com DNS/TLS egress with public chat HTTP 200. Response body was not recorded.",
+    "PR #219 fixed public AI model-variable fallback; API staging deployment 0982bc40 succeeded on 778d8f2, public AI capabilities report configured=true, and telemetry confirms api.openai.com DNS/TLS egress plus public AI chat HTTP 200 at 2026-10-07T14:42:28Z. Response body was not recorded.",
+    "Runtime migration boot evidence: API deployment 0982bc40 connected to the target PostgreSQL, found 30 migrations and reported no pending migrations; direct _prisma_migrations ledger query and backup/restore remain unverified.",
+    "Read-only deployed-source review on API commit 778d8f2 confirmed public AI uses Core availability only, collects no payment, cannot create confirmed reservations, leaves prepayment to a manager, blocks sensitive-data requests and fails closed on provider errors; staff MARINA AI is read-only, role/property-scoped and fail-closed.",
+    "Railway rollback capability observed on 2026-10-07 for current API 0982bc40, Web 81fe9fa1, Admin 51d68254 and Staff f9572ddf; no rollback was executed."
+  ],
+  "external_staging": {
+    "railway_project": "Three Crowns Full Test (existing Marina staging resources; no new resource created)",
+    "railway_environment": "production",
+    "source_branch": "marina-smart/live-base-20260925",
+    "deployed_commit": "MIXED_RUNTIME_API_ONLY_UPDATE",
+    "service_domains": {
+      "api": "https://api-production-f1171.up.railway.app",
+      "admin": "https://admin-production-80a1.up.railway.app",
+      "staff": "https://staff-production-69f6.up.railway.app",
+      "web": "https://web-production-b7d1e.up.railway.app"
+    },
+    "service_health": {
+      "postgres": "SUCCESS",
+      "api": "SUCCESS",
+      "admin": "SUCCESS",
+      "staff": "SUCCESS",
+      "web": "SUCCESS",
+      "failures": 0,
+      "pending_work": 0
+    },
+    "https_smoke": {
+      "api_readiness_http": 200,
+      "admin_http": 200,
+      "staff_http": 200,
+      "web_http": 200,
+      "readiness_property": "AK_BERMET_TEST",
+      "readiness_rooms": 169,
+      "readiness_room_types": 16
+    },
+    "role_login_smoke": {
+      "owner": "OWNER",
+      "reception": "RECEPTION",
+      "agent": "AGENT",
+      "maid": "MAID",
+      "technician": "TECHNICIAN",
+      "cook": "COOK",
+      "waiter": "WAITER",
+      "property_code": "AK_BERMET_TEST"
+    },
+    "observed_on": "2026-10-07",
+    "post_deploy_validation": {
+      "observed_on": "2026-10-07",
+      "wss": {
+        "verified": true,
+        "api_first_message_bytes": 47587,
+        "admin_rewrite_first_message_bytes": 47587,
+        "authenticated_role": "OWNER",
+        "path": "/ws/pms/grid"
+      },
+      "cookies": {
+        "login_http": 200,
+        "session_cookie": "resort_session",
+        "flags": [
+          "HttpOnly",
+          "Secure",
+          "SameSite=Lax",
+          "Path=/",
+          "Max-Age=86400"
+        ],
+        "token_recorded": false
+      },
+      "cors": {
+        "admin_preflight_http": 200,
+        "admin_allow_credentials": true,
+        "staff_preflight_http": 200,
+        "staff_allow_credentials": true,
+        "untrusted_origin_http": 400,
+        "untrusted_origin_rejected": true
+      },
+      "restart": {
+        "service": "api",
+        "deployment_id": "18e51a96-9f9d-4538-ac1f-9ca7f74786b7",
+        "restarted_in_place": true,
+        "readiness_http_after_restart": 200,
+        "environment_services_online_after_restart": 5,
+        "failures_after_restart": 0,
+        "pending_work_after_restart": 0
+      },
+      "migration_boot_contract": {
+        "command": "npx prisma migrate deploy",
+        "source": "deploy/ak-bermet-test-api.Dockerfile",
+        "target_ledger_verified": false,
+        "migration_boot_completed": true,
+        "runtime_log": "Deployment 0982bc40 logged 30 migrations found and No pending migrations to apply at 2026-10-07T13:48:51Z; direct target ledger query remains unverified."
+      },
+      "wss_access_control": {
+        "observed_on": "2026-10-07",
+        "owner_authenticated_connection": "PASS",
+        "anonymous_handshake_http": 403,
+        "agent_handshake_http": 403,
+        "note": "Agent and anonymous clients are denied access to /ws/pms/grid; no data mutation."
+      },
+      "live_ai_telemetry": {
+        "provider_host": "api.openai.com",
+        "dns_resolution": "PASS",
+        "outbound_tls_443": "PASS",
+        "public_chat_http": 200,
+        "response_body_recorded": false
+      }
+    },
+    "readonly_smoke": {
+      "observed_on": "2026-10-07",
+      "api": {
+        "health_http": 200,
+        "live_http": 200,
+        "ready_http": 200,
+        "openapi_http": 200,
+        "property": "AK_BERMET_TEST",
+        "rooms": 169,
+        "room_types": 16
+      },
+      "surfaces": {
+        "admin_http": 200,
+        "staff_http": 200,
+        "web_http": 200
+      },
+      "role_logins": {
+        "owner": {
+          "http": 200,
+          "role": "OWNER",
+          "property_code": "AK_BERMET_TEST"
+        },
+        "reception": {
+          "http": 200,
+          "role": "RECEPTION",
+          "property_code": "AK_BERMET_TEST"
+        },
+        "agent": {
+          "http": 200,
+          "role": "AGENT",
+          "property_code": "AK_BERMET_TEST"
+        },
+        "maid": {
+          "http": 200,
+          "role": "MAID",
+          "property_code": "AK_BERMET_TEST"
+        },
+        "technician": {
+          "http": 200,
+          "role": "TECHNICIAN",
+          "property_code": "AK_BERMET_TEST"
+        },
+        "cook": {
+          "http": 200,
+          "role": "COOK",
+          "property_code": "AK_BERMET_TEST"
+        },
+        "waiter": {
+          "http": 200,
+          "role": "WAITER",
+          "property_code": "AK_BERMET_TEST"
+        }
+      }
+    },
+    "public_readonly_smoke": {
+      "observed_on": "2026-10-07",
+      "locales": {
+        "ru": {
+          "http": 200,
+          "response_locale": "ru",
+          "content_blocks": 11
+        },
+        "kg": {
+          "http": 200,
+          "response_locale": "kg",
+          "content_blocks": 11
+        },
+        "kz": {
+          "http": 200,
+          "response_locale": "kz",
+          "content_blocks": 11
+        },
+        "en": {
+          "http": 200,
+          "response_locale": "en",
+          "content_blocks": 11
+        }
+      },
+      "property_code": "AK_BERMET_TEST",
+      "availability": {
+        "http": 200,
+        "check_in": "2026-12-10",
+        "check_out": "2026-12-12",
+        "nights": 2,
+        "results": 8
+      },
+      "public_ai_capabilities": {
+        "http": 200,
+        "configured": true,
+        "availability_from_core": true,
+        "collects_payment": false,
+        "creates_confirmed_reservation": false,
+        "live_provider_call_verified": true,
+        "verified_after_api_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+        "staging_http_chat_observed": {
+          "http": 200,
+          "observed_at": "2026-10-07T14:42:28Z",
+          "provider_response_body_verified": false
+        },
+        "provider_telemetry": {
+          "dns_qname": "api.openai.com",
+          "dns_rcode": "NOERROR",
+          "tls_egress_observed": true,
+          "destination_port": 443,
+          "chat_http": 200,
+          "observed_window": "2026-10-07T14:42:24Z/2026-10-07T14:42:32Z",
+          "response_body_recorded": false
+        }
+      }
+    },
+    "api_deployment": {
+      "deployed_commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+      "deployment_id": "0982bc40-c082-40b3-aa28-d8981acdc79e",
+      "status": "SUCCESS",
+      "observed_on": "2026-10-07",
+      "scope": "API only for public AI fallback; Web is deployed on 4249b39; Admin/Staff remained on the previously verified runtime commit 419bee7."
+    },
+    "deployment_layout": {
+      "api": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+      "admin": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+      "staff": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+      "web": "4249b39c1ed28046482c95af3fd1b01dbb015576",
+      "postgres": "existing Railway service/volume; target migration ledger and restore remain unverified"
+    },
+    "rollback_observed": {
+      "verified": true,
+      "observed_on": "2026-10-07",
+      "note": "Railway metadata reports canRollback=true for the current API, Web, Admin and Staff deployments; no rollback was executed.",
+      "deployments": {
+        "api": {
+          "service_id": "eeb844cc-bfce-41b1-88eb-06adb133eaa8",
+          "deployment_id": "0982bc40-c082-40b3-aa28-d8981acdc79e",
+          "commit": "778d8f2d4f1dcc859141b2e64a7c928e3bc85f92",
+          "can_rollback": true
+        },
+        "web": {
+          "service_id": "145fd88f-d223-445e-a419-ad2f07e40c63",
+          "deployment_id": "81fe9fa1-4b76-4943-ad8e-a7aaeee91ba9",
+          "commit": "4249b39c1ed28046482c95af3fd1b01dbb015576",
+          "can_rollback": true
+        },
+        "admin": {
+          "service_id": "8b843a29-51bc-44ab-ada0-f8726c0c563d",
+          "deployment_id": "51d68254-ff3b-4ba1-9fef-49e77da6bb9a",
+          "commit": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+          "can_rollback": true
+        },
+        "staff": {
+          "service_id": "93d86c09-0259-4365-b729-7b385eae5a4e",
+          "deployment_id": "f9572ddf-f7b9-4e08-80bd-5772ec4e7894",
+          "commit": "419bee7ed419ca80f9e8a612d9751cbcfad4e6a8",
+          "can_rollback": true
+        }
+      }
+    }
+  }
+}
