@@ -33,6 +33,9 @@ try {
      `Profile panel must fit the viewport: ${JSON.stringify({width,theme,profileRect})}`);
    const appearance=await metrics(page);
    assert.deepEqual(appearance.small,[]);
+   const profileLauncher=await page.locator('.fl2-account-settings summary').boundingBox();
+   assert.ok(profileLauncher && profileLauncher.width<=44.5 && profileLauncher.height>=43.9,
+     'Profile must be a compact 44px icon, not a wide language/theme toolbar');
    await page.locator('.fl2-account-settings summary').click();
   const closed=await metrics(page); assert.equal(closed.overflow,0); assert.deepEqual(closed.small,[]);
   assert.equal(await page.locator('.fl2-assistant-dock>button').evaluate(e=>getComputedStyle(e).position),'static');
