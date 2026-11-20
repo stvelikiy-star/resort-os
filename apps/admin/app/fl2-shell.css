@@ -312,7 +312,9 @@ html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin
     max-width: 180px;
   }
   .auth-toolbar .fl2-account-panel {
-    left: auto; right: max(12px, env(safe-area-inset-right));
+    /* The panel is anchored to the left edge of the narrow Profile button.
+       A right offset would push a 330px panel outside a 390px viewport. */
+    left: 0; right: auto;
     top: calc(100% + 8px); bottom: auto;
     width: min(330px, calc(100vw - 24px));
     max-height: calc(100dvh - 180px);
@@ -378,4 +380,3 @@ html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-o
 html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] > .command-grid > .command-panel :is(small,.command-note) {
   color: var(--mx-muted) !important;
 }
-
