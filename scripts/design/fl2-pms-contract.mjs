@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {assertDialogBehavior,dialogNames} from './fl2-pms-dialog-source.mjs';
 import fs from 'node:fs';
 import {execFileSync} from 'node:child_process';
+import {assertApprovedProfileShell} from './fl2-profile-source-contract.mjs';
 import {createRequire} from 'node:module';
 const ts=createRequire(new URL('../../apps/admin/package.json',import.meta.url))('typescript');
 const base='9f13104bddeffdd2c236dfacb0086e4eaa5d6bfc';
@@ -15,7 +16,8 @@ const shellPath='apps/admin/components/AdminShell.tsx';
 const appearanceImport='import FutureLuxuryAppearance from "./FutureLuxuryAppearance";\n';
 const shell=read(shellPath);
 assert.ok(shell.includes(appearanceImport),'C3: approved FL2 appearance import absent');
-assert.equal(shell.replace(appearanceImport,''),original(shellPath),'C3: AdminShell business/auth/navigation changed');
+const previousShell=assertApprovedProfileShell(shell);
+assert.equal(previousShell.replace(appearanceImport,''),original(shellPath),'C3: protected behavior changed');
 const path='apps/admin/components/PMSOwnerGrid.tsx';
 function functions(s){const ast=ts.createSourceFile(path,s,ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);const found={};function visit(n){if(ts.isFunctionDeclaration(n)&&n.name&&n.name.text!=='PMSOwnerGrid')found[n.name.text]=n.getText(ast);if(ts.isVariableDeclaration(n)&&n.initializer&&ts.isCallExpression(n.initializer)&&['useCallback','useMemo'].includes(n.initializer.expression.getText(ast)))found[n.name.getText(ast)]=n.getText(ast);ts.forEachChild(n,visit);}visit(ast);return found;}
 assert.deepEqual(functions(read(path)),functions(original(path)),'Booking operations, filtering, prices or callbacks changed');

@@ -57,7 +57,7 @@ try {
       const expectedLanguage = locale === "kg" ? "ky" : locale === "kz" ? "kk" : locale;
       let languageReady = false;
       for (let attempt = 0; attempt < 4; attempt += 1) {
-        await page.locator(surfaceIndex === 0 ? '.admin-locale-switcher summary' : '.staff-locale-switcher summary').click();
+        await page.locator(surfaceIndex === 0 ? '.fl2-account-settings summary' : '.staff-locale-switcher summary').click();
         await page.getByRole("button", { name: locale.toUpperCase(), exact: true }).click();
         try {
           await page.waitForFunction(expected => document.documentElement.lang.toLowerCase() === expected,
@@ -71,6 +71,7 @@ try {
         }
       }
       assert(languageReady, `Locale ${locale} did not become active`);
+      await page.locator(surfaceIndex === 0 ? '.fl2-account-settings' : '.staff-locale-switcher').evaluate(element => { element.open = false; });
       await page.getByRole("button", { name: open, exact: true }).click();
       const panel = page.getByRole("region", { name: "MARINA AI", exact: true });
       const received = page.waitForResponse(response => response.request().method() === "POST"

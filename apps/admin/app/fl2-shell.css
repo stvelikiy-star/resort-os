@@ -156,3 +156,226 @@ html[data-marina-ui="future-luxury"][data-fl2-theme] .hotel-finance-shell .btn:f
   outline:3px solid var(--mx-focus);outline-offset:2px;
 }
 
+/* MARINA PROFILE SETTINGS 2026-11-20 */
+
+/* Single profile entry for all appearance/language preferences.
+   Preference controls never float over PMS, finance or Dashboard. */
+.auth-toolbar .fl2-account-settings {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  z-index: 1605;
+  color: var(--mx-ink, #152b3a);
+}
+.auth-toolbar .fl2-account-settings > summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 13px;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid var(--mx-edge, #bacbd2);
+  border-radius: 12px;
+  background: var(--mx-glass, #f8fbfc);
+  color: var(--mx-ink, #152b3a);
+  cursor: pointer;
+}
+.auth-toolbar .fl2-account-settings > summary::-webkit-details-marker { display: none; }
+.auth-toolbar .fl2-account-settings > summary:hover,
+.auth-toolbar .fl2-account-settings[open] > summary {
+  border-color: var(--mx-edge-strong, #0f766e);
+  background: var(--mx-accent-soft, #e0f5f1);
+}
+.auth-toolbar .fl2-account-settings > summary:focus-visible,
+.auth-toolbar .fl2-account-panel button:focus-visible {
+  outline: 3px solid var(--mx-focus, #0f766e);
+  outline-offset: 2px;
+}
+.auth-toolbar .fl2-account-panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 2600;
+  display: grid;
+  gap: 14px;
+  width: min(306px, calc(100vw - 24px));
+  max-height: min(72dvh, calc(100dvh - 100px));
+  padding: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--mx-edge, #bacbd2);
+  border-radius: 18px;
+  background: var(--mx-glass-strong, #ffffff);
+  color: var(--mx-ink, #152b3a);
+  box-shadow: var(--mx-shadow, 0 18px 44px rgba(8, 26, 38, .17));
+  text-align: left;
+  box-sizing: border-box;
+}
+.auth-toolbar .fl2-account-heading { display: grid; gap: 3px; min-width: 0; }
+.auth-toolbar .fl2-account-heading > strong {
+  font-size: 15px; font-weight: 750; line-height: 1.4;
+  color: var(--mx-ink, #152b3a);
+}
+.auth-toolbar .fl2-account-heading > small {
+  font-size: 12px; line-height: 1.4;
+  color: var(--mx-muted, #52687a);
+  overflow-wrap: anywhere;
+}
+.auth-toolbar .fl2-account-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--mx-edge, #bacbd2);
+}
+.auth-toolbar .fl2-account-section h3 {
+  font-size: 12px; font-weight: 700; line-height: 1.35;
+  margin: 0; color: var(--mx-muted, #52687a);
+}
+.auth-toolbar .fl2-account-panel :is(.fl2-profile-languages,.shell-theme-toggle,.fl2-theme-switch) {
+  display: grid;
+  grid-auto-flow: row;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.auth-toolbar .fl2-account-panel .fl2-profile-languages {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.auth-toolbar .fl2-account-panel :is(.fl2-profile-languages,.shell-theme-toggle,.fl2-theme-switch) button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 5px;
+  border: 1px solid var(--mx-edge, #bacbd2);
+  border-radius: 10px;
+  background: var(--mx-glass, #f8fbfc);
+  color: var(--mx-ink, #152b3a);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: normal;
+  text-align: center;
+  cursor: pointer;
+}
+.auth-toolbar .fl2-account-panel :is(.fl2-profile-languages,.shell-theme-toggle,.fl2-theme-switch) button[aria-pressed="true"] {
+  background: var(--mx-accent, #0f766e);
+  color: var(--mx-accent-ink, #ffffff);
+  border-color: var(--mx-accent, #0f766e);
+}
+.auth-toolbar .fl2-account-panel .fl2-theme-switch { margin-top: 8px; }
+.auth-toolbar .fl2-account-panel .fl2-account-logout {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--mx-edge, #bacbd2);
+  border-radius: 10px;
+  background: var(--mx-glass, #f8fbfc);
+  color: var(--mx-ink, #152b3a);
+  font-size: 13px;
+}
+html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-shell-actions {
+  align-items: stretch;
+  overflow: visible;
+}
+@media (max-width: 1100px) {
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .admin-shell-actions {
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-end;
+    gap: 8px;
+    width: 100%;
+    padding: 0;
+    overflow: visible;
+    border: 0;
+  }
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .fl2-account-settings {
+    flex: 0 1 50%;
+    max-width: 180px;
+  }
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .fl2-assistant-dock {
+    flex: 0 1 50%;
+    min-width: 0;
+    max-width: 180px;
+  }
+  .auth-toolbar .fl2-account-panel {
+    left: auto; right: max(12px, env(safe-area-inset-right));
+    top: calc(100% + 8px); bottom: auto;
+    width: min(330px, calc(100vw - 24px));
+    max-height: calc(100dvh - 180px);
+  }
+}
+@media (min-width: 1101px) {
+  html[data-marina-ui="future-luxury"] .auth-toolbar[data-fl2-shell="true"] .fl2-account-panel {
+    left: 0;
+    bottom: calc(100% + 8px);
+  }
+}
+html:not([data-marina-ui="future-luxury"]) .auth-toolbar .fl2-account-panel {
+  left: auto; right: 0; top: calc(100% + 8px); bottom: auto;
+}
+@media (max-width: 390px) {
+  .auth-toolbar .fl2-account-panel { padding: 14px; gap: 11px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-toolbar .fl2-account-settings *,
+  .auth-toolbar .fl2-account-settings *::before { transition: none !important; animation: none !important; }
+}
+
+/* Approved Future Luxury colors: one restrained teal accent. Operational
+   red/amber/green remain reserved for genuine statuses and alerts. */
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] {
+  --fl2-owner-ink: var(--mx-ink);
+  --fl2-owner-muted: var(--mx-muted);
+  --fl2-owner-accent: var(--mx-accent);
+  --fl2-owner-champagne: var(--mx-gold);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] > .work-head {
+  background: linear-gradient(135deg, var(--mx-glass-strong), var(--mx-glass)) !important;
+  border-color: var(--mx-edge) !important;
+  box-shadow: var(--mx-shadow) !important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] > .work-head::after {
+  border-color: var(--mx-edge);
+  box-shadow: 0 0 0 35px var(--mx-accent-soft);
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] > .work-head > .btn {
+  background: var(--mx-accent) !important; color: var(--mx-accent-ink) !important;
+  border-color: var(--mx-accent) !important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article,
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(even) {
+  background: var(--mx-glass-strong) !important;
+  border-color: var(--mx-edge) !important;
+  box-shadow: var(--mx-shadow) !important;
+  color: var(--mx-ink) !important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:hover {
+  border-color: var(--mx-edge-strong) !important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] > .command-grid > .command-panel {
+  background: var(--mx-glass-strong) !important;
+  color: var(--mx-ink) !important;
+  border-color: var(--mx-edge) !important;
+  box-shadow: var(--mx-shadow) !important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] > .command-grid > .command-panel :is(h2,h3,strong) {
+  color: var(--mx-ink) !important;
+}
+html[data-marina-ui="future-luxury"][data-fl2-theme] .dashboard-shell[data-fl2-owner="true"] > .command-grid > .command-panel :is(small,.command-note) {
+  color: var(--mx-muted) !important;
+}
+

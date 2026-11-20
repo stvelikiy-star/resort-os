@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { assertApprovedProfileShell } from './fl2-profile-source-contract.mjs';
 const base='542c67a6bd6b3b415784164dc45e80ec68e14834';
 const read=p=>fs.readFileSync(p,'utf8');
 const original=p=>execFileSync('git',['show',`${base}:${p}`],{encoding:'utf8'});
@@ -13,7 +14,9 @@ const shellPath='apps/admin/components/AdminShell.tsx';
 const shell=read(shellPath);
 const appearanceImport='import FutureLuxuryAppearance from "./FutureLuxuryAppearance";\n';
 assert.ok(shell.includes(appearanceImport),'FL2 appearance integration import must be present');
-assert.equal(shell.replace(appearanceImport,''),original(shellPath),'AdminShell: unexpected non-appearance source change');
+const previousShell=assertApprovedProfileShell(shell);
+assert.equal(previousShell.replace(appearanceImport,''),original(shellPath),
+  'Previously approved AdminShell must still match immutable C2 source baseline');
 const control='apps/admin/components/OwnerControlV2.tsx';
 assert.equal(read(control).replace(' tabIndex={0} role="region" aria-label="Загрузка по дням"',''),original(control));
 const center='apps/admin/components/fl2/OwnerCommandCenter.tsx';

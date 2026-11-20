@@ -2,6 +2,7 @@
 import { ownerCommandCopy } from "./fl2/owner-command-copy";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Languages } from "lucide-react";
 import { FL2_OWNER_PATTERNS, FL2_OWNER_PHRASES } from "./fl2OwnerPhrases";
 
@@ -2385,6 +2386,20 @@ common.push(
   { ru: "Черновик ответа менеджера", kg: "Менеджердин жооп долбоору", en: "Manager's draft reply" },
 );
 
+// Personal preferences are translated with the same runtime as the rest of the PMS.
+common.push(
+  { ru: "Профиль", kg: "Профиль", kz: "Профиль", en: "Profile" },
+  { ru: "Профиль и настройки", kg: "Профиль жана жөндөөлөр", kz: "Профиль және баптаулар", en: "Profile and settings" },
+  { ru: "Настройки интерфейса", kg: "Интерфейстин жөндөөлөрү", kz: "Интерфейс баптаулары", en: "Interface settings" },
+  { ru: "Язык интерфейса", kg: "Интерфейстин тили", kz: "Интерфейс тілі", en: "Interface language" },
+  { ru: "Режим оформления", kg: "Көрүнүш режими", kz: "Көрініс режимі", en: "Appearance mode" },
+  { ru: "Классика", kg: "Классикалык", kz: "Классикалық", en: "Classic" },
+  { ru: "Тёмная", kg: "Караңгы", kz: "Қараңғы", en: "Dark" },
+  { ru: "Светлая", kg: "Жарык", kz: "Жарық", en: "Light" },
+  { ru: "Тёмная тема", kg: "Караңгы тема", kz: "Қараңғы тақырып", en: "Dark theme" },
+  { ru: "Светлая тема", kg: "Жарык тема", kz: "Жарық тақырып", en: "Light theme" },
+);
+
 Object.assign(KZ_EXACT, Object.fromEntries(Object.entries(ownerCommandCopy).map(([key, value]) => [key, value.kz])));
 
 const phraseIndex = new Map<string, Phrase>();
@@ -3373,6 +3388,21 @@ function requestUrl(input: RequestInfo | URL): string {
 
 export default function AdminExperienceRuntime() {
   const [locale, setLocale] = useState<Locale>("ru");
+  const [preferencesSlot, setPreferencesSlot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    // The language control belongs to the signed-in profile menu, not a
+    // floating toolbar over the working PMS. Keep login-language access intact.
+    const sync = () => {
+      const next = document.getElementById("marina-preferences-locale-slot");
+      setPreferencesSlot(current => current === next ? current : next);
+    };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+
   const [pin, setPin] = useState<PinPayload | null>(null);
   const [currentReservationId, setCurrentReservationId] = useState<string | null>(null);
   const [currentReservationCheckedIn, setCurrentReservationCheckedIn] = useState(false);
@@ -3491,14 +3521,21 @@ export default function AdminExperienceRuntime() {
   }[locale];
 
   return <>
-    <details className="admin-locale-switcher" data-i18n-skip>
+    {preferencesSlot ? createPortal(
+      <div className="fl2-profile-languages" data-i18n-skip role="group" aria-label={labels.language}>
+        {(["ru", "kg", "kz", "en"] as Locale[]).map(value => (
+          <button key={value} type="button" aria-pressed={locale === value}
+            onClick={() => setLocale(value)}>{value.toUpperCase()}</button>
+        ))}
+      </div>, preferencesSlot
+    ) : <details className="admin-locale-switcher" data-i18n-skip>
       <summary aria-label={`${labels.language}: ${locale.toUpperCase()}`} title={labels.language}>
         <Languages size={17} aria-hidden="true" /><strong>{locale.toUpperCase()}</strong>
       </summary>
       <div className="admin-locale-menu" role="group" aria-label={labels.language}>
         {(["ru", "kg", "kz", "en"] as Locale[]).map((value) => <button key={value} type="button" className={locale === value ? "active" : ""} aria-pressed={locale === value} onClick={(event) => { setLocale(value); event.currentTarget.closest("details")?.removeAttribute("open"); }}>{value.toUpperCase()}</button>)}
       </div>
-    </details>
+    </details>}
 
     {detailOpen && currentReservationCheckedIn && <button type="button" className="guest-pin-reissue" data-i18n-skip onClick={reissuePin} disabled={pinBusy}>{pinBusy ? "…" : labels.reissue}</button>}
     {pinError && <div className="guest-pin-runtime-error" data-i18n-skip>{labels.error}: {pinError}</div>}

@@ -32,7 +32,7 @@ import ChannelManagerBoard from "./ChannelManagerBoard";
 import { readMarinaUiPreference, writeMarinaUiPreference, type MarinaUiPreference } from "../lib/marina-ui-preference";
 import { readFl2Theme, writeFl2Theme, type Fl2Theme } from "../lib/fl2-appearance";
 
-import { Activity, BedDouble, CalendarDays, ChartNoAxesCombined, CircleDollarSign, ClipboardList, ContactRound, DoorOpen, FileChartColumn, Globe, Handshake, House, Inbox, LayoutGrid, Megaphone, Menu, MessageCircle, NotebookText, QrCode, Settings, SlidersHorizontal, Sparkles, Tags, Users, Utensils, Wrench, X, type LucideIcon } from "lucide-react";
+import { Activity, BedDouble, CalendarDays, ChartNoAxesCombined, CircleDollarSign, ClipboardList, ContactRound, DoorOpen, FileChartColumn, Globe, Handshake, House, Inbox, LayoutGrid, Megaphone, Menu, MessageCircle, NotebookText, QrCode, Settings, SlidersHorizontal, Moon, Sun, Sparkles, Tags, Users, Utensils, Wrench, X, type LucideIcon } from "lucide-react";
 
 type User = {
   id: string;
@@ -383,12 +383,12 @@ export default function AdminShell() {
 
   const appearanceControls = <>
 <div className="shell-theme-toggle" role="group" aria-label="Внешний вид интерфейса">
-            <button type="button" aria-pressed={uiPreference === "legacy"} onClick={() => chooseUiPreference("legacy")}>Legacy</button>
+            <button type="button" aria-pressed={uiPreference === "legacy"} onClick={() => chooseUiPreference("legacy")}>Классика</button>
             <button type="button" aria-pressed={uiPreference === "future-luxury"} onClick={() => chooseUiPreference("future-luxury")}>Future Luxury</button>
           </div>
           {uiPreference === "future-luxury" && <div className="fl2-theme-switch" role="group" aria-label="Цветовая тема Future Luxury">
-            <button type="button" aria-label="Тёмная тема" aria-pressed={fl2Theme === "dark"} onClick={() => chooseFl2Theme("dark")}>☾ Dark</button>
-            <button type="button" aria-label="Светлая тема" aria-pressed={fl2Theme === "light"} onClick={() => chooseFl2Theme("light")}>☀ Light</button>
+            <button type="button" aria-label="Тёмная тема" aria-pressed={fl2Theme === "dark"} onClick={() => chooseFl2Theme("dark")}><Moon size={16} aria-hidden="true" /><span>Тёмная</span></button>
+            <button type="button" aria-label="Светлая тема" aria-pressed={fl2Theme === "light"} onClick={() => chooseFl2Theme("light")}><Sun size={16} aria-hidden="true" /><span>Светлая</span></button>
           </div>}
   </>;
 
@@ -458,14 +458,29 @@ export default function AdminShell() {
           </details>}
         </nav>}
         <div className="admin-shell-actions">
-          {uiPreference === "future-luxury" ? <details className="fl2-style-options" onKeyDown={event => {
+          <details className="fl2-account-settings" onKeyDown={event => {
             if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); }
           }}>
-            <summary><SlidersHorizontal size={18} aria-hidden="true" /><span>Оформление</span></summary>
-            <div className="fl2-style-panel">{appearanceControls}</div>
-          </details> : appearanceControls}
+            <summary aria-label="Профиль и настройки" title="Профиль и настройки">
+              <ContactRound size={19} aria-hidden="true" /><span>Профиль</span>
+            </summary>
+            <div className="fl2-account-panel">
+              <div className="fl2-account-heading">
+                <strong>Настройки интерфейса</strong>
+                <small>{user.display_name}</small>
+              </div>
+              <section className="fl2-account-section">
+                <h3>Язык интерфейса</h3>
+                <div id="marina-preferences-locale-slot" />
+              </section>
+              <section className="fl2-account-section">
+                <h3>Режим оформления</h3>
+                {appearanceControls}
+              </section>
+              <button type="button" className="logout-button fl2-account-logout" onClick={logout}>Выйти</button>
+            </div>
+          </details>
           {uiPreference === "future-luxury" && <div className="fl2-assistant-dock"><MarinaAiAssistant screen={tab} role={user.role} onNavigate={(destination) => { setTab(destination as Tab); setNavigationOpen(false); }} /></div>}
-          <button className="logout-button" onClick={logout}>Выйти</button>
         </div>
       </div>
       {user.module_permissions.length === 0 && <main className="management-shell"><section className="management-truth"><strong>Доступ к разделам отключён.</strong> Попросите собственника MARINA SMART выдать нужные разделы.</section></main>}

@@ -100,3 +100,102 @@ body{background:var(--shift-bg);color:var(--shift-ink)}
 .shift-primary {background:var(--shift-accent);color:var(--shift-action-ink);box-shadow:var(--shift-shadow)}
 @media(prefers-color-scheme:light){:root{--shift-action-ink:#ffffff}}
 
+/* MARINA STAFF PROFILE PREFERENCES 2026-11-20 */
+
+/* Staff preferences: only a 44px settings icon is visible in the workspace.
+   Language and theme choices live inside a balanced popover. */
+html[data-staff-theme="dark"] {
+  color-scheme: dark;
+  --shift-ink:#f8fafc;--shift-muted:#b9d0df;--shift-line:#365565;
+  --shift-bg:#0b1f2a;--shift-surface:#123342;--shift-panel:#163e4e;
+  --shift-header:rgba(11,31,42,.98);--shift-soft:#174b55;
+  --shift-accent:#5eead4;--shift-action-ink:#052c36;
+  --shift-ok:#5ee6aa;--shift-warn:#f8c16b;--shift-danger:#ffaaa5;
+  --shift-success-bg:#164c40;--shift-error-bg:#592e35;--shift-error-ink:#ffd0cc;
+  --shift-shadow:0 16px 42px rgba(0,8,20,.18);
+}
+html[data-staff-theme="light"] {
+  color-scheme: light;
+  --shift-ink:#123549;--shift-muted:#4e697a;--shift-line:#b9d0dc;
+  --shift-bg:#edf5f9;--shift-surface:#ffffff;--shift-panel:#e8f3f7;
+  --shift-header:rgba(237,245,249,.98);--shift-soft:#d6f3f1;
+  --shift-accent:#087e77;--shift-action-ink:#ffffff;
+  --shift-ok:#17654c;--shift-warn:#8a5915;--shift-danger:#b23936;
+  --shift-success-bg:#e1f5ea;--shift-error-bg:#ffedeb;--shift-error-ink:#913a36;
+  --shift-shadow:0 12px 32px rgba(18,53,73,.08);
+}
+html .staff-locale-switcher.staff-preferences.staff-preferences {
+  position: fixed;top: max(12px,env(safe-area-inset-top));
+  right: max(12px,env(safe-area-inset-right));
+  bottom: auto;left: auto;
+  display: block;
+  flex: none;
+  width: 44px;min-width:44px;max-width:44px;height:44px;min-height:44px;
+  margin:0;padding:0;overflow:visible;z-index:2400;
+  border-radius:12px;border:1px solid var(--shift-line);
+  background:var(--shift-header);color:var(--shift-ink);
+  box-shadow:var(--shift-shadow);
+}
+html .staff-preferences > summary {
+  display:flex;align-items:center;justify-content:center;
+  width:44px;min-width:44px;max-width:44px;height:44px;min-height:44px;
+  padding:0;margin:0;
+  border-radius:12px;list-style:none;color:var(--shift-ink);cursor:pointer;
+}
+html .staff-preferences > summary::-webkit-details-marker {display:none}
+html .staff-preferences > summary:focus-visible,
+html .staff-preferences :is(button):focus-visible {
+  outline:3px solid var(--shift-accent);outline-offset:3px;
+}
+html .staff-preferences[open] > .staff-preferences-panel {
+  position:absolute;right:0;top:calc(100% + 9px);
+  display:grid;grid-template-columns:minmax(0,1fr);
+  gap:10px;width:min(304px,calc(100vw - 24px));
+  max-height:calc(100dvh - 88px);padding:17px;
+  overflow-y:auto;overscroll-behavior:contain;
+  background:var(--shift-header);color:var(--shift-ink);
+  border:1px solid var(--shift-line);border-radius:16px;
+  box-shadow:var(--shift-shadow);
+}
+html .staff-preferences-panel > strong {
+  font-size:15px;line-height:1.35;letter-spacing:-.01em;
+}
+html .staff-preferences-panel > span {
+  color:var(--shift-muted);font-size:12px;font-weight:700;
+  line-height:1.4;
+}
+html .staff-preferences-panel > :is(.staff-locale-menu,.staff-theme-options),
+html .staff-preferences[open] .staff-locale-menu {
+  position:static;right:auto;top:auto;bottom:auto;
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;width:100%;max-width:100%;min-width:0;
+  padding:0;margin:0;border:0;border-radius:0;
+  background:transparent;box-shadow:none;
+}
+html .staff-preferences-panel .staff-locale-menu {
+  grid-template-columns:repeat(4,minmax(0,1fr));
+}
+html .staff-preferences-panel :is(.staff-locale-menu,.staff-theme-options) button {
+  display:flex;align-items:center;justify-content:center;
+  min-height:44px;min-width:0;width:100%;padding:8px 5px;
+  font-size:12px;line-height:1.25;font-weight:700;
+  background:var(--shift-surface);color:var(--shift-ink);
+  border:1px solid var(--shift-line);border-radius:10px;cursor:pointer;
+}
+html .staff-preferences-panel :is(.staff-locale-menu,.staff-theme-options) button[aria-pressed="true"] {
+  background:var(--shift-accent);color:var(--shift-action-ink);
+  border-color:var(--shift-accent);
+}
+html .shift-shell .shift-head {
+  top:8px;
+  padding-right:max(60px,env(safe-area-inset-right));
+}
+@media(max-width:420px) {
+  html .staff-preferences[open] > .staff-preferences-panel {padding:14px;gap:8px;}
+}
+@media(prefers-reduced-motion:reduce) {
+  html .staff-preferences *,html .staff-preferences *::before {
+    transition:none!important;animation:none!important;
+  }
+}
+

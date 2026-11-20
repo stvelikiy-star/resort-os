@@ -27,7 +27,7 @@ try {
   await page.waitForSelector('[data-fl2-owner="true"]');
   assert.equal(await page.locator('.fl2-nav-group').count(),6);
   assert.equal(await page.locator('[data-section]').count(),26);
-  await page.locator('.fl2-style-options summary').click();const appearance=await metrics(page);assert.deepEqual(appearance.small,[]);await page.locator('.fl2-style-options summary').click();
+  await page.locator('.fl2-account-settings summary').click();const appearance=await metrics(page);assert.deepEqual(appearance.small,[]);await page.locator('.fl2-account-settings summary').click();
   const closed=await metrics(page); assert.equal(closed.overflow,0); assert.deepEqual(closed.small,[]);
   assert.equal(await page.locator('.fl2-assistant-dock>button').evaluate(e=>getComputedStyle(e).position),'static');
   await page.screenshot({path:`${out}/owner-${width}-${theme}.png`});
@@ -57,9 +57,10 @@ try {
   evidence.push({role,grants:permissions,enabled:['DINING'],visible:['DASHBOARD','DINING','FINANCE','PMS']});await context.close();
  }
  const languages=await open();
+ await languages.page.locator('.fl2-account-settings summary').click();
  for(const [code,heading] of [['EN','Growth'],['KG','Өнүгүү'],['KZ','Даму'],['RU','Развитие']]) {
-  await languages.page.locator('.admin-locale-switcher summary').click();
-  await languages.page.locator('.admin-locale-switcher').getByRole('button',{name:code,exact:true}).click();
+
+  await languages.page.locator('#marina-preferences-locale-slot').getByRole('button',{name:code,exact:true}).click();
   await languages.page.locator('.fl2-nav-group h2').filter({hasText:heading}).first().waitFor();
  }
  await languages.context.close();
