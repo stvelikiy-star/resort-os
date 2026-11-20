@@ -1322,6 +1322,7 @@ function translated(text: string, locale: Locale): string {
 export default function StaffLocaleRuntime() {
   const [locale, setLocale] = useState<Locale>("ru");
   const [initialized, setInitialized] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const originalText = useMemo(() => new WeakMap<Text, { source: string; rendered: string }>(), []);
   const originalAttrs = useMemo(() => new WeakMap<Element, Map<string, { source: string; rendered: string }>>(), []);
 
@@ -1329,6 +1330,9 @@ export default function StaffLocaleRuntime() {
     try {
       const stored = window.localStorage.getItem(STORAGE_KEY);
       if (stored === "ru" || stored === "kg" || stored === "kz" || stored === "en") setLocale(stored);
+      const savedTheme = window.localStorage.getItem("marina-staff-color-theme");
+      setTheme(savedTheme === "dark" || savedTheme === "light"
+        ? savedTheme : window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
     } catch {
       // The language selector also works when browser storage is unavailable.
     }
@@ -1390,14 +1394,44 @@ export default function StaffLocaleRuntime() {
     return () => observer.disconnect();
   }, [locale, originalAttrs, originalText]);
 
-  const label = locale === "en" ? "Language" : locale === "kg" ? "Тил" : locale === "kz" ? "Тіл" : "Язык";
+  useEffect(() => {
+    if (!initialized) return;
+    document.documentElement.dataset.staffTheme = theme;
+    try { window.localStorage.setItem("marina-staff-color-theme", theme); }
+    catch { /* Appearance selection still works for this session. */ }
+  }, [theme, initialized]);
 
-  return <details data-staff-i18n-skip className="staff-locale-switcher">
-    <summary aria-label={`${label}: ${locale.toUpperCase()}`} title={label}>
-      <strong>{locale.toUpperCase()}</strong><span aria-hidden="true">⌄</span>
+  const copy = {
+    ru: { settings: "Настройки интерфейса", language: "Язык", theme: "Цветовая тема", light: "Светлая", dark: "Тёмная" },
+    kg: { settings: "Интерфейстин жөндөөлөрү", language: "Тил", theme: "Түстүү тема", light: "Жарык", dark: "Караңгы" },
+    kz: { settings: "Интерфейс баптаулары", language: "Тіл", theme: "Түс тақырыбы", light: "Жарық", dark: "Қараңғы" },
+    en: { settings: "Interface settings", language: "Language", theme: "Color theme", light: "Light", dark: "Dark" },
+  }[locale];
+
+  return <details data-staff-i18n-skip className="staff-locale-switcher staff-preferences" onKeyDown={event => {
+    if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); }
+  }}>
+    <summary aria-label={copy.settings} title={copy.settings}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 2.5 14 4l2.4-.5 1.2 2.2 2.4 1 .1 2.6 1.6 2-1.6 2 .1 2.6-2.4 1-1.2 2.2-2.4-.5-2 1.5-2-1.5-2.4.5-1.2-2.2-2.4-1-.1-2.6-1.6-2 1.6-2 .1-2.6 2.4-1 1.2-2.2L10 4z"/>
+        <circle cx="12" cy="11.5" r="3"/>
+      </svg>
     </summary>
-    <div className="staff-locale-menu" role="group" aria-label={label}>
-      {(["ru", "kg", "kz", "en"] as Locale[]).map((value) => <button key={value} type="button" disabled={!initialized} onClick={(event) => { setLocale(value); event.currentTarget.closest("details")?.removeAttribute("open"); }} aria-pressed={locale === value}>{value.toUpperCase()}</button>)}
+    <div className="staff-preferences-panel">
+      <strong>{copy.settings}</strong>
+      <span>{copy.language}</span>
+      <div className="staff-locale-menu" role="group" aria-label={copy.language}>
+        {(["ru", "kg", "kz", "en"] as Locale[]).map(value => (
+          <button key={value} type="button" disabled={!initialized} onClick={() => setLocale(value)}
+            aria-pressed={locale === value}>{value.toUpperCase()}</button>
+        ))}
+      </div>
+      <span>{copy.theme}</span>
+      <div className="staff-theme-options" role="group" aria-label={copy.theme}>
+        <button type="button" aria-pressed={theme === "dark"} onClick={() => setTheme("dark")}>{copy.dark}</button>
+        <button type="button" aria-pressed={theme === "light"} onClick={() => setTheme("light")}>{copy.light}</button>
+      </div>
     </div>
   </details>;
 }
