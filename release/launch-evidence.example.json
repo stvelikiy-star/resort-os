@@ -40,7 +40,19 @@
       "zz111_marina_room_wayfinding_20261022",
       "zz112_marina_staff_module_permissions_20261022",
       "zz113_marina_housekeeping_schedule_date_20261027",
-      "zz114_marina_60minute_holds_20261029"
+      "zz114_marina_60minute_holds_20261029",
+      "zz115_marina_chef_production_targets_20261110",
+      "zz116_marina_kitchen_recipes_20261111",
+      "zz117_marina_kitchen_stock_20261111",
+      "zz118_marina_kitchen_waste_spoilage_20261115",
+      "zz119_marina_kitchen_procurement_20261115",
+      "zz120_marina_owner_expenses_20261115",
+      "zz121_marina_supplier_documents_20261116",
+      "zz122_marina_supplier_returns_20261116",
+      "zz123_marina_owner_revenue_source_events_20261116",
+      "zz124_marina_owner_revenue_corrections_20261116",
+      "zz125_marina_owner_revenue_evidence_bytes_20261116",
+      "zz126_marina_owner_accounting_journal_proposals_20261116"
     ]
   },
   "external_evidence": {
