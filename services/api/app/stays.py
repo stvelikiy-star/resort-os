@@ -369,6 +369,28 @@ async def check_in(
                     },
                 )
 
+            # Reservation inventory can become sellable on the previous stay's
+            # checkout date even while that guest is still physically in-room.
+            # The room row is locked by room_for_local_date above, so a
+            # concurrent check-in/checkout is serialized before this check.
+            occupied = await conn.fetchval(
+                """
+                SELECT 1 FROM room_assignments
+                WHERE "roomId"=$1 AND "endedAt" IS NULL
+                LIMIT 1
+                """,
+                room["id"],
+            )
+            if occupied:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "CHECK_IN_ROOM_OCCUPIED",
+                        "room_code": room["code"],
+                        "action": "CHECK_OUT_CURRENT_STAY_FIRST",
+                    },
+                )
+
             stay_id, room_assignment_id, guest_access_pin = await activate_stay(
                 conn,
                 property_id=pid,
