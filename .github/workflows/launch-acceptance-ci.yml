@@ -62,14 +62,15 @@ jobs:
       - name: Verify frozen release truth
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # A PR may be a controlled next release candidate. Validate the frozen
-            # manifest/docs contract without misclassifying legitimate candidate
-            # changes as corruption of the accepted executable tree.
+          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.ref_name }}" = "main" ]; then
+            # Historical 0.62.2 invariants remain active; November main has its own
+            # strict executable-boundary validator rather than bypassing drift checks.
             python scripts/release_rc_truth_guard.py --allow-non-accepted-head
           else
-            # main must stay strict: product drift requires an explicit refreeze.
             python scripts/release_rc_truth_guard.py
+          fi
+          if [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.base_ref }}" = "main" ]; then
+            python scripts/verify_marina_november_release_boundary.py
           fi
 
       - name: Verify canonical database release contract
@@ -78,7 +79,9 @@ jobs:
       - name: Verify release repository boundary
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.ref_name }}" = "main" ]; then
+            # The September documentation remains frozen. The current forward
+            # candidate manifest is checked against all committed migrations.
             python scripts/verify_launch_acceptance.py --mode repository --allow-candidate-contract
           else
             python scripts/verify_launch_acceptance.py --mode repository

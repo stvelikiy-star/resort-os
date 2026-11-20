@@ -29,14 +29,23 @@ jobs:
       - name: Compile RC truth guard
         run: python -m py_compile scripts/release_rc_truth_guard.py
 
-      - name: Verify frozen release candidate truth
+      - name: Verify historical release 0.62.2 contract (unchanged)
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
+          if [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.ref_name }}" = "main" ]; then
+            # The historical 0.62.2 assertions are still checked. A separate
+            # fail-closed November guard verifies the current main source tree.
             python scripts/release_rc_truth_guard.py --allow-non-accepted-head
           else
             python scripts/release_rc_truth_guard.py
           fi
+
+      - name: Verify November MARINA SMART release boundary negative cases
+        run: python scripts/verify_marina_november_release_boundary.py --self-test
+
+      - name: Verify November main executable source and historical separation
+        if: github.ref_name == 'main' || github.base_ref == 'main'
+        run: python scripts/verify_marina_november_release_boundary.py
 
       - name: Verify main production-source boundary remains fail-closed
         shell: bash
