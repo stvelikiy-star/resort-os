@@ -396,10 +396,18 @@ html[data-marina-ui="future-luxury"] .auth-toolbar .fl2-account-settings > summa
 html[data-marina-ui="future-luxury"] .auth-toolbar .fl2-account-settings > summary > span {
   display: none !important;
 }
-html[data-marina-ui="future-luxury"] .auth-toolbar .fl2-account-settings .fl2-account-panel {
-  position: fixed !important;
-  left: max(12px, env(safe-area-inset-left)) !important;
-  right: auto !important;
-  width: min(330px, calc(100vw - 24px)) !important;
+/* Only compact headers need viewport-fixed popovers. On desktop the
+   profile remains anchored above its sidebar launcher. */
+@media (max-width: 1100px) {
+  html[data-marina-ui="future-luxury"] .auth-toolbar .fl2-account-settings .fl2-account-panel {
+    position: fixed !important;
+    left: max(12px, env(safe-area-inset-left)) !important;
+    right: auto !important;
+    /* A fixed element's 100% top is the viewport height, not the
+       Profile launcher height. Keep the entire menu on screen. */
+    top: clamp(180px, 22dvh, 200px) !important;
+    bottom: auto !important;
+    width: min(330px, calc(100vw - 24px)) !important;
+    max-height: calc(100dvh - clamp(180px, 22dvh, 200px) - 12px) !important;
+  }
 }
-
