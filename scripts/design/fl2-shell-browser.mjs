@@ -71,23 +71,24 @@ try {
 
   await languages.page.locator('#marina-preferences-locale-slot').getByRole('button',{name:code,exact:true}).click();
   await languages.page.locator('.fl2-nav-group h2').filter({hasText:heading}).first().waitFor();
+  if(code === 'EN') {
+    // Source-case translation is verified during the already visible EN selection.
+    await languages.page.waitForFunction(() => document.documentElement.lang === 'en');
+   await languages.page.evaluate(() => {
+     const root=document.createElement('div');
+     root.id='qa-localization-source-case';
+     for(const label of ['Стадия','Сумма','Название отеля','Кому назначить питание']) {
+       const span=document.createElement('span');
+       span.textContent=label;
+       root.appendChild(span);
+     }
+     document.body.appendChild(root);
+   });
+   await languages.page.waitForFunction(() =>
+     [...document.querySelectorAll('#qa-localization-source-case span')].map(x=>x.textContent).join('|') ===
+     'Stage|Amount|Hotel name|Assign meals to');
+  }
  }
- // Regression: actual DOM source is title-case, while CSS displays it uppercase.
- await languages.page.locator('#marina-preferences-locale-slot').getByRole('button',{name:'EN',exact:true}).click();
- await languages.page.waitForFunction(() => document.documentElement.lang === 'en');
- await languages.page.evaluate(() => {
-   const root=document.createElement('div');
-   root.id='qa-localization-source-case';
-   for(const label of ['Стадия','Сумма','Название отеля','Кому назначить питание']) {
-     const span=document.createElement('span');
-     span.textContent=label;
-     root.appendChild(span);
-   }
-   document.body.appendChild(root);
- });
- await languages.page.waitForFunction(() =>
-   [...document.querySelectorAll('#qa-localization-source-case span')].map(x=>x.textContent).join('|') ===
-   'Stage|Amount|Hotel name|Assign meals to');
  await languages.context.close();
  const empty=await open({permissions:[]});assert.equal(await empty.page.locator('[data-section]').count(),0);await empty.page.getByText('Доступ к разделам отключён.',{exact:true}).waitFor();await empty.context.close();
  const zoom=await open({width:720});await zoom.page.setViewportSize({width:720,height:512});assert.equal((await metrics(zoom.page)).overflow,0);await zoom.page.screenshot({path:`${out}/owner-reflow-720.png`});await zoom.context.close();
