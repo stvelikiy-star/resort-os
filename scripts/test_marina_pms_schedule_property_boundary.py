@@ -39,5 +39,24 @@ class PmsSchedulePropertyBoundary(unittest.TestCase):
                 self.assertLess(fn.index('async with conn.transaction():'),fn.index('await expire_holds(conn, prop["id"])'))
                 self.assertLess(fn.index('await expire_holds(conn, prop["id"])'),fn.index('await _reservation(conn, reservation_id, prop["id"]'))
 
+    def test_checkin_rejects_room_with_open_stay_before_activation(self):
+        stays_source = (ROOT / 'services/api/app/stays.py').read_text()
+        stays_module = ast.parse(stays_source)
+        checkin = next(
+            node for node in stays_module.body
+            if isinstance(node, ast.AsyncFunctionDef) and node.name == 'check_in'
+        )
+        source = ast.get_source_segment(stays_source, checkin)
+        self.assertIn('FROM room_assignments', source)
+        self.assertIn('"endedAt" IS NULL', source)
+        self.assertIn('CHECK_IN_ROOM_OCCUPIED', source)
+        self.assertIn('CHECK_OUT_CURRENT_STAY_FIRST', source)
+        self.assertIn('status_code=409', source)
+        self.assertLess(
+            source.index('FROM room_assignments'),
+            source.index('await activate_stay('),
+        )
+
+
 if __name__=='__main__':
     unittest.main()
