@@ -17,6 +17,8 @@ TESTED_PR_HEAD = "6d5eff8d212cfb9da4b04bfb4fdec428f32b6d48"
 LEGACY_BASE = "a53850983d8fc6e1f1997199049a5b071511ed80"
 ALLOWED_GOVERNANCE = frozenset({
     ".github/workflows/release-rc-truth-ci.yml",
+    ".github/workflows/launch-acceptance-ci.yml",
+    "release/launch-evidence.example.json",
     "scripts/verify_marina_november_release_boundary.py",
 })
 
@@ -54,6 +56,7 @@ def main() -> int:
         assert not changed_paths_are_safe(["apps/admin/components/AdminShell.tsx"])
         assert not changed_paths_are_safe(["packages/database/prisma/schema.prisma"])
         assert not changed_paths_are_safe(["release/current-rc.json"])
+        assert changed_paths_are_safe(["release/launch-evidence.example.json", ".github/workflows/launch-acceptance-ci.yml"])
         assert not changed_paths_are_safe([".github/workflows/release-rc-truth-ci.yml", "services/api/app/main.py"])
         print("PASS: governance-only paths permitted, executable/history drift rejected")
         return 0
