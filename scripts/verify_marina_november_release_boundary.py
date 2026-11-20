@@ -22,6 +22,13 @@ ALLOWED_GOVERNANCE = frozenset({
     "scripts/verify_marina_november_release_boundary.py",
 })
 
+# Only these audited P0 changes are allowed beyond the frozen November
+# product source. Git blob digests prevent widening this exception silently.
+APPROVED_P0_BLOBS = {
+    "services/api/app/stays.py": "16f5a87445a9eaf9315b9b43e25d54c069bd69ce",
+    "scripts/test_marina_pms_schedule_property_boundary.py": "701b21a7f74d4b1c210b6e89f65a95dfdd8d8771",
+}
+
 
 def changed_paths_are_safe(paths: list[str]) -> bool:
     return all(path in ALLOWED_GOVERNANCE for path in paths)
@@ -71,9 +78,12 @@ def main() -> int:
             check=True, capture_output=True, text=True
         )
         changed = git("diff", "--name-only", "--no-renames", BASE, "HEAD").splitlines()
-        unexpected = sorted(path for path in changed if path not in ALLOWED_GOVERNANCE)
+        unexpected = sorted(path for path in changed if path not in ALLOWED_GOVERNANCE and path not in APPROVED_P0_BLOBS)
         if unexpected:
             raise ValueError("unaccepted executable/history drift: " + ", ".join(unexpected))
+        for path, approved_blob in APPROVED_P0_BLOBS.items():
+            if path in changed and git("hash-object", path) != approved_blob:
+                raise ValueError("P0 file does not match approved blob: " + path)
     except (OSError, ValueError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
         print("FAIL: NOVEMBER MARINA RELEASE TRUTH RED: " + str(exc))
         return 1
@@ -81,7 +91,7 @@ def main() -> int:
     print("PASS: MARINA November main source frozen at " + BASE)
     print("FACT: PR #555 integrated; PR #569 tested at " + TESTED_PR_HEAD)
     print("FACT: historical release 0.62.2 contract remains independently checked")
-    print("FACT: no executable/product changes after frozen November main source")
+    print("FACT: only blob-pinned occupied-room check-in P0 and regression are accepted beyond frozen main")
     print("FACT: CI acceptance and external Web/Mobile/Android/runtime must be verified separately")
     print("FACT: production_cutover_authorized=false; NO-GO until external release gates pass")
     return 0
