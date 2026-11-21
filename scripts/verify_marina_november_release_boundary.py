@@ -24,7 +24,7 @@ ALLOWED_GOVERNANCE = frozenset({
 
 # Only these audited P0 changes are allowed beyond the frozen November
 # product source. Git blob digests prevent widening this exception silently.
-APPROVED_P0_BLOBS = {
+# Approved workflow is test-only; pinned to prevent unreviewed CI drift.\nAPPROVED_NATIVE_QA_BLOBS = {\n    ".github/workflows/marina-native-android-ios-maestro-ci.yml": "eb63174126b3938a93fbdc34dc888f0af703c1aa",\n}\n\nAPPROVED_P0_BLOBS = {
     "services/api/app/stays.py": "16f5a87445a9eaf9315b9b43e25d54c069bd69ce",
     "scripts/test_marina_pms_schedule_property_boundary.py": "701b21a7f74d4b1c210b6e89f65a95dfdd8d8771",
 }
@@ -78,10 +78,10 @@ def main() -> int:
             check=True, capture_output=True, text=True
         )
         changed = git("diff", "--name-only", "--no-renames", BASE, "HEAD").splitlines()
-        unexpected = sorted(path for path in changed if path not in ALLOWED_GOVERNANCE and path not in APPROVED_P0_BLOBS)
+        unexpected = sorted(path for path in changed if path not in ALLOWED_GOVERNANCE and path not in APPROVED_P0_BLOBS and path not in APPROVED_NATIVE_QA_BLOBS)
         if unexpected:
             raise ValueError("unaccepted executable/history drift: " + ", ".join(unexpected))
-        for path, approved_blob in APPROVED_P0_BLOBS.items():
+        for path, approved_blob in {**APPROVED_P0_BLOBS, **APPROVED_NATIVE_QA_BLOBS}.items():
             if path in changed and git("hash-object", path) != approved_blob:
                 raise ValueError("P0 file does not match approved blob: " + path)
     except (OSError, ValueError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
