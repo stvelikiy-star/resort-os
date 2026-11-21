@@ -30,7 +30,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     "apps/staff/components/StaffRoleGateway.tsx": "ad307039fcee05324c5e1e2cd6a34cc732680f2a",
     "apps/staff/components/WaiterEntry.module.css": "7218c412d73930418c4d703267bf83e5f8153c0e",
-    "scripts/test_marina_staff_legacy_dining_preservation.py": "74e694fb509636018ed10890ef0fb3a50c12f3d5",
+    "scripts/test_marina_staff_legacy_dining_preservation.py": "15fb8274b823c5dcb0842aa6be4ca585b85d05a5",
 }
 
 
