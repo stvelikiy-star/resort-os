@@ -6,6 +6,17 @@ appId: kg.go.ms.staff
 - launchApp:
     clearState: true
     clearKeychain: true
+# A slow GitHub Android emulator can show an OS-level Pixel Launcher ANR
+# over a healthy app. Dismiss ONLY this system dialog; never suppress app errors.
+- runFlow:
+    when:
+      platform: Android
+      visible: "Pixel Launcher isn't responding"
+    commands:
+      - tapOn:
+          text: "Wait"
+- assertNotVisible:
+    text: "Pixel Launcher isn't responding"
 - extendedWaitUntil:
     visible:
       id: "login-username"

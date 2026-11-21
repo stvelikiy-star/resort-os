@@ -28,7 +28,7 @@ ALLOWED_GOVERNANCE = frozenset({
 APPROVED_NATIVE_QA_BLOBS = {
     ".github/workflows/marina-native-android-ios-maestro-ci.yml": "e96b19e2e97cfc5a67593ee0150b714ae7507aa1",
     "scripts/design/fl2-android-maestro-demo.sh": "b4372aa0fcb965a3d9337d86c2f4faf96db700c3",
-    "scripts/design/fl2-native-live-role.yaml": "8c909ac0e5f0dba26ff18174662feb41eb8373b3",
+    "scripts/design/fl2-native-live-role.yaml": "5c7508b1cf6e740e267bcd7d7009cd9eeaf99719",
     "scripts/design/fl2-native-live-role.sh": "12df57b660f8bb3bdb0d6bc922bdab2f2d3d8cbd",
     "scripts/design/fl2-native-live-role.README.md": "8e2e78527633902591c6fa56dd53b18afb9ab077",
     ".github/workflows/marina-native-live-qa-build-ci.yml": "756e8cb477eb405ebd70053b90e9186e3812e3dc",
@@ -37,7 +37,7 @@ APPROVED_NATIVE_QA_BLOBS = {
     ".github/workflows/marina-native-qa-negative-auth-ci.yml": "f72470cadd4b1a24bbee18216cb79d12f8450b0e",
     "scripts/design/fl2-native-qa-negative-login.yaml": "17ba220277be7f708f225bc08b751e74bc14dd32",
     "scripts/design/fl2-native-qa-negative-login.sh": "233060d52a0760a37b4f2b7f4b39f345c7db40b1",
-    ".github/workflows/marina-native-live-five-roles-ci.yml": "e046b0e9a8505ee64d895cf8fb5ceece95612aee",
+    ".github/workflows/marina-native-live-five-roles-ci.yml": "be72be0113edd293ec783834670314532349c129",
     "scripts/design/fl2-native-live-five-roles.sh": "d01d763fc413a2a5222424a473ee551d86aefbdd",
 }
 

@@ -136,6 +136,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Verify QA logout endpoint from macOS runner without a user session
+        run: |
+          set -euo pipefail
+          status=$(curl --silent --show-error --request POST --output /dev/null --write-out '%{http_code}' --connect-timeout 8 --max-time 20 "$MARINA_QA_ORIGIN/api/v1/auth/logout")
+          test "$status" = 204 || { echo "QA_ANONYMOUS_LOGOUT_HTTP_UNEXPECTED=$status"; exit 1; }
+          echo 'QA_ANONYMOUS_LOGOUT_FROM_MACOS_HTTP_204_PASS'
       - name: Boot simulator and install QA app
         run: |
           set -euo pipefail
@@ -148,6 +154,30 @@ jobs:
           xcrun simctl launch "$udid" kg.go.ms.staff
       - name: Real iPhone five-role QA login Maestro
         run: bash scripts/design/fl2-native-live-five-roles.sh ios
+      - name: Report redacted iPhone Keychain and SecureStore indicators on failure
+        if: failure()
+        run: |
+          set -euo pipefail
+          mkdir -p native-five-roles-evidence
+          {
+            if [[ -n "${MARINA_NATIVE_QA_IOS_APP:-}" && -d "$MARINA_NATIVE_QA_IOS_APP" ]]; then
+              if codesign -v "$MARINA_NATIVE_QA_IOS_APP" >/dev/null 2>&1; then
+                echo 'IOS_QA_CODE_SIGNATURE_PRESENT=true'
+              else
+                echo 'IOS_QA_CODE_SIGNATURE_PRESENT=false'
+              fi
+              if codesign -d --entitlements - "$MARINA_NATIVE_QA_IOS_APP" 2>/dev/null | grep -q 'keychain-access-groups'; then
+                echo 'IOS_QA_KEYCHAIN_ACCESS_ENTITLEMENT_PRESENT=true'
+              else
+                echo 'IOS_QA_KEYCHAIN_ACCESS_ENTITLEMENT_PRESENT=false'
+              fi
+            fi
+            if [[ -n "${IOS_SIMULATOR_UDID:-}" ]]; then
+              xcrun simctl spawn "$IOS_SIMULATOR_UDID" log show --last 12m --style compact --predicate 'process == "MARINASMART" OR process == "securityd"' 2>/dev/null |
+                python3 -c 'import sys,re; d={"keychain":0,"securestore":0,"osstatus_34018":0,"missing_entitlement":0}; terms={"keychain":r"keychain","securestore":r"securestore","osstatus_34018":r"-34018","missing_entitlement":r"missing.entitlement"}; lines=0; exec("for line in sys.stdin:\n lines+=1\n for k,p in terms.items():\n  d[k]+=bool(re.search(p,line,re.I))"); print("IOS_NATIVE_OSLOG_LINES_SCANNED",lines); print("IOS_NATIVE_KEYCHAIN_SIGNAL_COUNTS",d)'
+            fi
+          } > native-five-roles-evidence/ios-security-diagnostics.txt || true
+          echo 'iOS diagnostic report contains only boolean flags and counts'
       - name: Upload synthetic iPhone screenshots
         if: always()
         uses: actions/upload-artifact@v4
