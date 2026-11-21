@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, ColorValue, Easing, Modal, Pressable, StyleProp, View, ViewStyle, useWindowDimensions } from 'react-native';
+import { Animated, ColorValue, Modal, Pressable, StyleProp, View, ViewStyle, useWindowDimensions } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { motionPresets, useMotionPreference } from '../theme/motion';
-import { iconography, radius } from '../theme/tokens';
+import { iconography, motion, radius } from '../theme/tokens';
 
 /**
  * Shared motion primitives that complement PremiumEntrance / PressScale / AnimatedKpi (Future.tsx, ui.tsx).
@@ -27,7 +27,7 @@ export function TabIcon({ icon: Icon, focused, color }: { icon: LucideIcon; focu
     focus.stopAnimation();
     if (!ready || !allowed) { focus.setValue(target); return; }
     const animation = focused
-      ? Animated.spring(focus, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 6 })
+      ? Animated.spring(focus, { toValue: 1, useNativeDriver: true, speed: motion.spring.speed, bounciness: motion.spring.bounciness })
       : Animated.timing(focus, { toValue: 0, duration: motionPresets.tab.duration, easing: motionPresets.tab.easing, useNativeDriver: true });
     animation.start();
     return () => { animation.stop(); focus.setValue(target); };
@@ -101,7 +101,7 @@ export function AnimatedSheet({ visible, onRequestClose, closeLabel, children }:
     if (!canAnimate) { progress.setValue(visible ? 1 : 0); return; }
     const animation = visible
       ? Animated.timing(progress, { toValue: 1, duration: motionPresets.sheetIn.duration, easing: motionPresets.sheetIn.easing, useNativeDriver: true })
-      : Animated.timing(progress, { toValue: 0, duration: motionPresets.sheetOut.duration, easing: Easing.in(Easing.cubic), useNativeDriver: true });
+      : Animated.timing(progress, { toValue: 0, duration: motionPresets.sheetOut.duration, easing: motionPresets.sheetOut.easing, useNativeDriver: true });
     animation.start(({ finished }) => { if (finished && !visible) setClosing(false); });
     return () => animation.stop();
   }, [visible, canAnimate, progress]);

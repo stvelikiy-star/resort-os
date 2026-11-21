@@ -1,0 +1,211 @@
+/* MARINA SMART Premium Motion — canonical Web/Staff CSS token source.
+ * Mobile uses the existing typed motion object in apps/mobile/src/theme/tokens.ts.
+ * Do not copy numeric durations or easing curves into screen-specific CSS.
+ * This file contains no layouts, colors, branding or behavioral state.
+ */
+:root {
+  --marina-motion-quick: 120ms;
+  --marina-motion-standard: 200ms;
+  --marina-motion-deliberate: 320ms;
+  --marina-motion-stagger: 40ms;
+  --marina-motion-out: cubic-bezier(.2, .8, .2, 1);
+  --marina-motion-in: cubic-bezier(.4, 0, 1, 1);
+  --marina-motion-press-scale: .985;
+}
+
+/* Pattern 1: intentional press feedback. Pointer cancellation/exit is handled
+ * by :active; disabled actions never scale or animate. No layout properties.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-marina-ui="future-luxury"] :is(
+    .fl2-button, .fl2-nav-group button, .owner-grid-toolbar button,
+    .owner-booking-actions button, .finance-section button,
+    .work-shell button, .management-shell button,
+    .reception-shell button, .inbox-shell button
+  ):not(:disabled):not([aria-disabled="true"]),
+  :is(.shift-primary, .shift-ghost, .shift-kpis button, .shift-actions button):not(:disabled) {
+    transition: transform var(--marina-motion-quick) var(--marina-motion-out);
+  }
+  html[data-marina-ui="future-luxury"] :is(
+    .fl2-button, .fl2-nav-group button, .owner-grid-toolbar button,
+    .owner-booking-actions button, .finance-section button,
+    .work-shell button, .management-shell button,
+    .reception-shell button, .inbox-shell button
+  ):not(:disabled):not([aria-disabled="true"]):active,
+  :is(.shift-primary, .shift-ghost, .shift-kpis button, .shift-actions button):not(:disabled):active {
+    transform: scale(var(--marina-motion-press-scale));
+  }
+
+  /* Pattern 2: bounded one-time entrance of existing cards. Never animate
+   * values, table rows, bookings, room statuses or financial totals.
+   * No delay after card eight; larger lists render immediately.
+   */
+  html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(-n+8),
+  html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis > article:nth-child(-n+8),
+  html[data-marina-ui="future-luxury"] :is(.reports-kpis,.staff-kpis,.marketing-kpis) > article:nth-child(-n+8),
+  html[data-marina-ui="future-luxury"] .mx-page > :is(.mx-card,.fl2-card):nth-child(-n+8),
+  .shift-stack > .shift-task:nth-child(-n+8),
+  .shift-kpis > button:nth-child(-n+8) {
+    animation: marina-motion-card var(--marina-motion-deliberate) var(--marina-motion-out) both;
+    animation-delay: calc(var(--marina-motion-stagger) * var(--marina-motion-item, 0));
+  }
+
+  /* Pattern 3: existing navigation indicator, with an opt-in back direction.
+   * Route ownership, selection and focus remain with the original components.
+   */
+  html[data-marina-ui="future-luxury"] .fl2-nav-group button[aria-current="page"],
+  html[data-marina-ui="future-luxury"] .admin-tabs > button.active {
+    animation: marina-motion-tab var(--marina-motion-standard) var(--marina-motion-out) both;
+  }
+  html[data-marina-ui="future-luxury"] [data-motion-direction="back"] :is(.fl2-nav-group button[aria-current="page"],.admin-tabs>button.active) {
+    animation-name: marina-motion-tab-back;
+  }
+
+  /* Pattern 4: visual-only sheet/modal. Existing HTML/React owns focus,
+   * dismiss/Back, accessibility and authorization. No overlay interception.
+   */
+  .shift-modal-backdrop {
+    animation: marina-motion-overlay var(--marina-motion-standard) var(--marina-motion-out) both;
+  }
+  .shift-modal,
+  html[data-marina-ui="future-luxury"] [data-premium-motion="sheet"] {
+    animation: marina-motion-sheet var(--marina-motion-deliberate) var(--marina-motion-out) both;
+  }
+
+  /* Pattern 5: optional data-backed chart layers. Numeric values stay exact.
+   * These hooks do NOT invent success, change numbers, or touch chart data.
+   */
+  [data-premium-motion-chart="bar"] {
+    transform-origin: center bottom;
+    animation: marina-motion-bar var(--marina-motion-deliberate) var(--marina-motion-out) both;
+  }
+  [data-premium-motion-chart="line"] {
+    animation: marina-motion-overlay var(--marina-motion-standard) var(--marina-motion-out) both;
+  }
+
+  /* Pattern 6: only explicit server-confirmed transitions may show success.
+   * Pending, failed, unknown-result, no-access and offline stay distinguishable.
+   */
+  [data-premium-motion-status="success"][data-server-confirmed="true"] {
+    animation: marina-motion-state var(--marina-motion-standard) var(--marina-motion-out) both;
+  }
+
+  html[data-marina-ui="future-luxury"] :is(.loading,.empty,.error-box,.no-access,.access-denied,.offline,.result-unknown),
+  :is(.shift-empty,.shift-error,[data-premium-motion-status="pending"],[data-premium-motion-status="unknown"],[data-premium-motion-status="error"],[data-premium-motion-status="offline"],[data-premium-motion-status="no-access"]) {
+    animation: marina-motion-state var(--marina-motion-standard) var(--marina-motion-out) both;
+  }
+
+  /* Brand entrance: approved compass-and-ship logo only, natural proportions.
+   * No wave overlays, perpetual movement, scaling/stretch of image dimensions.
+   */
+  html[data-marina-ui="future-luxury"] .marina-brand-logo-small,
+  :is(.shift-login,.staff-head) img[src*="marina-smart-approved"] {
+    animation: marina-motion-logo var(--marina-motion-deliberate) var(--marina-motion-out) both;
+  }
+}
+
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(2),
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis > article:nth-child(2),
+html[data-marina-ui="future-luxury"] :is(.reports-kpis,.staff-kpis,.marketing-kpis) > article:nth-child(2),
+html[data-marina-ui="future-luxury"] .mx-page > :is(.mx-card,.fl2-card):nth-child(2),
+.shift-stack > .shift-task:nth-child(2),
+.shift-kpis > button:nth-child(2) {
+  --marina-motion-item: 1;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(3),
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis > article:nth-child(3),
+html[data-marina-ui="future-luxury"] :is(.reports-kpis,.staff-kpis,.marketing-kpis) > article:nth-child(3),
+html[data-marina-ui="future-luxury"] .mx-page > :is(.mx-card,.fl2-card):nth-child(3),
+.shift-stack > .shift-task:nth-child(3),
+.shift-kpis > button:nth-child(3) {
+  --marina-motion-item: 2;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(4),
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis > article:nth-child(4),
+html[data-marina-ui="future-luxury"] :is(.reports-kpis,.staff-kpis,.marketing-kpis) > article:nth-child(4),
+html[data-marina-ui="future-luxury"] .mx-page > :is(.mx-card,.fl2-card):nth-child(4),
+.shift-stack > .shift-task:nth-child(4),
+.shift-kpis > button:nth-child(4) {
+  --marina-motion-item: 3;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(5),
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis > article:nth-child(5),
+html[data-marina-ui="future-luxury"] :is(.reports-kpis,.staff-kpis,.marketing-kpis) > article:nth-child(5),
+html[data-marina-ui="future-luxury"] .mx-page > :is(.mx-card,.fl2-card):nth-child(5),
+.shift-stack > .shift-task:nth-child(5),
+.shift-kpis > button:nth-child(5) {
+  --marina-motion-item: 4;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(6),
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis > article:nth-child(6),
+html[data-marina-ui="future-luxury"] :is(.reports-kpis,.staff-kpis,.marketing-kpis) > article:nth-child(6),
+html[data-marina-ui="future-luxury"] .mx-page > :is(.mx-card,.fl2-card):nth-child(6),
+.shift-stack > .shift-task:nth-child(6),
+.shift-kpis > button:nth-child(6) {
+  --marina-motion-item: 5;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(7),
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis > article:nth-child(7),
+html[data-marina-ui="future-luxury"] :is(.reports-kpis,.staff-kpis,.marketing-kpis) > article:nth-child(7),
+html[data-marina-ui="future-luxury"] .mx-page > :is(.mx-card,.fl2-card):nth-child(7),
+.shift-stack > .shift-task:nth-child(7),
+.shift-kpis > button:nth-child(7) {
+  --marina-motion-item: 6;
+}
+html[data-marina-ui="future-luxury"] .dashboard-shell[data-fl2-owner="true"] > .command-kpis > article:nth-child(8),
+html[data-marina-ui="future-luxury"] .hotel-finance-shell .finance-kpis > article:nth-child(8),
+html[data-marina-ui="future-luxury"] :is(.reports-kpis,.staff-kpis,.marketing-kpis) > article:nth-child(8),
+html[data-marina-ui="future-luxury"] .mx-page > :is(.mx-card,.fl2-card):nth-child(8),
+.shift-stack > .shift-task:nth-child(8),
+.shift-kpis > button:nth-child(8) {
+  --marina-motion-item: 7;
+}
+
+
+@keyframes marina-motion-card {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes marina-motion-tab {
+  from { opacity: .7; transform: translate3d(-7px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes marina-motion-tab-back {
+  from { opacity: .7; transform: translate3d(7px, 0, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes marina-motion-overlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes marina-motion-sheet {
+  from { opacity: .65; transform: translate3d(0, 16px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes marina-motion-bar {
+  from { opacity: .7; transform: scaleY(.08); }
+  to { opacity: 1; transform: scaleY(1); }
+}
+@keyframes marina-motion-state {
+  from { opacity: .65; transform: translate3d(0, 5px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@keyframes marina-motion-logo {
+  from { opacity: .7; transform: scale(.985); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Reduced Motion is fail-visible: no opacity zero, transform or animation.
+ * Media query no-preference above does not match unavailable preferences.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html[data-marina-ui="future-luxury"] :is(.mx-card,.fl2-card,.fl2-button,.fl2-nav-group button,.command-kpis>article,.finance-kpis>article,.admin-tabs>button,.marina-brand-logo-small),
+  .shift-stack > .shift-task,
+  .shift-kpis > button,
+  .shift-modal-backdrop,
+  .shift-modal,
+  :is([data-premium-motion-chart],[data-premium-motion-status],[data-premium-motion="sheet"]) {
+    animation: none !important;
+    transition: none !important;
+  }
+}

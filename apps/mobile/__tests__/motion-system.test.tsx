@@ -5,7 +5,8 @@ import path from 'path';
 import { AccessibilityInfo, AppState, StyleSheet, Text, View } from 'react-native';
 import { act, fireEvent, render } from '@testing-library/react-native';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
-import { getMotionSnapshot, primeMotionPreference, resetMotionPreferenceForTests } from '../src/theme/motion';
+import { cappedStagger, getMotionSnapshot, primeMotionPreference, resetMotionPreferenceForTests } from '../src/theme/motion';
+import { motion } from '../src/theme/tokens';
 import { AnimatedKpi, OccupancyRing, PremiumEntrance } from '../src/components/Future';
 import { AnimatedProgressBar, PressScale } from '../src/components/ui';
 import { AnimatedSheet, ConfirmedChange, TabIcon } from '../src/components/Motion';
@@ -184,6 +185,62 @@ describe('TabIcon', () => {
     expect(view.getByTestId('on')).toBeTruthy();
     expect(view.getByTestId('off')).toBeTruthy();
     expect(pill('on')).toBeTruthy();
+  });
+});
+
+describe('Premium Motion 120 / 200 / 320 shared rules', () => {
+  it('progress visualization moves using native scaleX rather than changing layout width', async () => {
+    await setOsReduceMotion(true);
+    const view = await render(wrap(<AnimatedProgressBar testID="progress" percent={62} />));
+    const bar = view.getByTestId('progress').children[0] as { props: { style?: unknown } };
+    const style = StyleSheet.flatten(bar.props.style as never) as Record<string, unknown>;
+    expect(style.width).toBe('100%');
+    expect(style.transformOrigin).toBe('left center');
+    expect((style.transform as { scaleX?: unknown }[])[0]).toHaveProperty('scaleX');
+    expect(view.getByTestId('progress').props.accessibilityValue.now).toBe(62);
+  });
+
+  it('central tokens stay within the approved tempo and never exceed 8 staggered cards', () => {
+    expect([motion.press, motion.tab, motion.card, motion.modal, motion.chart,
+      motion.sheetIn, motion.sheetOut, motion.status, motion.tabIcon]).toEqual(
+      [120, 200, 320, 320, 320, 320, 200, 200, 200],
+    );
+    expect(motion.cardStagger).toBe(40);
+    expect(cappedStagger(0)).toBe(0);
+    expect(cappedStagger(7)).toBe(280);
+    expect(cappedStagger(200)).toBe(280);
+  });
+
+  it('canceling a press outside the touchable does not trigger the action', async () => {
+    await setOsReduceMotion(false);
+    const onPress = jest.fn();
+    const view = await render(<PressScale testID="cancel-press" onPress={onPress}><Text>Confirm</Text></PressScale>);
+    fireEvent(view.getByTestId('cancel-press'), 'pressIn');
+    fireEvent(view.getByTestId('cancel-press'), 'pressOut');
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('sheet close action and native Android Back callback share the existing handler', async () => {
+    await setOsReduceMotion(true);
+    const onRequestClose = jest.fn();
+    const view = await render(<AnimatedSheet visible closeLabel="Close" onRequestClose={onRequestClose}>
+      <View testID="sheet-body"><Text>Booking</Text></View>
+    </AnimatedSheet>);
+    fireEvent.press(view.getByLabelText('Close'));
+    expect(onRequestClose).toHaveBeenCalledTimes(1);
+    expect(view.getByTestId('sheet-body')).toBeTruthy();
+    // Source contract: Modal forwards the same handler to native Android Back.
+    // Device Back gesture itself requires emulator/handset acceptance.
+    const source = fs.readFileSync(path.join(__dirname, '../src/components/Motion.tsx'), 'utf8');
+    expect(source).toContain('onRequestClose={onRequestClose}');
+  });
+
+  it('pending server operations cannot trigger ConfirmedChange success motion', async () => {
+    await setOsReduceMotion(false);
+    const view = await render(<ConfirmedChange value="PENDING"><Text testID="pending">PENDING</Text></ConfirmedChange>);
+    await view.rerender(<ConfirmedChange value="PENDING"><Text testID="pending">PENDING</Text></ConfirmedChange>);
+    expect(opacityOf(view.getByTestId('pending').parent as never)).toBe(1);
+    // Only an externally confirmed, changed status may replace the displayed value.
   });
 });
 

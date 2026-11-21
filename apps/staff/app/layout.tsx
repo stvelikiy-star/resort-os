@@ -3,6 +3,7 @@ import Script from "next/script";
 import StaffLocaleRuntime from "../components/StaffLocaleRuntime";
 import "./globals.css";
 import "./shift-v2.css";
+import "../../../packages/design/premium-motion.css";
 
 export const metadata: Metadata = {
   title: "MARINA SMART · Моя смена",

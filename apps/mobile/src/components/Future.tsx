@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, Easing, StyleProp, Text, TextStyle, View, ViewStyle, useWindowDimensions } from 'react-native';
+import { Animated, StyleProp, Text, TextStyle, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { AlertCircle, ArrowUpRight, CircleHelp, CloudOff, LockKeyhole, Sparkles } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop } from 'react-native-svg';
@@ -152,8 +152,8 @@ export function LoadingShimmer({ count = 3 }: { count?: number }) {
   useEffect(() => {
     if (!allowed) { alpha.setValue(0.85); return; }
     const animation = Animated.loop(Animated.sequence([
-      Animated.timing(alpha, { toValue: 1, duration: 650, useNativeDriver: true, easing: Easing.inOut(Easing.quad) }),
-      Animated.timing(alpha, { toValue: 0.65, duration: 650, useNativeDriver: true, easing: Easing.inOut(Easing.quad) }),
+      Animated.timing(alpha, { toValue: 1, duration: motion.card, useNativeDriver: true, easing: motionPresets.entrance.easing }),
+      Animated.timing(alpha, { toValue: 0.65, duration: motion.card, useNativeDriver: true, easing: motionPresets.entrance.easing }),
     ]), { iterations: motion.maxShimmerPulses });
     animation.start(({ finished }) => { if (finished) alpha.setValue(0.85); });
     return () => { animation.stop(); alpha.setValue(0.85); };
@@ -171,7 +171,7 @@ export function AIOrb({ state = 'idle', size = 76, label, onPress }: { state?: A
   useEffect(() => {
     if (!allowed || state !== 'processing') { progress.setValue(0); return; }
     // Real request in flight only, and bounded: a hung request must not spin forever.
-    const loop = Animated.loop(Animated.timing(progress, { toValue: 1, duration: 1700, useNativeDriver: true }), { iterations: motion.maxOrbTurns });
+    const loop = Animated.loop(Animated.timing(progress, { toValue: 1, duration: motion.card, useNativeDriver: true }), { iterations: motion.maxOrbTurns });
     loop.start(({ finished }) => { if (finished) progress.setValue(0); });
     return () => loop.stop();
   }, [allowed, progress, state]);
