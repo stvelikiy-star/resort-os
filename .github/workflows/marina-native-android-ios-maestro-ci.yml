@@ -76,33 +76,7 @@ jobs:
           disk-size: 6000M
           disable-animations: true
           emulator-boot-timeout: 900
-          script: |
-            set -eu
-            mkdir -p android-emulator-evidence
-            bash scripts/design/fl2-android-emulator-smoke.sh
-            python3 scripts/design/fl2-android-owner-reception-demo.py
-            curl -fsSL https://get.maestro.mobile.dev -o /tmp/marina-install-maestro.sh
-            bash /tmp/marina-install-maestro.sh
-            export PATH="$HOME/.maestro/bin:$PATH"
-            maestro --version
-            for role in owner reception cook waiter; do
-              cat > /tmp/marina-native-demo.yaml <<EOF
-            appId: kg.go.ms.staff
-            ---
-            - launchApp:
-                clearState: true
-            - assertVisible:
-                id: "connect-demo-$role"
-            - tapOn:
-                id: "connect-demo-$role"
-            - extendedWaitUntil:
-                visible: ".*DEMO.*"
-                timeout: 30000
-            EOF
-              maestro test /tmp/marina-native-demo.yaml
-              adb exec-out screencap -p > "android-emulator-evidence/maestro-$role.png"
-            done
-            echo 'ANDROID_NATIVE_DEMO_4_ROLES_PASS (not live hotel E2E)'
+          script: bash scripts/design/fl2-android-maestro-demo.sh
       - name: Upload Android native evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -115,10 +89,12 @@ jobs:
   ios-simulator:
     name: iOS simulator offline build + Maestro demo roles
     runs-on: macos-26-intel
-    timeout-minutes: 95
+    timeout-minutes: 140
     env:
       CI: 'true'
       EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS: ''
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: '360000'
+      MAESTRO_CLI_NO_ANALYTICS: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
