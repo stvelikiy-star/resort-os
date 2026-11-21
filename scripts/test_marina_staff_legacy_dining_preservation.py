@@ -17,4 +17,14 @@ class LegacyDiningStaffPreservation(unittest.TestCase):
    self.assertIn(value,source)
   shared=source.split('function isSharedDiningUser(',1)[1].split('export default function',1)[0]
   self.assertNotIn('DINING_STAFF',shared)
+ def test_waiter_gets_direct_shift_navigation(self):
+  self.assertIn('user.role === "WAITER"',source)
+  self.assertIn('href="/waiter"',source)
+ def test_waiter_order_never_injects_stay_id(self):
+  waiter=(Path(__file__).resolve().parents[1]/'apps/staff/components/WaiterEntry.tsx').read_text()
+  kitchen=(Path(__file__).resolve().parents[1]/'services/api/app/kitchen.py').read_text()
+  order=waiter.split('async function createOrder(',1)[1].split('if (checking)',1)[0]
+  self.assertIn('table_id: orderTable',order)
+  self.assertNotIn('stay_id:',order)
+  self.assertIn('WAITER_TABLE_ORDER_ONLY',kitchen)
 if __name__=='__main__':unittest.main()
