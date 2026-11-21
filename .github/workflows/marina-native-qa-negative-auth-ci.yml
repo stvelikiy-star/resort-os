@@ -1,0 +1,126 @@
+name: MARINA Native QA Negative Authentication
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/marina-native-qa-negative-auth-ci.yml'
+      - 'scripts/design/fl2-native-qa-negative-login.yaml'
+      - 'scripts/design/fl2-native-qa-negative-login.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: marina-native-qa-negative-auth
+  cancel-in-progress: true
+
+jobs:
+  android-invalid-login:
+    name: Android 35 invalid login to MARINA_FINAL_QA
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    env:
+      MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      ANDROID_QA_APK_SHA256: 'f22aedddc4232b6ea85ed7e6de0cbc0f84cadf720900e1cc5332f971da9bb1f4'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch previously verified QA APK (no rebuild)
+        uses: actions/download-artifact@v4
+        with:
+          name: marina-qa-android-origin-pinned-apk
+          run-id: 44909147697
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: android-bin
+      - name: Verify exact QA APK and source build provenance
+        run: |
+          set -euo pipefail
+          test -s android-bin/app-release.apk
+          echo "$ANDROID_QA_APK_SHA256  android-bin/app-release.apk" | sha256sum -c -
+          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/44909147697" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='62a2d682cb90524493200858f8bbc50a200da7e5' and d['conclusion']=='success'"
+          echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-marina-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Real Android 35 invalid login test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          ram-size: 3072M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-boot-timeout: 900
+          script: bash scripts/design/fl2-native-qa-negative-login.sh android
+      - name: Upload synthetic negative-login UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-android-native-negative-login-qa
+          path: native-qa-evidence/
+          retention-days: 7
+          if-no-files-found: warn
+
+  ios-invalid-login:
+    name: iOS simulator invalid login to MARINA_FINAL_QA
+    runs-on: macos-26-intel
+    timeout-minutes: 70
+    env:
+      MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      IOS_QA_SIM_ZIP_SHA256: 'ced189dd4f54595867649da4e67d2e8fa186f47437af43d47fefbf41936653c8'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch verified unsigned iOS Simulator app (no rebuild)
+        uses: actions/download-artifact@v4
+        with:
+          name: marina-qa-ios-origin-pinned-app
+          run-id: 44909147697
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ios-bin
+      - name: Verify exact iOS app archive and source build provenance
+        run: |
+          set -euo pipefail
+          test -s ios-bin/MARINA_SMART_iOS_Simulator.zip
+          echo "$IOS_QA_SIM_ZIP_SHA256  ios-bin/MARINA_SMART_iOS_Simulator.zip" | shasum -a 256 -c -
+          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/44909147697" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='62a2d682cb90524493200858f8bbc50a200da7e5' and d['conclusion']=='success'"
+          mkdir -p "$RUNNER_TEMP/marina-native-qa-app"
+          unzip -q ios-bin/MARINA_SMART_iOS_Simulator.zip -d "$RUNNER_TEMP/marina-native-qa-app"
+          app=$(find "$RUNNER_TEMP/marina-native-qa-app" -name '*.app' -maxdepth 2 -print -quit)
+          test -d "$app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = kg.go.ms.staff
+          echo "MARINA_QA_APP=$app" >> "$GITHUB_ENV"
+          echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Launch existing QA iOS app on fresh Simulator
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          udid=$(xcrun simctl list devices available -j | python3 -c 'import sys,json;j=json.load(sys.stdin);xs=[x for arr in j["devices"].values() for x in arr if x.get("isAvailable") and "iPhone" in x["name"]];print(xs[0]["udid"] if xs else "")')
+          test -n "$udid"
+          echo "IOS_SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" "$MARINA_QA_APP"
+          xcrun simctl launch "$udid" kg.go.ms.staff
+      - name: Real iOS invalid login test
+        run: bash scripts/design/fl2-native-qa-negative-login.sh ios
+      - name: Upload synthetic negative-login UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-ios-native-negative-login-qa
+          path: native-qa-evidence/
+          retention-days: 7
+          if-no-files-found: warn

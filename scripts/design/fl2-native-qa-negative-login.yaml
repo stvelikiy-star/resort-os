@@ -1,0 +1,25 @@
+# Negative authentication only. Never use real staff credentials or production.
+appId: kg.go.ms.staff
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible:
+      id: "login-username"
+    timeout: 90000
+- tapOn:
+    id: "login-username"
+- inputText: ${MAESTRO_NONEXISTENT_QA_USERNAME}
+- tapOn:
+    id: "login-password"
+- inputText: ${MAESTRO_INVALID_QA_PASSWORD}
+- tapOn:
+    id: "login-submit"
+- extendedWaitUntil:
+    visible: "Wrong username or password"
+    timeout: 45000
+- assertVisible:
+    id: "login-error"
+- assertNotVisible:
+    id: "tab-overview"
