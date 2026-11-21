@@ -29,7 +29,8 @@ APPROVED_P0_BLOBS = {
     "scripts/test_marina_pms_schedule_property_boundary.py": "701b21a7f74d4b1c210b6e89f65a95dfdd8d8771",
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     "apps/staff/components/StaffRoleGateway.tsx": "ad307039fcee05324c5e1e2cd6a34cc732680f2a",
-    "scripts/test_marina_staff_legacy_dining_preservation.py": "13131d6832e772d1d72f05a9609d83594304e010",
+    "apps/staff/components/WaiterEntry.module.css": "7218c412d73930418c4d703267bf83e5f8153c0e",
+    "scripts/test_marina_staff_legacy_dining_preservation.py": "74e694fb509636018ed10890ef0fb3a50c12f3d5",
 }
 
 
