@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: marina-native-qa-negative-auth
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   android-invalid-login:

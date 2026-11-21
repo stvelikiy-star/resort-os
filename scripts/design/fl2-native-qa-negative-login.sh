@@ -15,6 +15,14 @@ curl -fsS --connect-timeout 8 --max-time 17 "$origin/api/v1/auth/mode" |
 if [[ "$platform" = ios ]];then
  : "${IOS_SIMULATOR_UDID:?iOS simulator UDID required}"
 fi
+if [[ "$platform" = android ]];then
+  apk='android-bin/app-release.apk'
+  test -s "$apk" || { echo 'BLOCKED: verified QA APK missing'; exit 78; }
+  adb install -r "$apk" >/dev/null
+  adb shell pm path kg.go.ms.staff | grep -q 'package:'
+  adb shell monkey -p kg.go.ms.staff -c android.intent.category.LAUNCHER 1 >/dev/null
+  sleep 3
+fi
 curl -fsSL https://get.maestro.mobile.dev -o /tmp/marina-maestro-qa-negative-install.sh
 bash /tmp/marina-maestro-qa-negative-install.sh >/dev/null
 maestro_bin="$HOME/.maestro/bin/maestro"
