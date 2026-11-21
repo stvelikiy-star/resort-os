@@ -51,6 +51,14 @@ jobs:
           if "$aapt" dump permissions "$apk" | grep -F 'android.permission.SYSTEM_ALERT_WINDOW'; then
             echo 'FAIL: forbidden overlay permission'; exit 1
           fi
+      - name: Upload installable Android APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-android-installable-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
+          if-no-files-found: warn
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-marina-kvm.rules
@@ -69,11 +77,12 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 900
           script: |
-            set -euo pipefail
+            set -eu
             mkdir -p android-emulator-evidence
             bash scripts/design/fl2-android-emulator-smoke.sh
             python3 scripts/design/fl2-android-owner-reception-demo.py
-            curl -fsSL https://get.maestro.mobile.dev | bash
+            curl -fsSL https://get.maestro.mobile.dev -o /tmp/marina-install-maestro.sh
+            bash /tmp/marina-install-maestro.sh
             export PATH="$HOME/.maestro/bin:$PATH"
             maestro --version
             for role in owner reception cook waiter; do
@@ -163,6 +172,22 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = "kg.go.ms.staff"
           echo "IOS_APP_PATH=$app" >> "$GITHUB_ENV"
           echo 'IOS_UNSIGNED_SIMULATOR_BUILD_PASS'
+      - name: Package unsigned iOS Simulator app for review
+        run: |
+          set -euo pipefail
+          test -d "$IOS_APP_PATH"
+          mkdir -p ios-simulator-evidence
+          cd "$(dirname "$IOS_APP_PATH")"
+          zip -qry "$GITHUB_WORKSPACE/ios-simulator-evidence/MARINA_SMART_iOS_Simulator.zip" "$(basename "$IOS_APP_PATH")"
+          test -s "$GITHUB_WORKSPACE/ios-simulator-evidence/MARINA_SMART_iOS_Simulator.zip"
+      - name: Upload unsigned iOS Simulator application
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-ios-simulator-app
+          path: ios-simulator-evidence/MARINA_SMART_iOS_Simulator.zip
+          retention-days: 14
+          if-no-files-found: warn
       - name: Boot iPhone Simulator, install app, capture native proof
         run: |
           set -euo pipefail
