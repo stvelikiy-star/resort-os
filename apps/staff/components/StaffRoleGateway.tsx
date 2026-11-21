@@ -259,6 +259,7 @@ export default function StaffRoleGateway() {
       </header>
       {telegramNotice && <div className="shift-notice">{telegramNotice}</div>}
       {user.role === "STORE_STAFF" && <StoreStaffStock />}
+      {mode === "single_property" && user.role === "WAITER" && <div className="shift-empty"><strong>Рабочий зал официанта</strong><span>Столы, заказы и выдача кухни доступны в отдельном интерфейсе.</span><a className="shift-primary" href="/waiter">Открыть зал официанта</a></div>}
       {(user.role === "COOK" || (mode === "single_property" && user.role === "DINING_STAFF")) && <div className="shift-empty"><strong>Kitchen Admin готов к работе.</strong><span>Меню, столы, заказы и новые заезды ведутся в отдельном кухонном интерфейсе.</span><a className="shift-primary" href="/kitchen">Открыть Kitchen Admin</a></div>}
       {user.role === "RECEPTION" && <div className="shift-empty"><strong>Рабочая очередь ниже обновляется автоматически.</strong><span>Берите заявку в работу и закрывайте её после фактического выполнения.</span></div>}
     </main>

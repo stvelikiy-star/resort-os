@@ -216,7 +216,7 @@ export default function WaiterEntry() {
         body: JSON.stringify({
           source: "TABLE",
           table_id: orderTable,
-          stay_id: selectedSession?.stay_id ?? null,
+          // The API resolves stay_id from the active table session; WAITER must not supply it.
           guest_count: selectedSession?.party_size ?? orderGuestCount,
           meal_type: selectedSession?.meal_type ?? null,
           notes: orderNote || null,
