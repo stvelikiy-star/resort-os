@@ -132,6 +132,24 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = kg.go.ms.staff
           echo "MARINA_NATIVE_QA_IOS_APP=$app" >> "$GITHUB_ENV"
           echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
+      - name: Sign only QA iOS Simulator app with scoped Keychain entitlement
+        run: |
+          set -euo pipefail
+          test -d "$MARINA_NATIVE_QA_IOS_APP"
+          cat > "$RUNNER_TEMP/marina-qa-simulator-keychain.plist" <<'ENTITLEMENTS'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>application-identifier</key><string>kg.go.ms.staff</string>
+            <key>keychain-access-groups</key><array><string>kg.go.ms.staff</string></array>
+          </dict></plist>
+          ENTITLEMENTS
+          # This is an ephemeral ad-hoc *Simulator* signature, not a distribution identity.
+          codesign --force --deep --sign - --timestamp=none --generate-entitlement-der --entitlements "$RUNNER_TEMP/marina-qa-simulator-keychain.plist" "$MARINA_NATIVE_QA_IOS_APP"
+          codesign --verify --deep --strict "$MARINA_NATIVE_QA_IOS_APP"
+          codesign -d --entitlements "$RUNNER_TEMP/marina-qa-signed-entitlements.plist" "$MARINA_NATIVE_QA_IOS_APP" 2>/dev/null
+          test "$(/usr/libexec/PlistBuddy -c 'Print :keychain-access-groups:0' "$RUNNER_TEMP/marina-qa-signed-entitlements.plist")" = kg.go.ms.staff
+          echo 'IOS_QA_SIMULATOR_KEYCHAIN_SIGNATURE_VERIFIED'
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
