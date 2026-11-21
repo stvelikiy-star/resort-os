@@ -1,0 +1,11 @@
+appId: kg.go.ms.staff
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible:
+      id: "login-username"
+    timeout: 90000
+- assertNotVisible:
+    id: "connect-demo-owner"
