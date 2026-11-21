@@ -105,7 +105,7 @@ jobs:
 
   ios-simulator:
     name: iOS simulator offline build + Maestro demo roles
-    runs-on: macos-15-intel
+    runs-on: macos-26-intel
     timeout-minutes: 95
     env:
       CI: 'true'
@@ -124,6 +124,8 @@ jobs:
       - name: Preflight Xcode iOS Simulator
         run: |
           xcodebuild -version
+          xcode_major=$(xcodebuild -version | awk '/^Xcode / {split($2,parts,"."); print parts[1]}')
+          test "${xcode_major:-0}" -ge 26 || { echo "FAIL: Expo 58 needs Xcode 26.4+"; exit 1; }
           xcrun simctl list devices available
           mkdir -p ios-simulator-evidence
       - name: Prepare simulator-only iOS bundle identifier (no App Store signing)
@@ -155,7 +157,7 @@ jobs:
           test -n "$workspace"
           scheme=$(basename "$workspace" .xcworkspace)
           echo "XCODE_WORKSPACE=$workspace SCHEME=$scheme"
-          xcodebuild -workspace "$workspace" -scheme "$scheme" -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/MarinaDerived" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build > "$RUNNER_TEMP/marina-xcodebuild.log" 2>&1 || { tail -120 "$RUNNER_TEMP/marina-xcodebuild.log"; exit 1; }
+          xcodebuild -workspace "$workspace" -scheme "$scheme" -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/MarinaDerived" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build > "$RUNNER_TEMP/marina-xcodebuild.log" 2>&1 || { grep -Ein "error:|fatal error|failed" "$RUNNER_TEMP/marina-xcodebuild.log" | tail -45 || true; tail -75 "$RUNNER_TEMP/marina-xcodebuild.log"; exit 1; }
           app=$(find "$RUNNER_TEMP/MarinaDerived/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)
           test -d "$app"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = "kg.go.ms.staff"
