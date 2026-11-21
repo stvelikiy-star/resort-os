@@ -190,15 +190,23 @@ jobs:
           ---
           - launchApp:
               clearState: true
-          - assertVisible:
-              id: "connect-demo-$role"
+              clearKeychain: true
+          - scrollUntilVisible:
+              element:
+                id: "connect-demo-$role"
+              direction: DOWN
+              timeout: 30000
+              visibilityPercentage: 70
           - tapOn:
               id: "connect-demo-$role"
           - extendedWaitUntil:
               visible: ".*DEMO.*"
               timeout: 30000
           EOF
-            maestro test /tmp/marina-native-demo.yaml
+            if ! maestro test /tmp/marina-native-demo.yaml; then
+              xcrun simctl io "$IOS_SIMULATOR_UDID" screenshot "ios-simulator-evidence/failure-$role.png" || true
+              exit 1
+            fi
             xcrun simctl io "$IOS_SIMULATOR_UDID" screenshot "ios-simulator-evidence/maestro-$role.png"
           done
           echo 'IOS_NATIVE_DEMO_4_ROLES_PASS (not live hotel E2E)'
