@@ -24,6 +24,23 @@ ALLOWED_GOVERNANCE = frozenset({
 
 # Only these audited P0 changes are allowed beyond the frozen November
 # product source. Git blob digests prevent widening this exception silently.
+# Approved workflow is test-only; pinned to prevent unreviewed CI drift.
+APPROVED_NATIVE_QA_BLOBS = {
+    ".github/workflows/marina-native-android-ios-maestro-ci.yml": "e96b19e2e97cfc5a67593ee0150b714ae7507aa1",
+    "scripts/design/fl2-android-maestro-demo.sh": "b4372aa0fcb965a3d9337d86c2f4faf96db700c3",
+    "scripts/design/fl2-native-live-role.yaml": "8c909ac0e5f0dba26ff18174662feb41eb8373b3",
+    "scripts/design/fl2-native-live-role.sh": "12df57b660f8bb3bdb0d6bc922bdab2f2d3d8cbd",
+    "scripts/design/fl2-native-live-role.README.md": "8e2e78527633902591c6fa56dd53b18afb9ab077",
+    ".github/workflows/marina-native-live-qa-build-ci.yml": "756e8cb477eb405ebd70053b90e9186e3812e3dc",
+    "scripts/design/fl2-native-qa-connect.yaml": "f92d7e839c81f451bf2896b610f019541f9213c1",
+    "scripts/design/fl2-native-qa-connect.sh": "b0df9bd280ac5b3deb5e6a5d5a5e34767cfb4ccb",
+    ".github/workflows/marina-native-qa-negative-auth-ci.yml": "f72470cadd4b1a24bbee18216cb79d12f8450b0e",
+    "scripts/design/fl2-native-qa-negative-login.yaml": "17ba220277be7f708f225bc08b751e74bc14dd32",
+    "scripts/design/fl2-native-qa-negative-login.sh": "233060d52a0760a37b4f2b7f4b39f345c7db40b1",
+    ".github/workflows/marina-native-live-five-roles-ci.yml": "e046b0e9a8505ee64d895cf8fb5ceece95612aee",
+    "scripts/design/fl2-native-live-five-roles.sh": "d01d763fc413a2a5222424a473ee551d86aefbdd",
+}
+
 APPROVED_P0_BLOBS = {
     "services/api/app/stays.py": "16f5a87445a9eaf9315b9b43e25d54c069bd69ce",
     "scripts/test_marina_pms_schedule_property_boundary.py": "701b21a7f74d4b1c210b6e89f65a95dfdd8d8771",
@@ -78,10 +95,10 @@ def main() -> int:
             check=True, capture_output=True, text=True
         )
         changed = git("diff", "--name-only", "--no-renames", BASE, "HEAD").splitlines()
-        unexpected = sorted(path for path in changed if path not in ALLOWED_GOVERNANCE and path not in APPROVED_P0_BLOBS)
+        unexpected = sorted(path for path in changed if path not in ALLOWED_GOVERNANCE and path not in APPROVED_P0_BLOBS and path not in APPROVED_NATIVE_QA_BLOBS)
         if unexpected:
             raise ValueError("unaccepted executable/history drift: " + ", ".join(unexpected))
-        for path, approved_blob in APPROVED_P0_BLOBS.items():
+        for path, approved_blob in {**APPROVED_P0_BLOBS, **APPROVED_NATIVE_QA_BLOBS}.items():
             if path in changed and git("hash-object", path) != approved_blob:
                 raise ValueError("P0 file does not match approved blob: " + path)
     except (OSError, ValueError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:

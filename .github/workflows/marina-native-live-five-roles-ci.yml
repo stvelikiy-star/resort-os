@@ -1,0 +1,158 @@
+name: MARINA Native QA Five Role LIVE Login
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/marina-native-live-five-roles-ci.yml'
+      - 'scripts/design/fl2-native-live-five-roles.sh'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: marina-native-qa-five-role-login
+  cancel-in-progress: true
+
+jobs:
+  qa-credentials-ready:
+    name: Protected QA credentials available (no values logged)
+    if: github.event.pull_request.number == 573 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/marina-native-android-ios-maestro-20261121'
+    runs-on: ubuntu-24.04
+    environment: marina-native-qa
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    env:
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
+    steps:
+      - name: Check protected secret presence without printing it
+        id: check
+        run: |
+          set -euo pipefail
+          if [[ -n "$MARINA_NATIVE_QA_USERS_JSON" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "Protected synthetic QA credentials present"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "LIVE five-role tests SKIPPED: protected QA credentials not provisioned"
+          fi
+
+  android-five-live:
+    needs: qa-credentials-ready
+    if: needs.qa-credentials-ready.outputs.ready == 'true'
+    name: Android 35 five LIVE staff roles (MARINA_FINAL_QA)
+    runs-on: ubuntu-24.04
+    environment: marina-native-qa
+    timeout-minutes: 75
+    env:
+      CI: 'true'
+      MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_BUILD_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify temporary synthetic QA secret provisioned
+        run: |
+          set -euo pipefail
+          test -n "$MARINA_NATIVE_QA_USERS_JSON" || { echo 'Missing QA environment secret'; exit 78; }
+      - uses: actions/download-artifact@v4
+        with:
+          name: marina-qa-android-origin-pinned-apk
+          run-id: 44909147697
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: android-bin
+      - name: Pin checked Android QA binary
+        run: |
+          set -euo pipefail
+          echo 'f22aedddc4232b6ea85ed7e6de0cbc0f84cadf720900e1cc5332f971da9bb1f4  android-bin/app-release.apk' | sha256sum -c -
+          echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-marina-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Real Android five-role QA login Maestro
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          ram-size: 3072M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-boot-timeout: 900
+          script: bash scripts/design/fl2-native-live-five-roles.sh android
+      - name: Upload synthetic Android screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-native-android-five-live-role-evidence
+          path: native-five-roles-evidence/
+          retention-days: 5
+          if-no-files-found: warn
+
+  ios-five-live:
+    needs: qa-credentials-ready
+    if: needs.qa-credentials-ready.outputs.ready == 'true'
+    name: iPhone Simulator five LIVE staff roles (MARINA_FINAL_QA)
+    runs-on: macos-26-intel
+    environment: marina-native-qa
+    timeout-minutes: 90
+    env:
+      CI: 'true'
+      MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_BUILD_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: '360000'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify temporary synthetic QA secret provisioned
+        run: |
+          set -euo pipefail
+          test -n "$MARINA_NATIVE_QA_USERS_JSON" || { echo 'Missing QA environment secret'; exit 78; }
+      - uses: actions/download-artifact@v4
+        with:
+          name: marina-qa-ios-origin-pinned-app
+          run-id: 44909147697
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ios-bin
+      - name: Pin checked iOS QA binary and extract
+        run: |
+          set -euo pipefail
+          echo 'ced189dd4f54595867649da4e67d2e8fa186f47437af43d47fefbf41936653c8  ios-bin/MARINA_SMART_iOS_Simulator.zip' | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/marina-five-live"
+          unzip -q ios-bin/MARINA_SMART_iOS_Simulator.zip -d "$RUNNER_TEMP/marina-five-live"
+          app=$(find "$RUNNER_TEMP/marina-five-live" -maxdepth 2 -name '*.app' -print -quit)
+          test -d "$app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = kg.go.ms.staff
+          echo "MARINA_NATIVE_QA_IOS_APP=$app" >> "$GITHUB_ENV"
+          echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Boot simulator and install QA app
+        run: |
+          set -euo pipefail
+          udid=$(xcrun simctl list devices available -j | python3 -c 'import json,sys;d=json.load(sys.stdin);xs=[x for vs in d["devices"].values() for x in vs if x.get("isAvailable") and "iPhone" in x.get("name","")];print(xs[0]["udid"] if xs else "")')
+          test -n "$udid"
+          echo "IOS_SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" "$MARINA_NATIVE_QA_IOS_APP"
+          xcrun simctl launch "$udid" kg.go.ms.staff
+      - name: Real iPhone five-role QA login Maestro
+        run: bash scripts/design/fl2-native-live-five-roles.sh ios
+      - name: Upload synthetic iPhone screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-native-ios-five-live-role-evidence
+          path: native-five-roles-evidence/
+          retention-days: 5
+          if-no-files-found: warn

@@ -1,0 +1,30 @@
+# This is an opt-in LIVE QA test, NOT production acceptance.
+# Compile a separate native build with EXACT EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS.
+# Use synthetic MARINA_FINAL_QA staff only. No real accounts.
+appId: kg.go.ms.staff
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+- extendedWaitUntil:
+    visible:
+      id: "login-username"
+    timeout: 90000
+- tapOn:
+    id: "login-username"
+- inputText: ${MAESTRO_QA_USERNAME}
+- tapOn:
+    id: "login-password"
+- inputText: ${MAESTRO_QA_PASSWORD}
+- extendedWaitUntil:
+    visible:
+      id: "login-submit"
+    timeout: 60000
+- tapOn:
+    id: "login-submit"
+- extendedWaitUntil:
+    visible:
+      id: "${MAESTRO_QA_EXPECTED_TAB}"
+    timeout: 60000
+- assertNotVisible:
+    id: "login-error"
