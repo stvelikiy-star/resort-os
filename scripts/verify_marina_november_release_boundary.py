@@ -24,7 +24,12 @@ ALLOWED_GOVERNANCE = frozenset({
 
 # Only these audited P0 changes are allowed beyond the frozen November
 # product source. Git blob digests prevent widening this exception silently.
-# Approved workflow is test-only; pinned to prevent unreviewed CI drift.\nAPPROVED_NATIVE_QA_BLOBS = {\n    ".github/workflows/marina-native-android-ios-maestro-ci.yml": "eb63174126b3938a93fbdc34dc888f0af703c1aa",\n}\n\nAPPROVED_P0_BLOBS = {
+# Approved workflow is test-only; pinned to prevent unreviewed CI drift.
+APPROVED_NATIVE_QA_BLOBS = {
+    ".github/workflows/marina-native-android-ios-maestro-ci.yml": "eb63174126b3938a93fbdc34dc888f0af703c1aa",
+}
+
+APPROVED_P0_BLOBS = {
     "services/api/app/stays.py": "16f5a87445a9eaf9315b9b43e25d54c069bd69ce",
     "scripts/test_marina_pms_schedule_property_boundary.py": "701b21a7f74d4b1c210b6e89f65a95dfdd8d8771",
 }
