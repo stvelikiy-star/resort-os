@@ -71,3 +71,6 @@
   .header a,.header button{min-height:44px}
 }
 @media(prefers-reduced-motion:reduce){.shell button{animation:none!important;transition:none!important}}
+
+/* Preserve the 390px mobile viewport even when a table option has a long label. */
+.section select{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
