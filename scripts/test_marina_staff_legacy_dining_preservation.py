@@ -27,4 +27,7 @@ class LegacyDiningStaffPreservation(unittest.TestCase):
   self.assertIn('table_id: orderTable',order)
   self.assertNotIn('stay_id:',order)
   self.assertIn('WAITER_TABLE_ORDER_ONLY',kitchen)
+ def test_waiter_long_table_labels_fit_mobile(self):
+  css=(Path(__file__).resolve().parents[1]/'apps/staff/components/WaiterEntry.module.css').read_text()
+  self.assertRegex(css,r'\\.section select\\s*\\{[^}]*width:100%;[^}]*min-width:0;[^}]*max-width:100%;')
 if __name__=='__main__':unittest.main()
