@@ -28,6 +28,9 @@ ALLOWED_GOVERNANCE = frozenset({
 APPROVED_NATIVE_QA_BLOBS = {
     ".github/workflows/marina-native-android-ios-maestro-ci.yml": "e96b19e2e97cfc5a67593ee0150b714ae7507aa1",
     "scripts/design/fl2-android-maestro-demo.sh": "b4372aa0fcb965a3d9337d86c2f4faf96db700c3",
+    "scripts/design/fl2-native-live-role.yaml": "8c909ac0e5f0dba26ff18174662feb41eb8373b3",
+    "scripts/design/fl2-native-live-role.sh": "4b6b340793fbdd2945fd7884d5ed77e9712cae9c",
+    "scripts/design/fl2-native-live-role.README.md": "8e2e78527633902591c6fa56dd53b18afb9ab077",
 }
 
 APPROVED_P0_BLOBS = {
