@@ -26,7 +26,7 @@ ALLOWED_GOVERNANCE = frozenset({
 # product source. Git blob digests prevent widening this exception silently.
 # Approved workflow is test-only; pinned to prevent unreviewed CI drift.
 APPROVED_NATIVE_QA_BLOBS = {
-    ".github/workflows/marina-native-android-ios-maestro-ci.yml": "1b0109a79dfa87d8dc388b711be47b48b7edecef",
+    ".github/workflows/marina-native-android-ios-maestro-ci.yml": "56fefd52fa52de2b49cfa22a21c1e21ed8a3b3c1",
 }
 
 APPROVED_P0_BLOBS = {
