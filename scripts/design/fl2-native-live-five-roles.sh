@@ -39,8 +39,11 @@ bash "$private/install-maestro.sh" >"$private/install.log" 2>&1
 export PATH="$HOME/.maestro/bin:$PATH"
 command -v maestro >/dev/null || { echo "MAESTRO_NOT_FOUND"; exit 78; }
 for role in OWNER RECEPTION COOK WAITER STORE_STAFF;do
-  mapfile -t c <"$private/$role"
-  export MARINA_QA_USERNAME="${c[0]}" MARINA_QA_PASSWORD="${c[1]}" MARINA_QA_ROLE="$role"
+  IFS= read -r qa_username <"$private/$role"
+  qa_password=$(sed -n '2p' "$private/$role")
+  test -n "$qa_username" && test -n "$qa_password"
+  export MARINA_QA_USERNAME="$qa_username" MARINA_QA_PASSWORD="$qa_password" MARINA_QA_ROLE="$role"
+  unset qa_username qa_password
   unset MAESTRO_QA_USERNAME MAESTRO_QA_PASSWORD
   if ! bash scripts/design/fl2-native-live-role.sh;then
     if [[ "$platform" == android ]];then

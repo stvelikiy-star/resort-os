@@ -29,7 +29,7 @@ APPROVED_NATIVE_QA_BLOBS = {
     ".github/workflows/marina-native-android-ios-maestro-ci.yml": "e96b19e2e97cfc5a67593ee0150b714ae7507aa1",
     "scripts/design/fl2-android-maestro-demo.sh": "b4372aa0fcb965a3d9337d86c2f4faf96db700c3",
     "scripts/design/fl2-native-live-role.yaml": "8c909ac0e5f0dba26ff18174662feb41eb8373b3",
-    "scripts/design/fl2-native-live-role.sh": "4b6b340793fbdd2945fd7884d5ed77e9712cae9c",
+    "scripts/design/fl2-native-live-role.sh": "12df57b660f8bb3bdb0d6bc922bdab2f2d3d8cbd",
     "scripts/design/fl2-native-live-role.README.md": "8e2e78527633902591c6fa56dd53b18afb9ab077",
     ".github/workflows/marina-native-live-qa-build-ci.yml": "756e8cb477eb405ebd70053b90e9186e3812e3dc",
     "scripts/design/fl2-native-qa-connect.yaml": "f92d7e839c81f451bf2896b610f019541f9213c1",
@@ -38,7 +38,7 @@ APPROVED_NATIVE_QA_BLOBS = {
     "scripts/design/fl2-native-qa-negative-login.yaml": "17ba220277be7f708f225bc08b751e74bc14dd32",
     "scripts/design/fl2-native-qa-negative-login.sh": "233060d52a0760a37b4f2b7f4b39f345c7db40b1",
     ".github/workflows/marina-native-live-five-roles-ci.yml": "e046b0e9a8505ee64d895cf8fb5ceece95612aee",
-    "scripts/design/fl2-native-live-five-roles.sh": "078e606f7ea7aeda9f3513ce8accb3b6e322211d",
+    "scripts/design/fl2-native-live-five-roles.sh": "d01d763fc413a2a5222424a473ee551d86aefbdd",
 }
 
 APPROVED_P0_BLOBS = {

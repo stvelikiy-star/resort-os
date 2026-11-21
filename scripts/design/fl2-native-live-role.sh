@@ -12,7 +12,7 @@ if [[ "$MARINA_QA_ORIGIN" != "$EXPECTED_ORIGIN" ]];then
   printf '%s\n' 'BLOCKED: origin is not MARINA_FINAL_QA' >&2
   exit 78
 fi
-if [[ ! "$MARINA_QA_USERNAME" =~ ^marina_(extqa|nativeqa|qa)_[-a-zA-Z0-9]+$ ]];then
+if [[ ! "$MARINA_QA_USERNAME" =~ ^marina_(extqa|nativeqa|qa)_[a-zA-Z0-9_-]+$ ]];then
   printf '%s\n' 'BLOCKED: only synthetic QA users allowed' >&2
   exit 78
 fi
