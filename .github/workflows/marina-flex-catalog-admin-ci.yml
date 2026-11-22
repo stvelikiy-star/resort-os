@@ -1,0 +1,83 @@
+name: MARINA FLEX Catalog & Drafts P0 CI
+on:
+  pull_request:
+    paths:
+      - "docs/flex/sql/0011_flex_catalog_subscription_drafts_preview.sql"
+      - "services/api/app/flex_catalog_admin.py"
+      - "scripts/marina_flex_catalog_*"
+      - ".github/workflows/marina-flex-catalog-admin-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  admin-api-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install isolated FLEX API dependencies
+        run: pip install --disable-pip-version-check -r services/api/requirements-flex-control.txt
+      - name: Strict admin models, MFA and draft-only invariant
+        run: python scripts/marina_flex_catalog_admin_contract_test.py
+      - name: All edits isolated from PMS, banks, and existing November release
+        run: |
+          python scripts/marina_flex_release_scope_guard.py --self-test
+          python -m compileall -q services/api/app/flex_catalog_admin.py
+
+  disposable-postgresql-16:
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: flex_ci
+          POSTGRES_USER: flex_ci
+          POSTGRES_PASSWORD: flex_ci_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flex_ci -d flex_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: flex_ci
+      PGPASSWORD: flex_ci_ci_only
+      PGDATABASE: flex_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+      - name: Check disposable FLEX PostgreSQL 16 only
+        run: psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_qa_db_preflight.sql
+      - name: Apply complete commercial baseline + new isolated 0011
+        run: |
+          set -euo pipefail
+          test -f docs/flex/sql/0010_flex_partner_earnings_preview.sql
+          test -f docs/flex/sql/0011_flex_catalog_subscription_drafts_preview.sql
+          for file in docs/flex/sql/00*.sql; do
+            echo "Applying $file to disposable FLEX CI only"
+            psql -X -v ON_ERROR_STOP=1 -f "$file" > /tmp/flex_catalog_migration.log
+          done
+      - name: Enforce only append-only SKU/prices and no payment, PMS or subscription mutation
+        run: psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_catalog_draft_sql_contract.sql
+      - name: Verify new draft table hidden from other readers
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -Atqc "
+            SELECT CASE WHEN
+              NOT has_table_privilege('flex_hotel_reader',
+                'flex_subscription_configuration_drafts','SELECT')
+              AND NOT has_table_privilege('flex_catalog_draft_writer',
+                'flex_subscriptions','UPDATE')
+              AND NOT has_table_privilege('flex_catalog_draft_writer',
+                'flex_confirmed_payments','INSERT')
+              THEN 'PASS' ELSE 'FAIL' END
+          " | grep -qx PASS
