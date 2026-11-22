@@ -85,6 +85,7 @@ DECLARE
   reversed numeric(18,2);
   eligible_net numeric(18,2);
   allowed numeric(18,2);
+  total_committed numeric(18,2);
 BEGIN
   -- All statement entries are synthetic until a separately audited bank
   -- ledger writer is built. This cannot be used to trigger a payout.
@@ -135,7 +136,8 @@ BEGIN
       FROM flex_partner_earnings_entries e
       WHERE e.rule_version_id=NEW.rule_version_id
         AND e.allocation_id=NEW.allocation_id AND e.entry_type='REVERSAL';
-    IF accrued=0 OR reversed>accrued
+    IF accrued=0 OR NEW.amount>round(accrued*reversal_amount/alloc_rec.amount,2)
+       OR reversed>accrued
        OR reversed>round(accrued*(
           SELECT coalesce(sum(ar.amount),0) FROM flex_allocation_reversals ar
           WHERE ar.allocation_id=NEW.allocation_id
@@ -144,6 +146,15 @@ BEGIN
     END IF;
   END IF;
 
+  -- Multiple investors plus referral commissions must never promise more
+  -- than the tax-excluded cash belonging to this specific allocation.
+  SELECT coalesce(sum(CASE WHEN entry_type='ACCRUAL' THEN amount
+                           ELSE -amount END),0)
+    INTO total_committed
+  FROM flex_partner_earnings_entries WHERE allocation_id=NEW.allocation_id;
+  IF total_committed>eligible_net THEN
+    RAISE EXCEPTION 'FLEX_PARTNER_COMBINED_OVERCOMMIT' USING ERRCODE='23514';
+  END IF;
   RETURN NEW;
 END $flex$;
 
