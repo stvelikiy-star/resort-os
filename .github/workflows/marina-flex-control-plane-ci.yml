@@ -1,0 +1,80 @@
+name: MARINA FLEX Control Plane Security
+
+on:
+  pull_request:
+    paths:
+      - "services/api/app/flex_control_plane.py"
+      - "services/api/app/flex_foundation.py"
+      - "services/api/requirements-flex-control.txt"
+      - "scripts/marina_flex_*"
+      - "docs/flex/sql/**"
+      - ".github/workflows/marina-flex-control-plane-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-token-contract:
+    name: FLEX EdDSA JWT verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install independent FLEX API dependencies
+        run: python -m pip install --disable-pip-version-check -r services/api/requirements-flex-control.txt
+      - name: Compile control-plane modules
+        run: python -m py_compile services/api/app/flex_control_plane.py scripts/marina_flex_control_plane_auth_test.py
+      - name: Negative signed token and DB boundary tests
+        run: python scripts/marina_flex_control_plane_auth_test.py
+
+  two-hotel-rls-e2e:
+    name: FLEX two-hotel RLS and HTTP isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: flex_ci
+          POSTGRES_USER: flex_ci
+          POSTGRES_PASSWORD: flex_ci_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flex_ci -d flex_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: flex_ci
+      PGPASSWORD: flex_ci_ci_only
+      PGDATABASE: flex_ci
+      FLEX_DATABASE_URL: postgresql://flex_runtime_ci:flex_ci_runtime_only@localhost:5432/flex_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PostgreSQL and FLEX API test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          python -m pip install --disable-pip-version-check -r services/api/requirements-flex-control.txt
+      - name: Create disposable commercial schema and guarded roles
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0001_flex_control_plane_preview.sql
+          psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0002_flex_platform_identity_rls_preview.sql
+      - name: Check unauthorized identity and hotel scope isolation
+        run: psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_rls_isolation_contract.sql
+      - name: Provision restricted CI-only DB identity
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -c "CREATE ROLE flex_runtime_ci LOGIN PASSWORD 'flex_ci_runtime_only' NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT"
+          psql -X -v ON_ERROR_STOP=1 -c "GRANT flex_hotel_reader, flex_identity_reader, flex_platform_admin_reader TO flex_runtime_ci"
+      - name: Verify authenticated API and negative cross-hotel access
+        run: python scripts/marina_flex_control_plane_http_test.py
