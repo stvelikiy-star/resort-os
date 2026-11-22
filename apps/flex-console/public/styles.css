@@ -41,3 +41,5 @@ body.light .side{background:#e4f1f7}body.light .badge{color:#92670c}body.light s
 @media (max-width:820px){.shell{display:block}.side{padding:15px;gap:6px}.brand{padding:4px 4px 6px}.side-label,.side-foot{display:none}#nav{display:flex;overflow-x:auto;gap:4px;padding-bottom:4px}#nav button{white-space:nowrap;flex:none}.topbar{padding:12px 18px}.content{padding:20px 16px}.grid.two{grid-template-columns:1fr}footer{padding:18px}}
 @media (max-width:540px){.grid,.grid.three{grid-template-columns:1fr}.page-header{align-items:flex-start}.period{max-width:100%}.top-actions{gap:7px}.badge{display:none}.panel{padding:17px}.table{font-size:12px}}
 @media (prefers-reduced-motion:reduce){.skeleton{animation:none}}
+
+.spacing-top{margin-top:18px}
