@@ -69,6 +69,21 @@ jobs:
           done
       - name: Enforce only append-only SKU/prices and no payment, PMS or subscription mutation
         run: psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_catalog_draft_sql_contract.sql
+      - name: Create two synthetic hotels, platform roles and catalog fixtures
+        run: psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_rls_isolation_contract.sql
+      - name: Create least-privilege standalone FLEX QA HTTP runtime (never PMS)
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -c "CREATE ROLE flex_catalog_runtime_ci LOGIN PASSWORD 'flex_catalog_ci_only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT"
+          psql -X -v ON_ERROR_STOP=1 -c "GRANT flex_hotel_reader, flex_identity_reader, flex_platform_admin_reader, flex_catalog_draft_writer TO flex_catalog_runtime_ci WITH INHERIT FALSE, SET TRUE"
+          psql -X -v ON_ERROR_STOP=1 -c "SELECT 1 / CASE WHEN NOT pg_has_role('flex_catalog_runtime_ci','flex_catalog_draft_writer','USAGE') THEN 1 ELSE 0 END"
+      - name: Real signed MFA HTTP catalog and subscription draft QA E2E
+        env:
+          FLEX_DATABASE_URL: postgresql://flex_catalog_runtime_ci:flex_catalog_ci_only@localhost:5432/flex_ci
+          FLEX_TEST_DB_OWNER_URL: postgresql://flex_ci:flex_ci_ci_only@localhost:5432/flex_ci
+          FLEX_ENVIRONMENT: qa
+          FLEX_ENABLE_QA_CATALOG_DRAFTS: "true"
+        run: python scripts/marina_flex_catalog_admin_http_test.py
       - name: Verify new draft table hidden from other readers
         run: |
           psql -X -v ON_ERROR_STOP=1 -Atqc "
