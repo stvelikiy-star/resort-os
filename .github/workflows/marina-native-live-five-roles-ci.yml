@@ -33,7 +33,8 @@ jobs:
             echo "Protected synthetic QA credentials present"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "LIVE five-role tests SKIPPED: protected QA credentials not provisioned"
+            echo "::error title=Missing protected QA credentials::LIVE acceptance is BLOCKED; provide synthetic MARINA_FINAL_QA credentials in environment marina-native-qa"
+            exit 78
           fi
 
   android-five-live:
