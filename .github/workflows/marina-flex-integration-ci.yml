@@ -115,7 +115,11 @@ jobs:
           docker run --rm --network host \
             -e PGHOST=127.0.0.1 -e PGPORT -e PGUSER -e PGPASSWORD \
             postgres:16 pg_dump -d flex_restored_ci --schema-only --no-owner --no-privileges > /tmp/flex_after.sql
-          diff -u /tmp/flex_before.sql /tmp/flex_after.sql
+          # pg_dump embeds a fresh random \restrict/\unrestrict marker every time.
+          # Discard ONLY those markers, retaining every actual SQL definition.
+          grep -v -E '^\\(un)?restrict ' /tmp/flex_before.sql > /tmp/flex_before.normalized.sql
+          grep -v -E '^\\(un)?restrict ' /tmp/flex_after.sql > /tmp/flex_after.normalized.sql
+          diff -u /tmp/flex_before.normalized.sql /tmp/flex_after.normalized.sql
           psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_restore_acceptance.sql
           for database in flex_ci flex_restored_ci; do
             psql -X -Atqc "SELECT count(*) FROM flex_hotels" -d "$database" > "/tmp/$database.hotel_count"
