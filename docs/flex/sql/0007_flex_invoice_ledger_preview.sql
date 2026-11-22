@@ -118,7 +118,10 @@ BEGIN
     WHERE line.invoice_id=document.invoice_id
       AND (t.invoice_line_id IS NULL
            OR line.amount <> t.payable_amount
-           OR line.price_version_id IS NULL);
+           OR line.price_version_id IS NULL
+           OR (policy.treatment='EXEMPT' AND t.tax_amount<>0)
+           OR (policy.treatment='ADDED' AND
+               t.tax_amount<>round(t.net_amount*policy.rate_bps::numeric/10000,2)));
   IF n=0 OR mismatches<>0 OR
      n<>(SELECT count(*) FROM flex_invoice_lines WHERE invoice_id=document.invoice_id)
      OR net<>document.net_amount OR tax<>document.tax_amount
