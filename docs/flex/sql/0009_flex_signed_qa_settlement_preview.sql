@@ -29,7 +29,8 @@ CREATE ROLE flex_qa_settlement_writer NOLOGIN;
 GRANT USAGE ON SCHEMA public TO flex_qa_settlement_writer;
 GRANT SELECT ON flex_payment_intents, flex_invoices, flex_invoice_lines,
   flex_issued_invoice_records, flex_confirmed_payments,
-  flex_payment_allocations, flex_qa_settlement_evidence TO flex_qa_settlement_writer;
+  flex_payment_allocations, flex_allocation_reversals,
+  flex_qa_settlement_evidence TO flex_qa_settlement_writer;
 GRANT INSERT ON flex_confirmed_payments, flex_payment_allocations,
   flex_qa_settlement_evidence, flex_provider_events,
   flex_provider_event_attempts TO flex_qa_settlement_writer;
@@ -88,6 +89,10 @@ FOR INSERT TO flex_qa_settlement_writer WITH CHECK (
     SELECT 1 FROM flex_confirmed_payments p
     WHERE p.id=payment_id AND p.invoice_id=invoice_id
   )
+);
+CREATE POLICY flex_qa_allocations_reversed_read ON flex_allocation_reversals
+FOR SELECT TO flex_qa_settlement_writer USING (
+  EXISTS (SELECT 1 FROM flex_payment_allocations a WHERE a.id=allocation_id)
 );
 CREATE POLICY flex_qa_event_read ON flex_provider_events
 FOR SELECT TO flex_qa_settlement_writer USING (
