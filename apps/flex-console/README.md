@@ -43,6 +43,31 @@ FLEX_ONBOARDING_API_ORIGIN=https://<qa-onboarding-private-origin>
 
 All 3 variables are required in addition to the platform issuer and API configuration. Without them the button stays disabled. The backend independently requires database-verified SUPER_ADMIN with MFA. This DOES NOT create a live hotel in operational MARINA SMART.
 
+## P0: Trusted hotel connection (QA only, no payments)
+
+SUPER_ADMIN hotel details now offer **Link to MARINA SMART**:
+
+1. Enter a registered `deployment_id` and the corresponding hotel `property_external_id` only in an **isolated, authorized QA environment**.
+2. The UI calls `POST /api/actions/hotels/<uuid>/challenge`. The backend checks `PENDING`, MFA, trusted deployment and writes a 10-minute challenge. Nothing is linked yet.
+3. Deliver the displayed exact `signed_message` to the **registered trusted MARINA SMART deployment signer**. The browser or FLEX console **never signs it and never stores a private key**.
+4. Paste only the approved Base64 signature. `POST /api/actions/challenges/<challenge_id>/confirm` checks the signature against the pre-registered public key, expiry, one-time use and ownership uniqueness.
+5. On verification the page says **VERIFIED; subscription not activated**. No payments, invoices, subscriptions, feature flags or operational PMS content are changed.
+
+To enable on approved isolated QA only:
+
+```sh
+FLEX_ENVIRONMENT=qa
+FLEX_ENABLE_QA_ONBOARDING=true
+FLEX_ENABLE_QA_LINKING=true
+FLEX_ONBOARDING_API_ORIGIN=https://<isolated-onboarding-private-origin>
+```
+
+All four values are necessary; no toggle or fake signature is available from browser UI. Without an approved signer the confirmation cannot succeed. For every request the BFF requires a same-origin browser, encrypted session, matching CSRF and strict schema. The backend independently verifies signed Ed25519 proof and server-authorized SUPER_ADMIN+MFA.
+
+The synthetic E2E test generates **disposable test signing keys in memory**; they are never reused by any actual MARINA SMART deployment. Keep trusted production/PMS secrets away from this QA environment.
+
+**Not yet implemented:** catalog publication and price-version administration, subscriptions state changes, agent/investor contract writes, or live deployment. These need dedicated safe transactional APIs, never imitation HTML mutations.
+
 ## Separate managed QA environment only
 
 Set these server-only environment variables (never commit values):
