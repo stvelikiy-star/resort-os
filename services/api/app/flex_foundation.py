@@ -161,3 +161,69 @@ def allocate_confirmed_payment(
             allocations.append(PaymentAllocation(line.line_id, allocated))
         remaining -= allocated
     return AllocationResult(tuple(allocations), remaining)
+
+# Platform roles are unrelated to the hotel's StaffRole.AGENT / StaffRole.OWNER.
+# This function is inert until an authenticated control-plane identity provider
+# constructs PlatformPrincipal server-side. NEVER build principal from request JSON.
+PLATFORM_ACTIONS = frozenset({
+    "PLATFORM_DASHBOARD", "MANAGE_CATALOG", "MANAGE_SUBSCRIPTIONS",
+    "RECONCILE_PAYMENTS", "MANAGE_INVESTOR_CONTRACTS",
+    "VIEW_HOTEL_BILLING", "REQUEST_HOTEL_FEATURE",
+    "VIEW_AGENT_EARNINGS", "VIEW_INVESTOR_EARNINGS",
+})
+SENSITIVE_PLATFORM_ACTIONS = frozenset({
+    "MANAGE_CATALOG", "MANAGE_SUBSCRIPTIONS", "RECONCILE_PAYMENTS",
+    "MANAGE_INVESTOR_CONTRACTS",
+})
+
+
+@dataclass(frozen=True)
+class PlatformPrincipal:
+    """Server-verified identity and scopes; never trust user-supplied fields."""
+    subject_id: str
+    role: str
+    mfa_verified: bool = False
+    hotel_ids: frozenset[str] = frozenset()
+    agent_id: str | None = None
+    investor_id: str | None = None
+
+
+def platform_action_allowed(
+    principal: PlatformPrincipal,
+    *,
+    action: str,
+    hotel_id: str | None = None,
+    agent_id: str | None = None,
+    investor_id: str | None = None,
+) -> bool:
+    """Fail-closed control-plane RBAC/scope policy, not a login mechanism.
+
+    No identity lookup, payout permission, external side effect or PMS grant.
+    Finance payout approval/execution must be a separate dual-control workflow.
+    """
+    if not principal.subject_id or action not in PLATFORM_ACTIONS:
+        return False
+    if action in SENSITIVE_PLATFORM_ACTIONS and not principal.mfa_verified:
+        return False
+    if principal.role == "SUPER_ADMIN":
+        return True
+    if principal.role == "BILLING":
+        return action == "RECONCILE_PAYMENTS" and principal.mfa_verified
+    if principal.role == "HOTEL_OWNER":
+        return (
+            action in {"VIEW_HOTEL_BILLING", "REQUEST_HOTEL_FEATURE"}
+            and hotel_id is not None and hotel_id in principal.hotel_ids
+        )
+    if principal.role == "SALES_AGENT":
+        return (
+            action == "VIEW_AGENT_EARNINGS"
+            and principal.agent_id is not None
+            and principal.agent_id == agent_id
+        )
+    if principal.role == "INVESTOR":
+        return (
+            action == "VIEW_INVESTOR_EARNINGS"
+            and principal.investor_id is not None
+            and principal.investor_id == investor_id
+        )
+    return False
