@@ -10,7 +10,7 @@ const state={lang:localStorage.getItem('flex_lang')||'ru',theme:localStorage.get
 const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=k=>(translations[state.lang]||translations.ru)[k]||translations.ru[k]||k;
 const fmt=v=>v===null||v===undefined?'—':new Intl.NumberFormat(state.lang==='kg'?'ky-KG':state.lang==='en'?'en-US':'ru-RU',{maximumFractionDigits:2}).format(Number(v));
-const date=v=>v?new Date(v).toLocaleDateString(state.lang==='en'?'en-US':'ru-RU'):'—';
+const date=v=>v?new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(v))?String(v)+'T12:00:00Z':v).toLocaleDateString(state.lang==='en'?'en-US':'ru-RU',{timeZone:/^\d{4}-\d{2}-\d{2}$/.test(String(v))?'UTC':'Asia/Bishkek'}):'—';
 const heading=(title,subtitle='')=>'<div class="page-header"><div><div class="eyebrow">MARINA SMART FLEX / '+safe(t('readOnly'))+'</div><h1>'+safe(title)+'</h1><div class="muted">'+safe(subtitle)+'</div></div><span class="role-mark">'+safe(state.me?.role||'QA')+'</span></div>';
 const metric=(label,value,klass='')=>'<div class="panel metric"><small>'+safe(label)+'</small><strong class="'+klass+'">'+safe(value)+'</strong></div>';
 const info=(message,type='info')=>'<div class="notice '+type+'">'+safe(message)+'</div>';
@@ -45,7 +45,7 @@ async function overview(){
  const c=results[1].status==='fulfilled'?results[1].value:null;
  const e=results[2].status==='fulfilled'?results[2].value:null;
  if(!h&&!c&&!e) throw results[0].reason;
- return heading(t('welcome'),t('helpQa'))+periodButtons()+'<div class="grid" style="margin-top:18px">'+metric(t('activeHotels'),h?.length??'—','cyan-text')+
+ return heading(t('welcome'),t('helpQa'))+periodButtons()+'<div class="grid spacing-top">'+metric(t('activeHotels'),h?.length??'—','cyan-text')+
  metric(t('activeSku'),c?.length??'—','gold-text')+metric(t('groups'),e?.groups?.length??'—')+metric(t('readOnly'),'QA')+'</div>'+
  '<div class="grid two"><section class="panel"><h2>'+safe(t('hotels'))+'</h2>'+(h?.length?hotelTable(h.slice(0,5)):empty(t('noHotels')))+
  '<button class="subtle" type="button" data-view="hotels">'+safe(t('back'))+' →</button></section><section class="panel"><h2>'+safe(t('obligations'))+'</h2>'+
@@ -67,7 +67,7 @@ async function hotelDetail(){
  if(sub.status==='rejected'&&sub.reason.status===403)throw sub.reason;
  if(inv.status==='rejected'&&inv.reason.status===403)throw inv.reason;
  return heading(t('selected'),id)+'<button type="button" class="subtle" data-view="'+(state.me?.role==='SUPER_ADMIN'?'hotels':'subscription')+'">← '+safe(t('openBack'))+'</button>'+
- '<div class="grid three" style="margin-top:18px">'+metric(t('planStatus'),subscription?.status??'—')+metric(t('enforcement'),subscription?.enforcement??'—')+metric(t('expires'),date(subscription?.period_end))+'</div>'+
+ '<div class="grid three spacing-top">'+metric(t('planStatus'),subscription?.status??'—')+metric(t('enforcement'),subscription?.enforcement??'—')+metric(t('expires'),date(subscription?.period_end))+'</div>'+
  '<section class="panel"><h2>'+safe(t('subscription'))+'</h2>'+(subscription?'<div class="grid three">'+kv(t('periodStart'),date(subscription.period_start))+kv(t('periodEnd'),date(subscription.period_end))+kv(t('grace'),date(subscription.grace_until))+'</div>':empty(t('noSubscription')))+'</section>'+
  '<section class="panel"><h2>'+safe(t('invoices'))+'</h2>'+(invoices?.length?table([t('invoice'),t('status'),t('total'),t('due')],invoices.map(i=>'<tr><td>'+safe(i.number||i.id)+'</td><td><span class="chip">'+safe(i.status)+'</span></td><td>'+money(i.total,i.currency)+'</td><td>'+safe(date(i.due_at))+'</td></tr>')):empty(t('noInvoices')))+'</section>'+info(t('warning'),'info');
 }
@@ -77,10 +77,10 @@ async function catalog(){
  '<section class="panel">'+(items.length?table([t('sku'),t('features'),t('price'),t('status')],items.map(i=>'<tr><td>'+safe(i.sku)+'</td><td>'+safe(i.name)+'</td><td>'+money(i.monthly_list_price,i.currency)+'</td><td><span class="chip">v'+safe(i.price_version)+'</span></td></tr>')):empty(t('noCatalog')))+'</section>';
 }
 function earningsSummary(o){return (o.groups?.length?table([t('groups'),t('gross'),t('refunds'),t('net')],o.groups.map(g=>'<tr><td>'+safe(g.role)+'</td><td>'+money(g.accrued_gross_kg)+'</td><td>'+money(g.reversed_kg)+'</td><td>'+money(g.net_accrued_kg)+'</td></tr>')):empty(t('noPartners')))+info('QA_ONLY_NOT_BANK_RECONCILED','info')}
-async function obligations(){const r=await api('/v1/platform/partner-earnings-summary?period='+state.period);return heading(t('obligations'),t('helpQa'))+periodButtons()+'<section class="panel" style="margin-top:18px">'+earningsSummary(r)+'</section>'+info(t('notImplemented'))}
+async function obligations(){const r=await api('/v1/platform/partner-earnings-summary?period='+state.period);return heading(t('obligations'),t('helpQa'))+periodButtons()+'<section class="panel spacing-top">'+earningsSummary(r)+'</section>'+info(t('notImplemented'))}
 async function earnings(){
  const r=await api('/v1/partner/me/earnings?period='+state.period);
- return heading(state.me.role==='INVESTOR'?t('investor'):t('agent'),t('helpQa'))+periodButtons()+'<div class="grid" style="margin-top:18px">'+
+ return heading(state.me.role==='INVESTOR'?t('investor'):t('agent'),t('helpQa'))+periodButtons()+'<div class="grid spacing-top">'+
  metric(t('gross'),money(r.accrued_gross_kg),'cyan-text')+metric(t('refunds'),money(r.reversed_kg))+
  metric(t('net'),money(r.net_accrued_kg),'gold-text')+metric(t('paid'),money(r.actual_paid_kg))+'</div>'+
  '<section class="panel"><h2>'+safe(t('earnings'))+'</h2><div class="grid two">'+kv(t('events'),r.events)+kv(t('role'),r.role)+'</div></section>'+info(t('notImplemented'))+info(safe(r.data_provenance||'QA_ONLY'),'info');
