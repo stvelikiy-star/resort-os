@@ -168,10 +168,10 @@ def investor_phase(snapshot: InvestorRepaymentSnapshot, *, on: date) -> str:
     principal = _money(snapshot.original_principal)
     cash_paid = _money(snapshot.principal_cash_paid_out)
     accrued = _money(snapshot.principal_accrued)
-    if principal <= 0 or cash_paid > principal or snapshot.bonus_months < 0 or snapshot.bonus_months > 36:
-        raise ValueError("Invalid principal/payout terms")
-    if type(snapshot.bonus_months) is not int:
+    if type(snapshot.bonus_months) is not int or snapshot.bonus_months < 0 or snapshot.bonus_months > 36:
         raise ValueError("Invalid bonus duration")
+    if principal <= 0 or cash_paid > principal:
+        raise ValueError("Invalid principal/payout terms")
     if cash_paid < principal:
         if snapshot.repaid_at is not None:
             raise ValueError("Principal not actually repaid")
@@ -184,7 +184,6 @@ def investor_phase(snapshot: InvestorRepaymentSnapshot, *, on: date) -> str:
     start = snapshot.repaid_at
     absolute_month = start.year * 12 + start.month - 1 + snapshot.bonus_months
     end_year, end_month = divmod(absolute_month, 12)
-    end_year += 0
     # end_month is zero-based; match end-exclusive day when month shorter.
     from calendar import monthrange
     end_date = date(end_year, end_month + 1,
@@ -220,7 +219,9 @@ def summarize_earnings(
             accrued += _money(entry.positive_accrual)
             reversed_total += _money(entry.reversal)
             paid += _money(entry.bank_payout)
-    net = _money(accrued - reversed_total) if accrued >= reversed_total else Decimal("0.00")
+    net = (accrued - reversed_total).quantize(KGS_CENT, rounding=ROUND_HALF_UP)
+    if abs(net) > MAX_MONEY:
+        raise ValueError("Dashboard net accrual exceeds financial range")
     return {
         "accrued_gross": f"{_money(accrued):.2f}",
         "reversed": f"{_money(reversed_total):.2f}",
