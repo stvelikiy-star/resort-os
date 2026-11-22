@@ -1,0 +1,35 @@
+name: MARINA FLEX Console Read-Only CI
+on:
+  pull_request:
+    paths:
+      - "apps/flex-console/**"
+      - "docs/flex/ui/**"
+      - "scripts/marina_flex_release_scope_guard.py"
+      - ".github/workflows/marina-flex-console-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-console:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax + isolated HTTP security tests
+        working-directory: apps/flex-console
+        run: npm run check
+      - name: FLEX-only cumulative additive guard self-test
+        run: python3 scripts/marina_flex_release_scope_guard.py --self-test
+      - name: Console cannot modify hotel PMS
+        shell: bash
+        run: |
+          if git diff --name-only "origin/main"...HEAD | grep -Eq '^(apps/(admin|staff|mobile|web)/|packages/database/|services/api/app/main\.py)'; then
+            echo 'Forbidden operational PMS change'
+            exit 1
+          fi
+          echo 'PASS: operational PMS is unchanged'
