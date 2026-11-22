@@ -6,6 +6,8 @@ on:
       - ".github/workflows/marina-flex-integration-ci.yml"
       - "scripts/marina_flex_release_scope_guard.py"
       - "scripts/marina_flex_restore_acceptance.sql"
+      - "scripts/marina_flex_qa_db_preflight.sql"
+      - "docs/flex/sql/**"
       - "docs/flex/FLEX_RELEASE_READINESS_AUDIT.md"
   workflow_dispatch:
 
@@ -83,6 +85,8 @@ jobs:
           sudo apt-get install -y -qq postgresql-client
           pg_dump --version
           psql --version
+      - name: Refuse installation outside empty disposable PostgreSQL 16 database
+        run: psql -X -v ON_ERROR_STOP=1 -d flex_ci -f scripts/marina_flex_qa_db_preflight.sql
       - name: Install all ten independent FLEX preview migrations in exact order
         run: |
           set -euo pipefail
@@ -106,6 +110,12 @@ jobs:
             -e PGHOST=127.0.0.1 -e PGPORT -e PGUSER -e PGPASSWORD \
             postgres:16 pg_restore --no-owner --exit-on-error --dbname=flex_restored_ci /tmp/flex_qa_only.dump
           test -s /tmp/flex_qa_only.dump
+          # Even a restored copy must never qualify for first-install migration.
+          if psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_qa_db_preflight.sql > /tmp/flex_guard_expected_failure.log 2>&1; then
+            echo "::error::A nonempty restored database unexpectedly passed the fresh-CI preflight"
+            exit 1
+          fi
+          grep -q "FLEX_QA_ONLY_DATABASE_REQUIRED" /tmp/flex_guard_expected_failure.log
       - name: Compare schema, policies and data after restore
         run: |
           set -euo pipefail
