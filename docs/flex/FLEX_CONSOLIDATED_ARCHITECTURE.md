@@ -127,7 +127,7 @@ Invoice -> immutable invoice lines -> payment intent -> provider event
 - отдельный workflow `marina-flex-foundation-ci.yml`;
 - данный документ и карта внедрения.
 
-**Нет:** новых работающих API, платёжного провайдера, migration SQL в активном пути, изменения UI, блокировки, интеграции с PMS, DB mutations и запусков на Ubuntu.
+**Нет:** новых работающих API, платёжного провайдера, изменения UI, блокировки, интеграции с PMS, DB mutations и запусков на Ubuntu. Есть только **ручной preview SQL** \`docs/flex/sql/0001_flex_control_plane_preview.sql\`, который CI исполняет в одноразовой PostgreSQL; этот файл НЕ подключён к миграциям гостиничных баз. До авторизации/изоляции и полноценного финансового аудита применять его в Production запрещено.
 
 ## 10. Решения перед включением следующих фаз
 
