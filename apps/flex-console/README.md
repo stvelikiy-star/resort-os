@@ -1,6 +1,6 @@
 # MARINA SMART FLEX — isolated commercial console (read-only QA)
 
-This app implements the **existing Future Luxury 2.0** visual language (navy/cyan/champagne) with role-bound views. The exact six-screen approved interactive reference remains at \`docs/flex/ui/MARINA_FLEX_Interactive_Prototype.html\` and is NOT served on the authenticated origin.
+This app implements the **existing Future Luxury 2.0** visual language (navy/cyan/champagne) with role-bound views. The exact six-screen approved interactive reference remains at `docs/flex/ui/MARINA_FLEX_Interactive_Prototype.html` and is NOT served on the authenticated origin.
 
 ## What's implemented
 
@@ -9,17 +9,17 @@ This app implements the **existing Future Luxury 2.0** visual language (navy/cya
 - SALES_AGENT / INVESTOR: only own day/week/month QA earnings (MFA enforced by FLEX API for investors).
 - Responsive desktop/mobile, RU/KG/EN, dark/light. Loading, empty, 401/403 and offline states.
 - Server-side BFF, **strict allowlisted GET proxy**, encrypted HttpOnly same-site cookies, OIDC authorization-code with PKCE, JWT/JWKS verification, issuer/audience/nonce validation. The browser never receives raw bearer tokens.
-- No role picker in live mode; role comes from \`GET /v1/me\` validated by backend. No writable bank, subscription, entitlement or payout routes.
+- No role picker in live mode; role comes from `GET /v1/me` validated by backend. No writable bank, subscription, entitlement or payout routes.
 
 ## Run offline for UI smoke
 
-\`\`\`sh
+```sh
 cd apps/flex-console
 node --version  # v22+
 npm test
 npm start
 # http://127.0.0.1:3407
-\`\`\`
+```
 
 Without an issuer and live backend, the UI accurately says **QA not configured**. It does NOT fall back to invented balances, demo hotel names or browser-supplied roles. The six-screen approved design reference can be inspected as a standalone HTML file; it is deliberately **not exposed by the authenticated HTTP server**.
 
@@ -27,7 +27,7 @@ Without an issuer and live backend, the UI accurately says **QA not configured**
 
 Set these server-only environment variables (never commit values):
 
-\`\`\`sh
+```sh
 FLEX_PUBLIC_ORIGIN=https://<qa-console-host>
 FLEX_API_ORIGIN=https://<qa-control-plane-private-origin>
 FLEX_PARTNER_API_ORIGIN=https://<qa-partner-portal-private-origin>
@@ -38,9 +38,9 @@ FLEX_API_AUDIENCE=<exact audience accepted by backend>
 FLEX_SESSION_KEY=<base64 of 32 cryptographically random bytes>
 HOST=127.0.0.1
 PORT=3407
-\`\`\`
+```
 
-Register **exact** redirect URI \`<FLEX_PUBLIC_ORIGIN>/api/auth/callback\` with the issuer. Require MFA on all platform management users at the issuer AND keep backend role/MFA validation; access token must be JWT verifiable with the issuer's JWKS and match backend EdDSA requirements. Ensure BFF traffic to backend is private/TLS, no forwarding through a live PMS endpoint. Use an approved QA ingress/proxy before exposing this server to testers.
+Register **exact** redirect URI `<FLEX_PUBLIC_ORIGIN>/api/auth/callback` with the issuer. Require MFA on all platform management users at the issuer AND keep backend role/MFA validation; access token must be JWT verifiable with the issuer's JWKS and match backend EdDSA requirements. Ensure BFF traffic to backend is private/TLS, no forwarding through a live PMS endpoint. Use an approved QA ingress/proxy before exposing this server to testers.
 
 **Deployment NO-GO until:** independent FLEX QA DB in private schema, issuer/MFA with real users, restricted DB grants, negative two-hotel/two-agent/two-investor E2E, R2/offsite encrypted backup+restore, legal/bank approvals where required, and release governance review. Do not change historical November release checks or enable production restrictions.
 
