@@ -1,0 +1,30 @@
+name: MARINA FLEX Pricing Contract
+
+on:
+  pull_request:
+    paths:
+      - "services/api/app/flex_pricing.py"
+      - "services/api/app/flex_foundation.py"
+      - "scripts/marina_flex_pricing_contract_test.py"
+      - "docs/flex/sql/0003_flex_price_version_guard_preview.sql"
+      - "scripts/marina_flex_price_version_sql_test.sql"
+      - ".github/workflows/marina-flex-pricing-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quote:
+    name: FLEX deterministic SKU quote and proration
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile commercial quote engine
+        run: python -m py_compile services/api/app/flex_foundation.py services/api/app/flex_pricing.py
+      - name: Verify pricing and seasonal edge cases
+        run: python scripts/marina_flex_pricing_contract_test.py

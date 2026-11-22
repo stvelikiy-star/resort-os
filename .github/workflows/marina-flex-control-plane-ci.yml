@@ -70,8 +70,11 @@ jobs:
         run: |
           psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0001_flex_control_plane_preview.sql
           psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0002_flex_platform_identity_rls_preview.sql
+          psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0003_flex_price_version_guard_preview.sql
       - name: Check unauthorized identity and hotel scope isolation
         run: psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_rls_isolation_contract.sql
+      - name: Verify price versions are immutable and never overlap
+        run: psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_price_version_sql_test.sql
       - name: Provision restricted CI-only DB identity
         run: |
           psql -X -v ON_ERROR_STOP=1 -c "CREATE ROLE flex_runtime_ci LOGIN PASSWORD 'flex_ci_runtime_only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT"

@@ -289,3 +289,44 @@ async def hotel_invoices(
                 )
                 for r in rows
             ]
+
+
+@app.get("/v1/catalog")
+async def commercial_catalog(
+    request: Request, principal: PlatformPrincipal = Depends(resolve_platform_principal),
+):
+    """Published LIST prices only; contract discounts and feature grants are private.
+
+    This is informational and never enables a PMS feature or creates an invoice.
+    """
+    if principal.role not in {"HOTEL_OWNER", "SUPER_ADMIN"}:
+        raise HTTPException(403, detail="Catalog not available to this role")
+    if principal.role == "SUPER_ADMIN" and not principal.mfa_verified:
+        raise HTTPException(403, detail="MFA required")
+    if principal.role == "HOTEL_OWNER" and not principal.hotel_ids:
+        raise HTTPException(403, detail="No assigned hotel")
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await _switch_to_reader(
+                conn, _reader_for(principal), "flex.authorized_hotel_id",
+                sorted(principal.hotel_ids)[0] if principal.hotel_ids else "",
+            )
+            rows = await conn.fetch(
+                "SELECT s.sku,s.title,s.capability_key,p.version,p.monthly_price,p.currency "
+                "FROM flex_skus s "
+                "JOIN LATERAL ( "
+                "  SELECT version,monthly_price,currency FROM flex_price_versions "
+                "  WHERE sku=s.sku AND valid_from<=now() "
+                "    AND (valid_to IS NULL OR valid_to>now()) "
+                "    AND currency='KGS' "
+                "  ORDER BY valid_from DESC,version DESC LIMIT 1 "
+                ") p ON true "
+                "WHERE s.product_status='AVAILABLE' "
+                "ORDER BY s.sku LIMIT 100"
+            )
+            return [
+                {"sku": r["sku"], "name": r["title"],
+                 "capability": r["capability_key"], "price_version": r["version"],
+                 "monthly_list_price": str(r["monthly_price"]), "currency": r["currency"]}
+                for r in rows
+            ]
