@@ -135,7 +135,8 @@ class CashRepaidInvestorPhases(unittest.TestCase):
 
     def test_monthend_leap_year_bonus(self):
         s=self.contract(paid="150000",repaid=date(2027,8,31))
-        self.assertEqual(investor_phase(s,on=date(2028,2,28)),"ENDED")
+        self.assertEqual(investor_phase(s,on=date(2028,2,28)),"BONUS")
+        self.assertEqual(investor_phase(s,on=date(2028,2,29)),"ENDED")
 
     def test_no_bonus_without_cash_proof(self):
         with self.assertRaises(ValueError):
