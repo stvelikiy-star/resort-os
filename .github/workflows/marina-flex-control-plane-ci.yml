@@ -3,6 +3,12 @@ name: MARINA FLEX Control Plane Security
 on:
   pull_request:
     paths:
+      # Release candidate gate: every FLEX change must check the SAME head SHA.
+      - ".github/workflows/marina-flex-*.yml"
+      - "apps/flex-console/**"
+      - "docs/flex/**"
+      - "services/api/app/flex_*.py"
+      - "scripts/marina_flex_*"
       - "services/api/app/flex_control_plane.py"
       - "services/api/app/flex_foundation.py"
       - "services/api/requirements-flex-control.txt"
