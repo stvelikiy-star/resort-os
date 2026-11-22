@@ -12,7 +12,8 @@ import sys
 import time
 import unittest
 import uuid
-from datetime import datetime, timedelta, timezone, date
+from datetime import datetime, timedelta, timezone, date, time as clock_time
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import asyncpg
@@ -123,7 +124,7 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         self.assertEqual(self.get("/v1/platform/catalog/skus/EXTRA_QA_CI/versions","owner-a").status_code,403)
 
     def test_03_draft_configuration_is_not_subscription(self):
-        start=date.today()+timedelta(days=4)
+        start=datetime.now(ZoneInfo('Asia/Bishkek')).date()+timedelta(days=4)
         end=start+timedelta(days=30)
         path="/v1/platform/subscription-drafts"
         payload={
@@ -134,6 +135,14 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         }
         self.assertEqual(self.post(path,payload,"owner-a").status_code,403)
         self.assertEqual(self.post(path,{**payload,"enforcement":"ENFORCE"}).status_code,422)
+        # A new version starts at 20:00 on the first contract day. It must NOT
+        # replace the version in force at 00:00 Asia/Bishkek on that same day.
+        in_day=datetime.combine(start,clock_time(hour=20),ZoneInfo('Asia/Bishkek')).astimezone(timezone.utc)
+        scheduled=self.post('/v1/platform/catalog/skus/AI_ASSISTANT/prices',{
+            'monthly_price':'15000.00','currency':'KGS','valid_from':in_day.isoformat()
+        })
+        self.assertEqual(scheduled.status_code,201,scheduled.text)
+        self.assertEqual(scheduled.json()['version'],2)
         created=self.post(path,payload)
         self.assertEqual(created.status_code,201,created.text)
         result=created.json()
