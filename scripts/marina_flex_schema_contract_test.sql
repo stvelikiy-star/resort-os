@@ -18,6 +18,19 @@ BEGIN
     VALUES(invoice,hotel,'FLEX_CI_INV','KGS','ISSUED',100.00);
   INSERT INTO flex_invoice_lines(id,invoice_id,sku,currency,description,quantity,unit_price,amount)
     VALUES(line,invoice,'TEST_AI','KGS','Test feature',1,100.00,100.00);
+  -- Currency of the line and payment must match their invoice.
+  BEGIN
+    INSERT INTO flex_invoice_lines(invoice_id,sku,currency,description,quantity,unit_price,amount)
+      VALUES(invoice,'TEST_AI','USD','Wrong currency',1,1.00,1.00);
+    RAISE EXCEPTION 'CI_FAILURE_CROSS_CURRENCY_LINE_ACCEPTED';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
+  BEGIN
+    INSERT INTO flex_confirmed_payments(hotel_id,invoice_id,provider,provider_payment_id,amount,currency,confirmed_at)
+      VALUES(hotel,invoice,'TEST','FLEX_CI_BAD_FX',50.00,'USD',now());
+    RAISE EXCEPTION 'CI_FAILURE_CROSS_CURRENCY_PAYMENT_ACCEPTED';
+  EXCEPTION WHEN foreign_key_violation THEN NULL;
+  END;
   INSERT INTO flex_confirmed_payments(id,hotel_id,invoice_id,provider,provider_payment_id,amount,currency,confirmed_at)
     VALUES(paid,hotel,invoice,'TEST','FLEX_CI_PAY_1',100.00,'KGS',now());
   INSERT INTO flex_confirmed_payments(id,hotel_id,invoice_id,provider,provider_payment_id,amount,currency,confirmed_at)
