@@ -1,0 +1,132 @@
+name: MARINA FLEX Integrated QA Restore and Scope
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/marina-flex-integration-ci.yml"
+      - "scripts/marina_flex_release_scope_guard.py"
+      - "scripts/marina_flex_restore_acceptance.sql"
+      - "docs/flex/FLEX_RELEASE_READINESS_AUDIT.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scope-and-domain:
+    name: FLEX frozen-PMS scope and complete pure-domain tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test safe file selection and pin against frozen main SHA
+        run: |
+          python scripts/marina_flex_release_scope_guard.py --self-test
+          python scripts/marina_flex_release_scope_guard.py
+      - name: Install isolated commercial API test libraries
+        run: python -m pip install --disable-pip-version-check -r services/api/requirements-flex-control.txt
+      - name: Recheck all standalone FLEX calculations
+        run: |
+          set -euo pipefail
+          for test_file in \
+            marina_flex_foundation_contract_test.py \
+            marina_flex_control_plane_auth_test.py \
+            marina_flex_pricing_contract_test.py \
+            marina_flex_billing_contract_test.py \
+            marina_flex_subscription_contract_test.py \
+            marina_flex_qr_provider_contract_test.py \
+            marina_flex_renewal_decision_test.py \
+            marina_flex_partner_earnings_contract_test.py
+          do
+            python "scripts/$test_file"
+          done
+      - name: Keep historical Release RC Truth untouched
+        run: |
+          test -f scripts/verify_marina_november_release_boundary.py
+          python scripts/verify_marina_november_release_boundary.py --self-test
+          echo "Historical November Release RC Truth stays a separate NO-GO for main."
+
+  clean-install-and-recovery:
+    name: FLEX ten-migration PostgreSQL bootstrap, backup and restore acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: flex_ci
+          POSTGRES_USER: flex_ci
+          POSTGRES_PASSWORD: flex_ci_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flex_ci -d flex_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: flex_ci
+      PGPASSWORD: flex_ci_ci_only
+      PGDATABASE: flex_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install matching PostgreSQL client tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-16
+      - name: Install all ten independent FLEX preview migrations in exact order
+        run: |
+          set -euo pipefail
+          test -f "docs/flex/sql/0010_flex_partner_earnings_preview.sql"
+          for file in 0001_flex_control_plane_preview.sql 0002_flex_platform_identity_rls_preview.sql 0003_flex_price_version_guard_preview.sql 0004_flex_hotel_onboarding_preview.sql 0005_flex_deployment_attestation_preview.sql 0006_flex_agreements_subscription_preview.sql 0007_flex_invoice_ledger_preview.sql 0008_flex_refund_reconciliation_preview.sql 0009_flex_signed_qa_settlement_preview.sql 0010_flex_partner_earnings_preview.sql; do
+            psql -X -v ON_ERROR_STOP=1 -d flex_ci -f "docs/flex/sql/$file"
+          done
+          sha256sum docs/flex/sql/*.sql
+      - name: Seed two synthetic hotels, no operational PMS records
+        run: psql -X -v ON_ERROR_STOP=1 -d flex_ci -f scripts/marina_flex_rls_isolation_contract.sql
+      - name: Verify source schema and data security before backup
+        run: psql -X -v ON_ERROR_STOP=1 -d flex_ci -f scripts/marina_flex_restore_acceptance.sql
+      - name: Make a complete local QA backup and independently restore to a second database
+        run: |
+          set -euo pipefail
+          pg_dump -d flex_ci --format=custom --file=/tmp/flex_qa_only.dump
+          createdb -T template0 flex_restored_ci
+          pg_restore --no-owner --exit-on-error --dbname=flex_restored_ci /tmp/flex_qa_only.dump
+          test -s /tmp/flex_qa_only.dump
+      - name: Compare schema, policies and data after restore
+        run: |
+          set -euo pipefail
+          pg_dump -d flex_ci --schema-only --no-owner --no-privileges > /tmp/flex_before.sql
+          pg_dump -d flex_restored_ci --schema-only --no-owner --no-privileges > /tmp/flex_after.sql
+          diff -u /tmp/flex_before.sql /tmp/flex_after.sql
+          psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_restore_acceptance.sql
+          for database in flex_ci flex_restored_ci; do
+            psql -X -Atqc "SELECT count(*) FROM flex_hotels" -d "$database" > "/tmp/$database.hotel_count"
+            psql -X -Atqc "SELECT string_agg(display_name||':'||id::text,',' ORDER BY id) FROM flex_hotels" -d "$database" > "/tmp/$database.hotel_rows"
+          done
+          diff -u /tmp/flex_ci.hotel_count /tmp/flex_restored_ci.hotel_count
+          diff -u /tmp/flex_ci.hotel_rows /tmp/flex_restored_ci.hotel_rows
+      - name: Replay financial and partner contract tests on RESTORED QA copy
+        run: |
+          set -euo pipefail
+          for sql in \
+            marina_flex_schema_contract_test.sql \
+            marina_flex_subscription_sql_contract.sql \
+            marina_flex_invoice_ledger_sql_contract.sql \
+            marina_flex_refund_reconciliation_sql_contract.sql; do
+            psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f "scripts/$sql"
+          done
+          psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_qa_settlement_fixture.sql
+          psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_partner_earnings_sql_contract.sql
+      - name: Prove no PMS data and no real receipts entered QA
+        run: |
+          set -euo pipefail
+          test "$(psql -X -Atqc "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('properties','guests','reservations','folio','staff_users')" -d flex_restored_ci)" = "0"
+          test "$(psql -X -Atqc "SELECT count(*) FROM flex_confirmed_payments WHERE provider <> 'FLEX_QA_SIMULATOR'" -d flex_restored_ci)" = "0"
