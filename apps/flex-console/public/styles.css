@@ -48,3 +48,10 @@ body.light .side{background:#e4f1f7}body.light .badge{color:#92670c}body.light s
 #hotel-registration label{display:inline-block;margin:0 0 10px;color:var(--muted);font-weight:600}
 #hotel-registration input{max-width:480px;width:100%}
 #registration-result:not(:empty){margin-top:15px}
+
+#link-challenge-form label,#link-confirm-form label{display:block;margin:12px 0 6px;font-weight:700;color:var(--muted)}
+#link-challenge-form input{display:block;width:100%;max-width:520px;margin:0 0 16px}
+#link-confirm-form textarea{display:block;width:100%;max-width:700px;min-height:98px;margin:0 0 18px;color:var(--text);background:rgba(8,50,83,.8);border:1px solid var(--border);border-radius:10px;padding:12px;font:13px/1.55 ui-monospace,monospace}
+body.light #link-confirm-form textarea{background:#fff}
+.signed-message{max-width:100%;overflow-wrap:anywhere;white-space:pre-wrap;background:rgba(0,216,255,.05);border:1px solid var(--border);border-radius:13px;padding:16px;color:var(--cyan);font-size:12px;line-height:1.55}
+#link-result:not(:empty){margin-top:15px;color:var(--red)}

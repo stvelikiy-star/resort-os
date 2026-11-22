@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-import {handler,testRouteAllowed,testValidateHotelRegistration} from '../server.mjs';
+import {handler,testRouteAllowed,testValidateHotelRegistration,testValidateLinkPayload} from '../server.mjs';
 
 test('GET allowlist is narrowly scoped to read-only FLEX routes',()=>{
  const empty=new URLSearchParams();
@@ -71,4 +71,22 @@ test('QA registration requires explicit environment approval and never mutates p
   const session=await fetch(base+'/api/session');
   assert.equal(session.status,401);
  }finally{await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));}
+});
+
+test('P0 trusted hotel linking payloads reject broad mutation or forged signer metadata',()=>{
+ assert.deepEqual(testValidateLinkPayload('challenge',{deployment_id:'qa-deploy-001',property_external_id:'qa-property-001'}),
+   {deployment_id:'qa-deploy-001',property_external_id:'qa-property-001'});
+ assert.deepEqual(testValidateLinkPayload('confirm',{signature_b64:'A'.repeat(88)}),{signature_b64:'A'.repeat(88)});
+ for(const data of [
+    {deployment_id:'x',property_external_id:'hotel-001'},
+    {deployment_id:'qa-deploy-001',property_external_id:''},
+    {deployment_id:'qa-deploy-001',property_external_id:'prop-001',activate:true},
+    {deployment_id:'qa-deploy-001',property_external_id:'prop-001',payment_status:'PAID'},
+ ]) assert.equal(testValidateLinkPayload('challenge',data),null);
+ for(const data of [
+    {signature_b64:'x'},
+    {signature_b64:'A'.repeat(88),new_public_key:'injected-key'},
+    {signature_b64:'A'.repeat(88),subscription_activated:true},
+    {signature_b64:'A'.repeat(88)+'!'},
+ ]) assert.equal(testValidateLinkPayload('confirm',data),null);
 });
