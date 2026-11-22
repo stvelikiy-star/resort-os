@@ -17,13 +17,20 @@ INSERT INTO flex_platform_memberships(subject_id,role,active)
  VALUES ('owner-a','HOTEL_OWNER',true),
  ('owner-b','HOTEL_OWNER',true),
  ('administrator','SUPER_ADMIN',true),
- ('disabled-owner','HOTEL_OWNER',false);
+ ('disabled-owner','HOTEL_OWNER',false),
+ ('sales-1','SALES_AGENT',true),
+ ('investor-1','INVESTOR',true);
 INSERT INTO flex_platform_hotel_grants(subject_id,hotel_id,granted_by)
  VALUES ('owner-a','00000000-0000-0000-0000-00000000000a','fixture'),
  ('owner-b','00000000-0000-0000-0000-00000000000b','fixture');
+INSERT INTO flex_agents(platform_subject_id,status) VALUES ('sales-1','ACTIVE');
+INSERT INTO flex_investors(platform_subject_id,status) VALUES ('investor-1','ACTIVE');
 INSERT INTO flex_invoices(hotel_id,invoice_number,currency,status,total)
  VALUES ('00000000-0000-0000-0000-00000000000a','FLEX_RLS_A','KGS','ISSUED',100.00),
  ('00000000-0000-0000-0000-00000000000b','FLEX_RLS_B','KGS','ISSUED',200.00);
+INSERT INTO flex_invoice_lines(invoice_id,sku,currency,description,quantity,unit_price,amount)
+ SELECT id,'BASE_PMS','KGS','Test invoice item',1,total,total
+ FROM flex_invoices WHERE invoice_number IN ('FLEX_RLS_A','FLEX_RLS_B');
 INSERT INTO flex_subscriptions(hotel_id,status,period_start,period_end)
  VALUES ('00000000-0000-0000-0000-00000000000a','ACTIVE','2026-11-01','2026-11-30'),
  ('00000000-0000-0000-0000-00000000000b','GRACE','2026-11-01','2026-11-30');
@@ -51,6 +58,7 @@ BEGIN;
 SET LOCAL ROLE flex_hotel_reader;
 SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_hotels) = 0 THEN 1 ELSE 0 END;
 SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_invoices) = 0 THEN 1 ELSE 0 END;
+SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_invoice_lines) = 0 THEN 1 ELSE 0 END;
 SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_subscriptions) = 0 THEN 1 ELSE 0 END;
 ROLLBACK;
 
@@ -60,6 +68,7 @@ SELECT set_config('flex.authorized_hotel_id','00000000-0000-0000-0000-0000000000
 SET LOCAL ROLE flex_hotel_reader;
 SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_hotels) = 1 THEN 1 ELSE 0 END;
 SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_invoices) = 1 THEN 1 ELSE 0 END;
+SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_invoice_lines) = 1 THEN 1 ELSE 0 END;
 SELECT 1 / CASE WHEN (SELECT sum(total) FROM flex_invoices) = 100.00 THEN 1 ELSE 0 END;
 SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_subscriptions) = 1 THEN 1 ELSE 0 END;
 ROLLBACK;
@@ -77,6 +86,7 @@ BEGIN;
 SET LOCAL ROLE flex_platform_admin_reader;
 SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_hotels) = 2 THEN 1 ELSE 0 END;
 SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_invoices) = 2 THEN 1 ELSE 0 END;
+SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_invoice_lines) = 2 THEN 1 ELSE 0 END;
 ROLLBACK;
 
 SELECT 1 / CASE WHEN (
