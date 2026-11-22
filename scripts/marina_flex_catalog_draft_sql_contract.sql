@@ -27,8 +27,12 @@ BEGIN
       OR has_table_privilege('flex_catalog_draft_writer','flex_subscription_configuration_drafts','UPDATE') THEN
     RAISE EXCEPTION 'CI_WRITER_CAN_MODIFY_HISTORY';
   END IF;
-  IF has_table_privilege('PUBLIC','flex_subscription_configuration_drafts','SELECT') OR
-     has_table_privilege('PUBLIC','flex_subscription_configuration_drafts','INSERT') THEN
+  IF EXISTS (
+    SELECT 1 FROM pg_class c,
+      LATERAL aclexplode(COALESCE(c.relacl,acldefault('r',c.relowner))) acl
+    WHERE c.oid='flex_subscription_configuration_drafts'::regclass
+      AND acl.grantee=0 AND acl.privilege_type IN ('SELECT','INSERT')
+  ) THEN
     RAISE EXCEPTION 'CI_DRAFTS_PUBLICLY_EXPOSED';
   END IF;
   IF NOT (SELECT relrowsecurity AND relforcerowsecurity
