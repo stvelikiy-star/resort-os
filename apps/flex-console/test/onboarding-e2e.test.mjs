@@ -100,7 +100,7 @@ test('authenticated QA: platform login, CSRF-gated PENDING registration, safe re
     const allSet=callback.headers.getSetCookie?.()||[callback.headers.get('set-cookie')||''];
     const sessionCookie=allSet.map(x=>x.split(';')[0]).find(x=>x.startsWith('flex_session='));
     assert.ok(sessionCookie,'encrypted HttpOnly session cookie');
-    assert.match(allSet.join(';'),'HttpOnly');
+    assert.match(allSet.join(';'),/HttpOnly/);
     const sessions=await fetch(origin+'/api/session',{headers:{Cookie:sessionCookie}});
     assert.equal(sessions.status,200);
     const session=await sessions.json();assert.ok(session.csrf);
