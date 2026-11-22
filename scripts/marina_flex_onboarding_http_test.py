@@ -5,6 +5,9 @@ The source PMS cannot be modified. Hotels remain PENDING without entitlements.
 """
 from __future__ import annotations
 
+import asyncio
+import base64
+import hashlib
 import json
 import os
 import sys
@@ -13,6 +16,7 @@ import unittest
 import uuid
 from pathlib import Path
 
+import asyncpg
 import jwt
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
@@ -40,6 +44,28 @@ class CommercialHotelRegistration(unittest.TestCase):
             "FLEX_AUTH_ISSUER": "marina-flex-hotel-ci",
             "FLEX_AUTH_AUDIENCE": "marina-flex-commercial",
         })
+        # CI-only pre-enrolment of one trusted PMS deployment, no live API.
+        cls.deployment_private = Ed25519PrivateKey.generate()
+        deployment_public = cls.deployment_private.public_key().public_bytes(
+            Encoding.PEM, PublicFormat.SubjectPublicKeyInfo
+        ).decode()
+        cls.deployment_id = "marina-ci-deployment-01"
+        async def enroll_ci_deployment():
+            dsn = os.getenv("FLEX_TEST_DB_OWNER_URL")
+            if not dsn:
+                raise RuntimeError("Ephemeral CI DB owner URL is required for fixture")
+            conn = await asyncpg.connect(dsn)
+            try:
+                await conn.execute(
+                    "INSERT INTO flex_trusted_deployments("
+                    "deployment_id,public_key_pem,key_fingerprint_sha256,enrolled_by"
+                    ") VALUES($1,$2,$3,'CI_FIXTURE')",
+                    cls.deployment_id, deployment_public,
+                    hashlib.sha256(deployment_public.encode()).hexdigest(),
+                )
+            finally:
+                await conn.close()
+        asyncio.run(enroll_ci_deployment())
         cls.writer_ctx = TestClient(write_app)
         cls.writer = cls.writer_ctx.__enter__()
         cls.reader_ctx = TestClient(read_app)
