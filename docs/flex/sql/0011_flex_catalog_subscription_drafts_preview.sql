@@ -44,7 +44,7 @@ CREATE POLICY flex_admin_read_configuration_drafts
 -- advisory transaction lock: isolated catalog writer gets NO UPDATE permission
 -- on existing SKU definitions, and version monotonicity remains protected.
 CREATE OR REPLACE FUNCTION flex_price_version_period_guard()
-RETURNS trigger LANGUAGE plpgsql AS $
+RETURNS trigger LANGUAGE plpgsql AS $flex_guard$
 BEGIN
   PERFORM pg_advisory_xact_lock(
     hashtextextended('FLEX_PRICE_'||NEW.sku,0)
@@ -59,7 +59,7 @@ BEGIN
       USING ERRCODE='23514';
   END IF;
   RETURN NEW;
-END $;
+END $flex_guard$;
 
 -- The only writer role; the dedicated API runtime must have NOINHERIT membership.
 -- It has *no* rights on flex_subscriptions, *_items, hotel links, invoice,
