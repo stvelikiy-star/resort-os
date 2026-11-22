@@ -1,5 +1,7 @@
 # MARINA FLEX — INVESTOR PORTAL (архитектура и интерфейсы)
 
+> **Сверка с Codex (22.11.2026):** роли платформы в реализации: SUPER_ADMIN, BILLING, HOTEL_OWNER, SALES_AGENT, INVESTOR; INVESTOR_MANAGER отложена; выплаты отложены. См. `FLEX_RECONCILIATION_CODEX.md`.
+
 Только проект. Production, действующие финансовые операции, БД, авторизация и тарифы не менялись. Дополняет FLEX 1 и FLEX 2.0; формулы и учёт — в `FLEX_INVESTOR_FINANCE.md`.
 
 ## 1. Существующая реализация

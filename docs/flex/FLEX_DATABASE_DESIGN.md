@@ -1,5 +1,7 @@
 # MARINA SMART FLEX — проект PostgreSQL-схемы
 
+> **Сверка с Codex (22.11.2026):** FLEX живёт в отдельной control-plane БД. См. `FLEX_RECONCILIATION_CODEX.md`.
+
 Только проект. Миграции не созданы. Существующие таблицы (`tenants`, `properties`, `property_product_settings`, `staff_users`, `audit_logs`) **не изменяются**; все новые таблицы — отдельные, с префиксом `flex_`. Стиль — как в репозитории: `uuid`, `timestamptz`, camelCase-колонки в кавычках, CHECK вместо enum.
 
 ## Таблицы
