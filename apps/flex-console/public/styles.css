@@ -43,3 +43,8 @@ body.light .side{background:#e4f1f7}body.light .badge{color:#92670c}body.light s
 @media (prefers-reduced-motion:reduce){.skeleton{animation:none}}
 
 .spacing-top{margin-top:18px}
+
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 18px}
+#hotel-registration label{display:inline-block;margin:0 0 10px;color:var(--muted);font-weight:600}
+#hotel-registration input{max-width:480px;width:100%}
+#registration-result:not(:empty){margin-top:15px}
