@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-import {handler,testRouteAllowed} from '../server.mjs';
+import {handler,testRouteAllowed,testValidateHotelRegistration} from '../server.mjs';
 
 test('GET allowlist is narrowly scoped to read-only FLEX routes',()=>{
  const empty=new URLSearchParams();
@@ -40,5 +40,35 @@ test('not configured: no false session, protected data never leaked', async()=>{
   assert.doesNotMatch(home.headers.get('content-security-policy'),/unsafe-inline/);
   assert.equal(home.headers.get('cache-control'),'no-store, private');
   assert.equal((await fetch(base+'/prototype.html')).status,404);
+ }finally{await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));}
+});
+
+test('PENDING hotel request rejects malformed or financial payloads',()=>{
+ assert.deepEqual(testValidateHotelRegistration({display_name:' QA HOTEL 01 ',currency:'KGS'}),{display_name:'QA HOTEL 01',currency:'KGS'});
+ for(const p of [
+   {display_name:'X',currency:'KGS'},
+   {display_name:'QA HOTEL',currency:'USD'},
+   {display_name:'QA HOTEL',currency:'KGS',subscription_status:'ACTIVE'},
+   {display_name:'QA HOTEL',currency:'KGS',payment:1000},
+   {display_name:'QA\\nHOTEL',currency:'KGS'},
+   {display_name:'  ',currency:'KGS'},
+   null,
+ ])assert.equal(testValidateHotelRegistration(p),null,JSON.stringify(p));
+});
+test('QA registration requires explicit environment approval and never mutates production by default',async()=>{
+ const server=createServer(handler);
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ try{
+  const base='http://127.0.0.1:'+server.address().port;
+  const status=await (await fetch(base+'/api/status')).json();
+  assert.equal(status.qa_onboarding_enabled,false);
+  const blocked=await fetch(base+'/api/actions/hotels',{
+    method:'POST',headers:{'Content-Type':'application/json','Origin':base,'Idempotency-Key':'unique-request-123'},
+    body:JSON.stringify({display_name:'QA HOTEL',currency:'KGS'})
+  });
+  assert.equal(blocked.status,503);
+  assert.equal((await blocked.json()).error,'QA_ONBOARDING_NOT_ENABLED');
+  const session=await fetch(base+'/api/session');
+  assert.equal(session.status,401);
  }finally{await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));}
 });
