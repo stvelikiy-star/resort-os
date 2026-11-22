@@ -40,6 +40,8 @@ class QuoteLine:
     sku: str
     price_version: int
     quantity: int
+    discount_bps: int
+    enabled_from: date
     unit_monthly_price: Decimal
     active_days: int
     period_days: int
@@ -64,7 +66,7 @@ class CommercialQuote:
 
 
 def _verified_month(first: date) -> date:
-    if not isinstance(first, date) or first.day != 1:
+    if type(first) is not date or first.day != 1:
         raise ValueError("Billing month must begin on the 1st")
     return date(first.year, first.month, monthrange(first.year, first.month)[1])
 
@@ -120,7 +122,7 @@ def quote_month(
             raise ValueError("Unknown pricing source")
         unit = _safe_money(item.monthly_price)
         first_active = item.enabled_from or period_start
-        if not isinstance(first_active, date):
+        if type(first_active) is not date:
             raise ValueError("Invalid activation date")
         days = max(0, (period_end - max(first_active, period_start)).days + 1)
         days = min(days, period_days)
@@ -130,7 +132,8 @@ def quote_month(
         full_discount = _safe_money(full * Decimal(item.discount_bps) / Decimal(10000))
         lines.append(QuoteLine(
             sku=item.sku, price_version=item.price_version,
-            quantity=item.quantity, unit_monthly_price=unit,
+            quantity=item.quantity, discount_bps=item.discount_bps,
+            enabled_from=first_active, unit_monthly_price=unit,
             active_days=days, period_days=period_days,
             gross=gross, discount=discount, subtotal=gross-discount,
             renewal_monthly=full-full_discount,
@@ -146,6 +149,8 @@ def quote_month(
             {
                 "sku": line.sku, "version": line.price_version,
                 "quantity": line.quantity, "unit_price": str(line.unit_monthly_price),
+                "discount_bps": line.discount_bps,
+                "enabled_from": line.enabled_from.isoformat(),
                 "active_days": line.active_days, "period_days": line.period_days,
                 "discount": str(line.discount), "subtotal": str(line.subtotal),
                 "source": line.pricing_source,
