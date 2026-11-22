@@ -94,11 +94,12 @@ jobs:
           psql --version
       - name: Refuse installation outside empty disposable PostgreSQL 16 database
         run: psql -X -v ON_ERROR_STOP=1 -d flex_ci -f scripts/marina_flex_qa_db_preflight.sql
-      - name: Install all ten independent FLEX preview migrations in exact order
+      - name: Install all eleven independent FLEX preview migrations in exact order
         run: |
           set -euo pipefail
           test -f "docs/flex/sql/0010_flex_partner_earnings_preview.sql"
-          for file in 0001_flex_control_plane_preview.sql 0002_flex_platform_identity_rls_preview.sql 0003_flex_price_version_guard_preview.sql 0004_flex_hotel_onboarding_preview.sql 0005_flex_deployment_attestation_preview.sql 0006_flex_agreements_subscription_preview.sql 0007_flex_invoice_ledger_preview.sql 0008_flex_refund_reconciliation_preview.sql 0009_flex_signed_qa_settlement_preview.sql 0010_flex_partner_earnings_preview.sql; do
+          test -f "docs/flex/sql/0011_flex_catalog_subscription_drafts_preview.sql"
+          for file in 0001_flex_control_plane_preview.sql 0002_flex_platform_identity_rls_preview.sql 0003_flex_price_version_guard_preview.sql 0004_flex_hotel_onboarding_preview.sql 0005_flex_deployment_attestation_preview.sql 0006_flex_agreements_subscription_preview.sql 0007_flex_invoice_ledger_preview.sql 0008_flex_refund_reconciliation_preview.sql 0009_flex_signed_qa_settlement_preview.sql 0010_flex_partner_earnings_preview.sql 0011_flex_catalog_subscription_drafts_preview.sql; do
             psql -X -v ON_ERROR_STOP=1 -d flex_ci -f "docs/flex/sql/$file"
           done
           sha256sum docs/flex/sql/*.sql
@@ -156,6 +157,7 @@ jobs:
           done
           psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_qa_settlement_fixture.sql
           psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_partner_earnings_sql_contract.sql
+          psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_catalog_draft_sql_contract.sql
       - name: Prove no PMS data and no real receipts entered QA
         run: |
           set -euo pipefail
