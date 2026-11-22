@@ -22,7 +22,7 @@
 |---|---|---|
 | 0 | PR #588: точный HEAD SHA, все required GitHub CI PASS; failed/queued/skipped mandatory checks недопустимы | GitHub checks на одном SHA |
 | 1 | Чистый PG16: 0001–0011, RLS + writer, негативные cases; восстановление backup в **независимую** PostgreSQL | SQL logs, restore report |
-| 2 | Отдельный FLEX QA project и DB: НЕ использовать существующую PMS/чужую DB; TLS, закрытые backend origins, журналы, непубличный Postgres, секреты вне repo | QA resource inventory |
+| 2 | Отдельный Vercel FLEX QA и совместимая изолированная Postgres через Vercel-интеграцию; Cloudflare DNS/TLS/Access, закрытые backend origins, секреты вне repo | QA resource inventory + URLs |
 | 3 | Отдельный OIDC issuer EdDSA/JWKS, exact iss/aud/redirect, PKCE, MFA, короткоживущие токены, серверные memberships+grants, subject binding | Журнал сценариев ролей |
 | 4 | SUPER_ADMIN: только в QA создать гостиницу PENDING; повтор запроса -> тот же ID; изменённый повтор -> 409; поддельный role/MFA -> 403 | Подписанный HTTP E2E |
 | 5 | Hotel A/B: запрос владельца A к B -> 403/404 и никаких B данных, включая drafts, invoices; ошибочный PMS signer/replay/expired -> reject | HTTP/SQL traces |
@@ -63,13 +63,47 @@
 5. Новый исправленный SHA получает повторную полную приёмку.
 6. Не объединять цепочку Draft PR в `main` до отдельного утверждения.
 
-## Открытые внешние блокеры
+## Утверждённый стек: GitHub → Vercel → Cloudflare (решение владельца 2026-11-23)
 
-На 2026-11-23 отдельная облачная FLEX QA не создана.
-Railway ответил: «Your trial has expired. Please select a plan to continue
-using Railway». В доступном Supabase нет проекта FLEX, отдельного Vercel
-проекта FLEX также не обнаружено. Платные ресурсы без согласованного тарифа
-не создаются.
+**GitHub:** исходный код MARINA SMART FLEX, отдельные Draft PR,
+автоматизированные проверки, история решений. `main` и PMS Production
+не меняются до приёмки.
 
-**Следующая фактическая работа:** добиться зелёного CI PostgreSQL на PR #588;
-после этого подготовить независимую QA-площадку с известной стоимостью.
+**Vercel:** выделенный проект MARINA FLEX QA для веб-консоли и совместимых
+серверных функций. Существующую MARINA SMART и её проекты не использовать
+как тестовую площадку FLEX. Текущие Node HTTP server и Python FastAPI
+**не считать автоматически совместимыми** с Vercel Functions:
+нужно подготовить deployment adapter/entrypoint и проверить serverless
+лимиты, соединения, cookie/OIDC и окружение на Preview.
+
+**Cloudflare:** DNS, HTTPS/TLS, защищённый доступ к QA (Access/WAF по
+потребности) и изолированный off-site backup в R2 после подтверждения
+реального восстановления. Не менять существующие доменные маршруты PMS.
+Домен/поддомен FLEX QA ещё не выбран и не подключён.
+
+**PostgreSQL 16:** текущий контракт 0001–0011 использует Postgres роли,
+триггеры и RLS. Подключать только **отдельную Postgres-совместимую БД**
+через Vercel Marketplace storage integration после проверки версии,
+ролевых прав, сетевой защиты, сроков жизни соединений и стоимости.
+Сам Vercel не заменяет PostgreSQL; Cloudflare D1 использует SQLite и
+не является совместимой заменой текущей схемы. Никакие чужие БД не
+переиспользовать. Для любой интеграции миграции следует проверить в
+изолированной `private` схеме и без открытого Data API.
+
+**Railway исключён полностью.** Не предлагать его как резервный
+хостинг и не создавать там ресурсы.
+
+## Открытые блокеры
+
+- Пока нет выделенного проекта Vercel FLEX QA и проверенного Preview URL.
+- Не выбрана отдельная Postgres-интеграция через Vercel и не утверждена
+  её стоимость (возможно $0, но не предполагать).
+- Не настроены Cloudflare DNS/Access/R2 для FLEX QA.
+- Не выпущены отдельные OIDC/MFA credentials и DB runtime роли.
+- Нет подтверждённого внешнего зашифрованного backup и restore постоянной FLEX базы.
+- Платежи, касса, наличные, payout и связанные API остаются замороженными.
+
+**Следующее действие:** получить полный PASS CI на едином SHA PR #588;
+затем спроектировать и проверить Vercel Preview + Cloudflare QA
+маршрутизацию, отдельную Postgres интеграцию и восстановление, не
+меняя MARINA SMART Production.
