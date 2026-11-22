@@ -323,10 +323,22 @@ async function hotelDetail(){
  const invoices=inv.status==='fulfilled'?inv.value:null;
  if(sub.status==='rejected'&&sub.reason.status===403)throw sub.reason;
  if(inv.status==='rejected'&&inv.reason.status===403)throw inv.reason;
+ let draftHistory='';
+ if(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled){
+  try {
+   const drafts=await api('/v1/platform/subscription-drafts?hotel_id='+id);
+   draftHistory='<section class="panel"><h2>'+safe(t('draftList'))+'</h2>'+
+   (drafts.length?table([t('skuVersion'),t('draftTitle'),t('period'),t('status'),t('monthlyEstimate')],
+   drafts.map(d=>'<tr><td>v'+safe(d.version)+'</td><td>'+safe(d.title)+'</td>'+
+   '<td>'+safe(d.period_start)+' — '+safe(d.period_end)+'</td><td><span class="chip">'+safe(d.state)+' · OFF</span></td>'+
+   '<td>'+money(d.proposed_monthly_total,d.currency)+'</td></tr>')):empty(t('noDrafts')))+
+   '</section>'+info(t('draftOnly'),'info');
+  } catch(e){ draftHistory=info(t('error')+': '+e.message,'error'); }
+ }
  return heading(t('selected'),id)+toolbar()+ (state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?'<button type="button" class="outline" data-view="subscription-draft">'+safe(t('configure'))+'</button>':'')+ (state.me?.role==='SUPER_ADMIN'?'<button type="button" class="outline" data-link="'+safe(id)+'">'+safe(t('linkHotel'))+'</button>':'')+'<button type="button" class="subtle" data-view="'+(state.me?.role==='SUPER_ADMIN'?'hotels':'subscription')+'">← '+safe(t('openBack'))+'</button>'+
  '<div class="grid three spacing-top">'+metric(t('planStatus'),subscription?.status??'—')+metric(t('enforcement'),subscription?.enforcement??'—')+metric(t('expires'),date(subscription?.period_end))+'</div>'+
  '<section class="panel"><h2>'+safe(t('subscription'))+'</h2>'+(subscription?'<div class="grid three">'+kv(t('periodStart'),date(subscription.period_start))+kv(t('periodEnd'),date(subscription.period_end))+kv(t('grace'),date(subscription.grace_until))+'</div>':empty(t('noSubscription')))+'</section>'+
- '<section class="panel"><h2>'+safe(t('invoices'))+'</h2>'+(invoices?.length?table([t('invoice'),t('status'),t('total'),t('due')],invoices.map(i=>'<tr><td>'+safe(i.number||i.id)+'</td><td><span class="chip">'+safe(i.status)+'</span></td><td>'+money(i.total,i.currency)+'</td><td>'+safe(date(i.due_at))+'</td></tr>')):empty(t('noInvoices')))+'</section>'+info(t('warning'),'info');
+ '<section class="panel"><h2>'+safe(t('invoices'))+'</h2>'+(invoices?.length?table([t('invoice'),t('status'),t('total'),t('due')],invoices.map(i=>'<tr><td>'+safe(i.number||i.id)+'</td><td><span class="chip">'+safe(i.status)+'</span></td><td>'+money(i.total,i.currency)+'</td><td>'+safe(date(i.due_at))+'</td></tr>')):empty(t('noInvoices')))+'</section>'+draftHistory+info(t('warning'),'info');
 }
 async function catalog(){
  if(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled){
