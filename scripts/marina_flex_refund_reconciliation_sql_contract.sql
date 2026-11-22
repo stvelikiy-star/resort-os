@@ -2,9 +2,9 @@
 -- CI simulator runs as ephemeral PostgreSQL owner; no bank funds are moved.
 BEGIN;
 SET CONSTRAINTS flex_allocation_capacity IMMEDIATE;
-SET CONSTRAINTS flex_refund_cash_capacity IMMEDIATE;
-SET CONSTRAINTS flex_refund_allocated_capacity IMMEDIATE;
-SET CONSTRAINTS flex_post_refund_allocation_capacity IMMEDIATE;
+SET CONSTRAINTS flex_refund_cash_capacity DEFERRED;
+SET CONSTRAINTS flex_refund_allocated_capacity DEFERRED;
+SET CONSTRAINTS flex_post_refund_allocation_capacity DEFERRED;
 DO $test$
 DECLARE
   ia uuid;
@@ -42,11 +42,14 @@ BEGIN
   INSERT INTO flex_payment_reversals(payment_id,external_reversal_key,amount,reason)
     VALUES(p1,'CI-REFUND-A-001',10.00,'unused credit')
     RETURNING id INTO refund1;
+  SET CONSTRAINTS flex_refund_cash_capacity, flex_refund_allocated_capacity, flex_post_refund_allocation_capacity IMMEDIATE;
   IF (SELECT unapplied_cash_credit FROM flex_refund_adjusted_invoice_balances
       WHERE invoice_id=ia)<>10.00 THEN
     RAISE EXCEPTION 'CI_FAILED_TO_REDUCE_CREDIT';
   END IF;
 
+  -- The second refund and matching SKU reversal must be atomically checked.
+  SET CONSTRAINTS flex_refund_cash_capacity, flex_refund_allocated_capacity, flex_post_refund_allocation_capacity DEFERRED;
   -- Next 50.00 refund consumes remaining 10.00 credit and 40.00 allocation.
   -- Both rows commit atomically, ensuring subscription revenue is reversed.
   INSERT INTO flex_payment_reversals(payment_id,external_reversal_key,amount,reason)
@@ -54,6 +57,7 @@ BEGIN
     RETURNING id INTO refund2;
   INSERT INTO flex_allocation_reversals(reversal_id,allocation_id,amount)
     VALUES(refund2,a1,40.00);
+  SET CONSTRAINTS flex_refund_cash_capacity, flex_refund_allocated_capacity, flex_post_refund_allocation_capacity IMMEDIATE;
   IF (SELECT net_confirmed_cash FROM flex_refund_adjusted_invoice_balances
       WHERE invoice_id=ia)<>60.00 THEN
     RAISE EXCEPTION 'CI_WRONG_NET_CASH';
