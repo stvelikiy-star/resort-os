@@ -48,6 +48,7 @@ ALTER TABLE flex_non_issuable_invoice_previews FORCE ROW LEVEL SECURITY;
 
 CREATE TABLE flex_subscription_lifecycle_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  hotel_id uuid NOT NULL REFERENCES flex_hotels(id),
   subscription_id uuid NOT NULL REFERENCES flex_subscriptions(id),
   prior_state text NOT NULL,
   next_state text NOT NULL,
@@ -60,6 +61,10 @@ CREATE TABLE flex_subscription_lifecycle_events (
   event_digest char(64) NOT NULL UNIQUE
     CHECK (event_digest ~ '^[a-f0-9]{64}$'),
   created_at timestamptz NOT NULL DEFAULT now(),
+  FOREIGN KEY (subscription_id,hotel_id) REFERENCES flex_subscriptions(id,hotel_id),
+  FOREIGN KEY (source_invoice_id,hotel_id) REFERENCES flex_invoices(id,hotel_id),
+  FOREIGN KEY (source_confirmed_payment_id,source_invoice_id)
+    REFERENCES flex_confirmed_payments(id,invoice_id),
   CHECK (prior_state<>next_state),
   CHECK (transition_code<>'REACTIVATE_PAID' OR source_confirmed_payment_id IS NOT NULL)
 );
