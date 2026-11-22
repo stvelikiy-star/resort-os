@@ -55,8 +55,10 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          cores: 2
-          ram-size: 3072M
+          # Reserve more resources for system launcher under GitHub CI.
+          # Login is still validated against the same pinned QA APK.
+          cores: 4
+          ram-size: 4096M
           disk-size: 6000M
           disable-animations: true
           emulator-boot-timeout: 900
