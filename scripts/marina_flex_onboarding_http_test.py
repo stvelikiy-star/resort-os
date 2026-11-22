@@ -175,6 +175,91 @@ class CommercialHotelRegistration(unittest.TestCase):
             ).status_code, 404
         )
 
+    def test_06_signed_deployment_proof_and_single_use(self):
+        headers = {"Authorization": self.auth("administrator", mfa=True)}
+        url = f"/v1/onboarding/hotels/{self.created_hotel}/challenge"
+        payload = {
+            "deployment_id": self.deployment_id,
+            "property_external_id": "ci-hotel-property-a",
+        }
+        self.assertEqual(self.writer.post(
+            url, headers=headers,
+            json={**payload, "deployment_id": "nonexistent-issuer"},
+        ).status_code, 404)
+        self.assertEqual(self.writer.post(
+            url, headers={"Authorization": self.auth("owner-a")}, json=payload
+        ).status_code, 403)
+        response = self.writer.post(url, headers=headers, json=payload)
+        self.assertEqual(response.status_code, 201, response.text)
+        challenge = response.json()
+        self.assertIn("MARINA-FLEX-PMS-LINK-V1", challenge["signed_message"])
+        confirm = "/v1/onboarding/challenges/" + challenge["challenge_id"] + "/confirm"
+        forged = base64.urlsafe_b64encode(
+            Ed25519PrivateKey.generate().sign(challenge["signed_message"].encode())
+        ).decode()
+        self.assertEqual(self.writer.post(
+            confirm, headers=headers, json={"signature_b64": forged}
+        ).status_code, 403)
+        signature = base64.urlsafe_b64encode(
+            self.deployment_private.sign(challenge["signed_message"].encode())
+        ).decode()
+        good = self.writer.post(
+            confirm, headers=headers, json={"signature_b64": signature},
+        )
+        self.assertEqual(good.status_code, 200, good.text)
+        self.assertEqual(good.json()["link_status"], "VERIFIED")
+        self.assertFalse(good.json()["subscription_activated"])
+        self.assertEqual(self.writer.post(
+            confirm, headers=headers, json={"signature_b64": signature}
+        ).status_code, 409)
+
+        async def verify_database():
+            conn = await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                links = await conn.fetchval(
+                    "SELECT count(*) FROM flex_hotel_links "
+                    "WHERE deployment_id=$1 AND property_external_id=$2",
+                    self.deployment_id, payload["property_external_id"],
+                )
+                subscriptions = await conn.fetchval(
+                    "SELECT count(*) FROM flex_subscriptions WHERE hotel_id=$1",
+                    uuid.UUID(self.created_hotel),
+                )
+                audits = await conn.fetchval(
+                    "SELECT count(*) FROM flex_audit_events "
+                    "WHERE action='HOTEL_PMS_LINK_VERIFIED' AND resource_id=$1",
+                    self.created_hotel,
+                )
+                self.assertEqual(links, 1)
+                self.assertEqual(subscriptions, 0)
+                self.assertEqual(audits, 1)
+            finally:
+                await conn.close()
+        asyncio.run(verify_database())
+
+    def test_07_other_hotel_cannot_claim_same_pms_property(self):
+        created = self.post(key="flex-create-different-hotel-0002", name="Another Hotel")
+        self.assertEqual(created.status_code, 201, created.text)
+        admin_headers = {"Authorization": self.auth("administrator", mfa=True)}
+        challenge_response = self.writer.post(
+            f"/v1/onboarding/hotels/{created.json()['hotel_id']}/challenge",
+            headers=admin_headers,
+            json={
+                "deployment_id": self.deployment_id,
+                "property_external_id": "ci-hotel-property-a",
+            },
+        )
+        self.assertEqual(challenge_response.status_code, 201, challenge_response.text)
+        challenge = challenge_response.json()
+        signature = base64.urlsafe_b64encode(
+            self.deployment_private.sign(challenge["signed_message"].encode())
+        ).decode()
+        refused = self.writer.post(
+            "/v1/onboarding/challenges/" + challenge["challenge_id"] + "/confirm",
+            headers=admin_headers, json={"signature_b64": signature},
+        )
+        self.assertEqual(refused.status_code, 409, refused.text)
+
     def test_05_onboarding_cannot_mutate_or_activate_hotel(self):
         for method,path in (
             ("patch", f"/v1/onboarding/hotels/{self.created_hotel}"),
