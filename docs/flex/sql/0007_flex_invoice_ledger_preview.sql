@@ -141,7 +141,8 @@ BEGIN
             WHERE invoice_id=OLD.id) THEN
     RAISE EXCEPTION 'FLEX_ISSUED_INVOICE_IMMUTABLE';
   END IF;
-  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
 END $$;
 CREATE TRIGGER flex_issued_invoice_header_no_rewrite
 BEFORE UPDATE OR DELETE ON flex_invoices
@@ -158,6 +159,19 @@ END $$;
 CREATE TRIGGER flex_issued_invoice_lines_no_rewrite
 BEFORE UPDATE OR DELETE ON flex_invoice_lines
 FOR EACH ROW EXECUTE FUNCTION flex_reject_issued_invoice_line_rewrite();
+
+-- No new SKU can be appended to a finalized invoice in a later transaction.
+CREATE FUNCTION flex_reject_issued_invoice_line_append() RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+  IF EXISTS(SELECT 1 FROM flex_issued_invoice_records
+            WHERE invoice_id=NEW.invoice_id) THEN
+    RAISE EXCEPTION 'FLEX_ISSUED_INVOICE_IMMUTABLE';
+  END IF;
+  RETURN NEW;
+END $;
+CREATE TRIGGER flex_issued_invoice_lines_no_late_insert
+BEFORE INSERT ON flex_invoice_lines
+FOR EACH ROW EXECUTE FUNCTION flex_reject_issued_invoice_line_append();
 
 CREATE INDEX flex_issued_invoice_hotel_period
  ON flex_issued_invoice_records(hotel_id,period_start,period_end);
