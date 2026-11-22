@@ -335,7 +335,9 @@ async function catalogAdminPost(req,res,url) {
 }
 
 function routeAllowed(path, search) {
-  if(search && [...search.keys()].some(k=>k!=='period')) return null;
+  if(search && [...search.keys()].some(k=>!['period','hotel_id'].includes(k)))return null;
+  if(search.has('hotel_id')&&path!=='/v1/platform/subscription-drafts')return null;
+  if(search.has('period')&&!['/v1/partner/me/earnings','/v1/platform/partner-earnings-summary'].includes(path))return null;
   if(['/v1/me','/v1/hotels','/v1/catalog'].includes(path) && !search.size) return 'core';
   if((path==='/v1/platform/catalog'||catalogVersionsRead.test(path))&&!search.size)return 'catalog_admin';
   if(path==='/v1/platform/subscription-drafts'&&
