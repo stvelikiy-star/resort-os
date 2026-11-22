@@ -14,12 +14,19 @@ const apiAudience = process.env.FLEX_API_AUDIENCE || '';
 const apiOrigin = (process.env.FLEX_API_ORIGIN || '').replace(/\/$/, '');
 const partnerApiOrigin = (process.env.FLEX_PARTNER_API_ORIGIN || apiOrigin).replace(/\/$/, '');
 const rawSecret = process.env.FLEX_SESSION_KEY || '';
+const qaEnvironment = process.env.FLEX_ENVIRONMENT === 'qa';
+const onboardingApiOrigin = (process.env.FLEX_ONBOARDING_API_ORIGIN || '').replace(/\/$/, '');
+const qaOnboarding = qaEnvironment && process.env.FLEX_ENABLE_QA_ONBOARDING === 'true' && Boolean(onboardingApiOrigin);
+
 const secret = rawSecret ? Buffer.from(rawSecret, 'base64') : null;
 const configured = Boolean(publicOrigin && issuer && clientId && apiAudience && apiOrigin && partnerApiOrigin && secret?.length === 32);
 const localOrigin = publicOrigin === 'http://127.0.0.1:' + port || publicOrigin === 'http://localhost:' + port;
 if (configured && (!publicOrigin.startsWith('https://') && !localOrigin)) throw new Error('FLEX_PUBLIC_ORIGIN must use HTTPS outside localhost');
 if (configured && (![issuer, apiOrigin, partnerApiOrigin].every(v => v.startsWith('https://') || (localOrigin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(v))))) {
   throw new Error('OIDC and FLEX backend endpoints require HTTPS outside localhost');
+}
+if (qaOnboarding && !(onboardingApiOrigin.startsWith('https://') || (localOrigin && /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(onboardingApiOrigin)))) {
+  throw new Error('FLEX QA onboarding origin must use HTTPS');
 }
 const secureCookie = publicOrigin.startsWith('https://');
 const cookies = { login: 'flex_login', session: 'flex_session' };
@@ -101,10 +108,55 @@ async function authCallback(req,res,url) {
   const claims=await verifyJwt(data.access_token,doc,apiAudience);
   const expiresMs=Math.min(Number(data.expires_in||900)*1000,(claims.exp*1000)-Date.now(),900000);
   if(expiresMs<10000) return json(res,401,{error:'OIDC_TOKEN_EXPIRED'});
-  const session=seal({ token:data.access_token, exp:Date.now()+expiresMs });
+  const session=seal({ token:data.access_token, csrf:b64u(randomBytes(32)), exp:Date.now()+expiresMs });
   redirect(res,'/',{ 'Set-Cookie':[cookie(cookies.login,'',0,'/api/auth'),cookie(cookies.session,session,Math.floor(expiresMs/1000))] });
 }
 const hotelPattern=/^\/v1\/hotels\/[0-9a-fA-F-]{36}\/(subscription|invoices)$/;
+function validateHotelRegistration(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  if(Object.keys(body).some(k=>!['display_name','currency'].includes(k)))return null;
+  const displayName=typeof body.display_name==='string'?body.display_name.trim():'';
+  if(displayName.length<2 || displayName.length>180 || /[\u0000-\u001F\u007F]/.test(displayName) || body.currency!=='KGS')return null;
+  return {display_name:displayName,currency:'KGS'};
+}
+function isSameOrigin(req) {
+  const origin=req.headers.origin;
+  const site=req.headers['sec-fetch-site'];
+  return Boolean(origin && origin===publicOrigin && (!site || site==='same-origin'));
+}
+async function registration(req,res) {
+  if(!configured || !qaOnboarding)return json(res,503,{error:'QA_ONBOARDING_NOT_ENABLED'});
+  if(!isSameOrigin(req))return json(res,403,{error:'ORIGIN_NOT_ALLOWED'});
+  if(!String(req.headers['content-type']||'').startsWith('application/json'))return json(res,415,{error:'JSON_REQUIRED'});
+  const session=unseal(cookiesFrom(req)[cookies.session]);
+  if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
+  if(!session.csrf || !fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
+  const idem=req.headers['idempotency-key'];
+  if(typeof idem!=='string'||idem.length<12||idem.length>128||!/^[A-Za-z0-9._:-]+$/.test(idem))return json(res,422,{error:'IDEMPOTENCY_KEY_REQUIRED'});
+  let raw='';
+  for await(const part of req){
+    raw+=part.toString();
+    if(Buffer.byteLength(raw,'utf8')>2048)return json(res,413,{error:'BODY_TOO_LARGE'});
+  }
+  let parsed;
+  try{parsed=JSON.parse(raw)}catch{return json(res,400,{error:'INVALID_JSON'});}
+  const payload=validateHotelRegistration(parsed);
+  if(!payload)return json(res,422,{error:'HOTEL_NAME_OR_CURRENCY_INVALID'});
+  const upstream=await fetch(onboardingApiOrigin+'/v1/onboarding/hotels',{
+    method:'POST',
+    headers:{Authorization:'Bearer '+session.token,'Idempotency-Key':idem,'Content-Type':'application/json','Accept':'application/json'},
+    body:JSON.stringify(payload),redirect:'manual',signal:AbortSignal.timeout(10000)
+  });
+  if(upstream.status>=300&&upstream.status<400)return json(res,502,{error:'UNEXPECTED_UPSTREAM_REDIRECT'});
+  if(!(upstream.headers.get('content-type')||'').includes('application/json'))return json(res,502,{error:'UPSTREAM_NON_JSON'});
+  const rawResponse=await upstream.text();
+  if(rawResponse.length>10000)return json(res,502,{error:'UPSTREAM_TOO_LARGE'});
+  if(!upstream.ok)return json(res,upstream.status,{error:'QA_HOTEL_REGISTRATION_FAILED',detail:upstream.status===409?'IDEMPOTENCY_CONFLICT':upstream.status===403?'ROLE_OR_MFA_REQUIRED':'BACKEND_REJECTED'});
+  let result;
+  try{result=JSON.parse(rawResponse)}catch{return json(res,502,{error:'UPSTREAM_INVALID_JSON'});}
+  if(result.billable!==false ||result.status!=='PENDING'||!result.hotel_id)return json(res,502,{error:'UNEXPECTED_REGISTRATION_RESULT'});
+  return json(res,upstream.status,{hotel_id:result.hotel_id,status:'PENDING',billable:false,idempotent_replay:Boolean(result.idempotent_replay)});
+}
 function routeAllowed(path, search) {
   if(search && [...search.keys()].some(k=>k!=='period')) return null;
   if(['/v1/me','/v1/hotels','/v1/catalog'].includes(path) && !search.size) return 'core';
@@ -141,8 +193,10 @@ async function staticFile(res, pathname) {
 export async function handler(req,res) {
   try {
     const url=new URL(req.url,'http://localhost');
-    if(req.method!=='GET') return json(res,405,{error:'READ_ONLY'});
-    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'READ_ONLY_QA',payments_enabled:false,payouts_enabled:false});
+    if(req.method!=='GET' && !(req.method==='POST'&&url.pathname==='/api/actions/hotels')) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
+    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,payments_enabled:false,payouts_enabled:false});
+    if(url.pathname==='/api/session') { const s=unseal(cookiesFrom(req)[cookies.session]);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
+    if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
     if(url.pathname==='/api/auth/login') return await authLogin(res);
     if(url.pathname==='/api/auth/callback') return await authCallback(req,res,url);
     if(url.pathname==='/api/auth/logout') return redirect(res,'/',{'Set-Cookie':cookie(cookies.session,'',0)});
@@ -152,3 +206,4 @@ export async function handler(req,res) {
 }
 if(process.env.NODE_ENV!=='test') createServer(handler).listen(port,host,()=>console.log('MARINA FLEX Console READ-ONLY listening on http://'+host+':'+port));
 export const testRouteAllowed=routeAllowed;
+export const testValidateHotelRegistration=validateHotelRegistration;
