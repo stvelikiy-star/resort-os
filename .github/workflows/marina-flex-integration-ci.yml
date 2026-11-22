@@ -98,15 +98,23 @@ jobs:
       - name: Make a complete local QA backup and independently restore to a second database
         run: |
           set -euo pipefail
-          pg_dump -d flex_ci --format=custom --file=/tmp/flex_qa_only.dump
+          docker run --rm --network host -v /tmp:/tmp \
+            -e PGHOST=127.0.0.1 -e PGPORT -e PGUSER -e PGPASSWORD \
+            postgres:16 pg_dump -d flex_ci --format=custom --file=/tmp/flex_qa_only.dump
           createdb -T template0 flex_restored_ci
-          pg_restore --no-owner --exit-on-error --dbname=flex_restored_ci /tmp/flex_qa_only.dump
+          docker run --rm --network host -v /tmp:/tmp \
+            -e PGHOST=127.0.0.1 -e PGPORT -e PGUSER -e PGPASSWORD \
+            postgres:16 pg_restore --no-owner --exit-on-error --dbname=flex_restored_ci /tmp/flex_qa_only.dump
           test -s /tmp/flex_qa_only.dump
       - name: Compare schema, policies and data after restore
         run: |
           set -euo pipefail
-          pg_dump -d flex_ci --schema-only --no-owner --no-privileges > /tmp/flex_before.sql
-          pg_dump -d flex_restored_ci --schema-only --no-owner --no-privileges > /tmp/flex_after.sql
+          docker run --rm --network host \
+            -e PGHOST=127.0.0.1 -e PGPORT -e PGUSER -e PGPASSWORD \
+            postgres:16 pg_dump -d flex_ci --schema-only --no-owner --no-privileges > /tmp/flex_before.sql
+          docker run --rm --network host \
+            -e PGHOST=127.0.0.1 -e PGPORT -e PGUSER -e PGPASSWORD \
+            postgres:16 pg_dump -d flex_restored_ci --schema-only --no-owner --no-privileges > /tmp/flex_after.sql
           diff -u /tmp/flex_before.sql /tmp/flex_after.sql
           psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_restore_acceptance.sql
           for database in flex_ci flex_restored_ci; do
