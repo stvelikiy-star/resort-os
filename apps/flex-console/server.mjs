@@ -17,6 +17,7 @@ const rawSecret = process.env.FLEX_SESSION_KEY || '';
 const qaEnvironment = process.env.FLEX_ENVIRONMENT === 'qa';
 const onboardingApiOrigin = (process.env.FLEX_ONBOARDING_API_ORIGIN || '').replace(/\/$/, '');
 const qaOnboarding = qaEnvironment && process.env.FLEX_ENABLE_QA_ONBOARDING === 'true' && Boolean(onboardingApiOrigin);
+const qaLinking = qaOnboarding && process.env.FLEX_ENABLE_QA_LINKING === 'true';
 
 const secret = rawSecret ? Buffer.from(rawSecret, 'base64') : null;
 const configured = Boolean(publicOrigin && issuer && clientId && apiAudience && apiOrigin && partnerApiOrigin && secret?.length === 32);
@@ -157,6 +158,86 @@ async function registration(req,res) {
   if(result.billable!==false ||result.status!=='PENDING'||!result.hotel_id)return json(res,502,{error:'UNEXPECTED_REGISTRATION_RESULT'});
   return json(res,upstream.status,{hotel_id:result.hotel_id,status:'PENDING',billable:false,idempotent_replay:Boolean(result.idempotent_replay)});
 }
+
+/**
+ * Trusted-PMS link workflow: two tightly scoped actions only.
+ * The signature is minted by a separately registered trusted MARINA SMART signer.
+ * Never generate a signature in the browser/BFF or accept an untrusted deployment key.
+ * This does not change subscriptions, payments or any PMS data.
+ */
+const flexUuidRe=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const linkHotelRoute=/^\/api\/actions\/hotels\/([0-9a-fA-F-]{36})\/challenge$/;
+const linkConfirmRoute=/^\/api\/actions\/challenges\/([0-9a-fA-F-]{36})\/confirm$/;
+function validateLinkPayload(kind,payload) {
+  if(!payload||typeof payload!=='object'||Array.isArray(payload))return null;
+  if(kind==='challenge') {
+    if(Object.keys(payload).some(k=>!['deployment_id','property_external_id'].includes(k)))return null;
+    const deployment=payload.deployment_id,property=payload.property_external_id;
+    if(typeof deployment!=='string'||!(/^[A-Za-z0-9][A-Za-z0-9_.-]{3,99}$/.test(deployment)))return null;
+    if(typeof property!=='string'||!property.trim()||property.length>180||/[\u0000-\u001F\u007F]/.test(property))return null;
+    return {deployment_id:deployment,property_external_id:property.trim()};
+  }
+  if(kind==='confirm') {
+    if(Object.keys(payload).length!==1||!Object.hasOwn(payload,'signature_b64'))return null;
+    const signature=payload.signature_b64;
+    if(typeof signature!=='string'||signature.length<64||signature.length>256||!/^[A-Za-z0-9_\-+/=]+$/.test(signature))return null;
+    return {signature_b64:signature};
+  }
+  return null;
+}
+async function trustedLinkAction(req,res,url) {
+  if(!configured||!qaLinking)return json(res,503,{error:'QA_TRUSTED_LINK_NOT_ENABLED'});
+  if(!isSameOrigin(req))return json(res,403,{error:'ORIGIN_NOT_ALLOWED'});
+  if(!/^application\/json(?:\s*;|$)/i.test(String(req.headers['content-type']||'')))
+    return json(res,415,{error:'JSON_REQUIRED'});
+  const session=unseal(cookiesFrom(req)[cookies.session]);
+  if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
+  if(!session.csrf||!fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
+  const hotelMatch=url.pathname.match(linkHotelRoute);
+  const confirmMatch=url.pathname.match(linkConfirmRoute);
+  const kind=hotelMatch?'challenge':confirmMatch?'confirm':null;
+  const id=hotelMatch?.[1]||confirmMatch?.[1];
+  if(!kind||!flexUuidRe.test(id))return json(res,404,{error:'ACTION_NOT_ALLOWED'});
+  let raw='';
+  for await(const part of req) {
+    raw+=part.toString();
+    if(Buffer.byteLength(raw,'utf8')>4096)return json(res,413,{error:'BODY_TOO_LARGE'});
+  }
+  let parsed;try{parsed=JSON.parse(raw)}catch{return json(res,400,{error:'INVALID_JSON'});}
+  const payload=validateLinkPayload(kind,parsed);
+  if(!payload)return json(res,422,{error:'INVALID_TRUSTED_LINK_REQUEST'});
+  const endpoint=kind==='challenge'?'/v1/onboarding/hotels/'+id+'/challenge':'/v1/onboarding/challenges/'+id+'/confirm';
+  const upstream=await fetch(onboardingApiOrigin+endpoint,{
+    method:'POST',headers:{Authorization:'Bearer '+session.token,'Content-Type':'application/json','Accept':'application/json'},
+    body:JSON.stringify(payload),redirect:'manual',signal:AbortSignal.timeout(10000),
+  });
+  if(upstream.status>=300&&upstream.status<400)return json(res,502,{error:'UNEXPECTED_UPSTREAM_REDIRECT'});
+  if(!(upstream.headers.get('content-type')||'').includes('application/json'))return json(res,502,{error:'UPSTREAM_NON_JSON'});
+  const body=await upstream.text();
+  if(body.length>12000)return json(res,502,{error:'UPSTREAM_TOO_LARGE'});
+  if(!upstream.ok)return json(res,upstream.status,{
+    error:'TRUSTED_LINK_REJECTED',code:upstream.status===403?'ROLE_MFA_OR_SIGNATURE_INVALID':
+      upstream.status===404?'PENDING_HOTEL_OR_DEPLOYMENT_NOT_FOUND':
+      upstream.status===409?'LINK_ALREADY_USED_OR_CONFLICT':
+      upstream.status===410?'LINK_CHALLENGE_EXPIRED':'REJECTED_BY_BACKEND',
+  });
+  let reply;try{reply=JSON.parse(body)}catch{return json(res,502,{error:'UPSTREAM_INVALID_JSON'});}
+  if(kind==='challenge'){
+    if(reply.status!=='AWAITING_TRUSTED_PMS_SIGNATURE'||!flexUuidRe.test(reply.challenge_id)||
+       typeof reply.signed_message!=='string'||reply.signed_message.length>2000||
+       !/^\d{4}-\d{2}-\d{2}T/.test(reply.expires_at||'')){
+      return json(res,502,{error:'UNEXPECTED_CHALLENGE_RESULT'});
+    }
+    return json(res,201,{challenge_id:reply.challenge_id,signed_message:reply.signed_message,expires_at:reply.expires_at,
+      status:'AWAITING_TRUSTED_PMS_SIGNATURE'});
+  }
+  if(reply.link_status!=='VERIFIED'||reply.subscription_activated!==false||
+     !flexUuidRe.test(reply.hotel_id)||!reply.deployment_id||!reply.property_external_id){
+    return json(res,502,{error:'UNEXPECTED_LINK_CONFIRMATION'});
+  }
+  return json(res,200,{hotel_id:reply.hotel_id,link_status:'VERIFIED',subscription_activated:false});
+}
+
 function routeAllowed(path, search) {
   if(search && [...search.keys()].some(k=>k!=='period')) return null;
   if(['/v1/me','/v1/hotels','/v1/catalog'].includes(path) && !search.size) return 'core';
@@ -193,10 +274,11 @@ async function staticFile(res, pathname) {
 export async function handler(req,res) {
   try {
     const url=new URL(req.url,'http://localhost');
-    if(req.method!=='GET' && !(req.method==='POST'&&url.pathname==='/api/actions/hotels')) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
-    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,payments_enabled:false,payouts_enabled:false});
+    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
+    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,payments_enabled:false,payouts_enabled:false});
     if(url.pathname==='/api/session') { const s=unseal(cookiesFrom(req)[cookies.session]);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
+    if(req.method==='POST'&&(linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))return await trustedLinkAction(req,res,url);
     if(url.pathname==='/api/auth/login') return await authLogin(res);
     if(url.pathname==='/api/auth/callback') return await authCallback(req,res,url);
     if(url.pathname==='/api/auth/logout') return redirect(res,'/',{'Set-Cookie':cookie(cookies.session,'',0)});
@@ -207,3 +289,4 @@ export async function handler(req,res) {
 if(process.env.NODE_ENV!=='test') createServer(handler).listen(port,host,()=>console.log('MARINA FLEX Console READ-ONLY listening on http://'+host+':'+port));
 export const testRouteAllowed=routeAllowed;
 export const testValidateHotelRegistration=validateHotelRegistration;
+export const testValidateLinkPayload=validateLinkPayload;
