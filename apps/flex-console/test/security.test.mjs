@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-import {handler,testRouteAllowed,testValidateHotelRegistration,testValidateLinkPayload} from '../server.mjs';
+import {handler,testRouteAllowed,testValidateHotelRegistration,testValidateLinkPayload,testValidateCatalogAdminAction} from '../server.mjs';
 
 test('GET allowlist is narrowly scoped to read-only FLEX routes',()=>{
  const empty=new URLSearchParams();
@@ -89,4 +89,45 @@ test('P0 trusted hotel linking payloads reject broad mutation or forged signer m
     {signature_b64:'A'.repeat(88),subscription_activated:true},
     {signature_b64:'A'.repeat(88)+'!'},
  ]) assert.equal(testValidateLinkPayload('confirm',data),null);
+});
+
+test('catalog and subscription proposal actions are strict and never accept payment/activation fields',()=>{
+ const goodSku={sku:'EXTRA_QA',title:'Extended QA',capability_key:'analytics.extra'};
+ assert.deepEqual(testValidateCatalogAdminAction('sku',goodSku),goodSku);
+ for(const bad of [
+   {...goodSku,product_status:'AVAILABLE'},
+   {...goodSku,payment_received:true},
+   {...goodSku,capability_key:'../../etc'},
+   {...goodSku,sku:'badSku'},
+ ]) assert.equal(testValidateCatalogAdminAction('sku',bad),null);
+ const validFuture=new Date(Date.now()+72*3600*1000).toISOString();
+ const goodPrice={monthly_price:'1500.00',currency:'KGS',valid_from:validFuture};
+ assert.deepEqual(testValidateCatalogAdminAction('price',goodPrice),goodPrice);
+ for(const bad of [
+   {...goodPrice,monthly_price:-1},
+   {...goodPrice,monthly_price:'1e9'},
+   {...goodPrice,monthly_price:'1.000'},
+   {...goodPrice,currency:'USD'},
+   {...goodPrice,valid_from:new Date().toISOString()},
+   {...goodPrice,confirmed_payment_id:'fake'},
+ ]) assert.equal(testValidateCatalogAdminAction('price',bad),null);
+ const goodDraft={
+   hotel_id:'123e4567-e89b-12d3-a456-426614174000',
+   title:'QA package',period_start:'2027-01-01',period_end:'2027-01-31',
+   skus:['BASE_PMS','EXTRA_QA']
+ };
+ assert.deepEqual(testValidateCatalogAdminAction('draft',goodDraft),goodDraft);
+ for(const bad of [
+   {...goodDraft,skus:['BASE_PMS','BASE_PMS']},
+   {...goodDraft,period_end:'2026-12-01'},
+   {...goodDraft,state:'ACTIVE'},
+   {...goodDraft,enforcement:'ENFORCE'},
+   {...goodDraft,paid:true},
+   {...goodDraft,invoice_id:'uuid'},
+ ]) assert.equal(testValidateCatalogAdminAction('draft',bad),null);
+ assert.equal(testRouteAllowed('/v1/platform/catalog',new URLSearchParams()),'catalog_admin');
+ assert.equal(testRouteAllowed('/v1/platform/catalog/skus/EXTRA_QA/versions',new URLSearchParams()),'catalog_admin');
+ assert.equal(testRouteAllowed('/v1/platform/subscription-drafts',new URLSearchParams('hotel_id=123e4567-e89b-12d3-a456-426614174000')),'catalog_admin');
+ assert.equal(testRouteAllowed('/v1/platform/subscription-drafts',new URLSearchParams('hotel_id=../admin')),null);
+ assert.equal(testRouteAllowed('/v1/platform/catalog',new URLSearchParams('role=admin')),null);
 });
