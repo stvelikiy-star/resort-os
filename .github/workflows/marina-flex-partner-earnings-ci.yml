@@ -1,0 +1,97 @@
+name: MARINA FLEX Agent Investor Earnings
+
+on:
+  pull_request:
+    paths:
+      - "services/api/app/flex_partner_earnings.py"
+      - "services/api/app/flex_partner_portal.py"
+      - "scripts/marina_flex_partner_*"
+      - "docs/flex/sql/0010_flex_partner_earnings_preview.sql"
+      - "docs/flex/FLEX_PARTNER_EARNINGS_QA.md"
+      - ".github/workflows/marina-flex-partner-earnings-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  partner-math:
+    name: FLEX cash-only agent/investor and payout-phase calculations
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify precision and pure earnings logic
+        run: |
+          python -m py_compile services/api/app/flex_partner_earnings.py scripts/marina_flex_partner_earnings_contract_test.py
+          python scripts/marina_flex_partner_earnings_contract_test.py
+
+  partner-rls:
+    name: FLEX two-hotel agent/investor SQL and signed HTTP isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: flex_ci
+          POSTGRES_USER: flex_ci
+          POSTGRES_PASSWORD: flex_ci_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flex_ci -d flex_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: flex_ci
+      PGPASSWORD: flex_ci_ci_only
+      PGDATABASE: flex_ci
+      FLEX_DATABASE_URL: postgresql://flex_partner_runtime_ci:flex_partner_ci_only@localhost:5432/flex_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install isolated PostgreSQL client and API dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          python -m pip install --disable-pip-version-check -r services/api/requirements-flex-control.txt
+      - name: Compile read-only partner portal
+        run: python -m py_compile services/api/app/flex_partner_portal.py scripts/marina_flex_partner_portal_http_test.py
+      - name: Bootstrap disposable FLEX 0010 and two-hotel commercial receipts
+        run: |
+          for f in \
+            0001_flex_control_plane_preview.sql \
+            0002_flex_platform_identity_rls_preview.sql \
+            0003_flex_price_version_guard_preview.sql \
+            0004_flex_hotel_onboarding_preview.sql \
+            0005_flex_deployment_attestation_preview.sql \
+            0006_flex_agreements_subscription_preview.sql \
+            0007_flex_invoice_ledger_preview.sql \
+            0008_flex_refund_reconciliation_preview.sql \
+            0009_flex_signed_qa_settlement_preview.sql \
+            0010_flex_partner_earnings_preview.sql; do
+            psql -X -v ON_ERROR_STOP=1 -f "docs/flex/sql/$f"
+          done
+          psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_rls_isolation_contract.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_qa_settlement_fixture.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_partner_earnings_sql_contract.sql
+      - name: Provision isolated read-only CI runtime identity with no inherited admin
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -c "CREATE ROLE flex_partner_runtime_ci LOGIN PASSWORD 'flex_partner_ci_only' NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE"
+          psql -X -v ON_ERROR_STOP=1 -c "GRANT flex_identity_reader,flex_hotel_reader,flex_platform_admin_reader,flex_agent_statement_reader,flex_investor_statement_reader,flex_platform_statement_reader TO flex_partner_runtime_ci WITH INHERIT FALSE, SET TRUE"
+          psql -X -v ON_ERROR_STOP=1 -c "SELECT 1 / CASE WHEN NOT pg_has_role('flex_partner_runtime_ci','flex_platform_statement_reader','USAGE') THEN 1 ELSE 0 END"
+      - name: Negative and positive HTTP/RLS agent-investor access
+        run: python scripts/marina_flex_partner_portal_http_test.py
+      - name: No hotel-PMS data or simulated bank disbursement
+        run: |
+          test "$(psql -X -Atqc "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('properties','guests','reservations','folio')")" = "0"
+          test "$(psql -X -Atqc "SELECT count(*) FROM flex_partner_earnings_entries WHERE provenance<>'QA_ONLY'")" = "0"
