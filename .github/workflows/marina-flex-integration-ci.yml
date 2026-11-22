@@ -9,6 +9,7 @@ on:
       - "scripts/marina_flex_qa_db_preflight.sql"
       - "docs/flex/sql/**"
       - "docs/flex/FLEX_RELEASE_READINESS_AUDIT.md"
+      - "docs/flex/FLEX_ISOLATED_QA_DEPLOYMENT_GATE.md"
   workflow_dispatch:
 
 permissions:
