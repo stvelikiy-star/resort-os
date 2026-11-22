@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn } from 'node:child_process';
-import { generateKeyPairSync, sign, randomBytes } from 'node:crypto';
+import { generateKeyPairSync, sign, verify, randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createServer as createNetServer } from 'node:net';
 
@@ -25,8 +25,9 @@ test('authenticated QA: platform login, CSRF-gated PENDING registration, safe re
   const issuer='http://127.0.0.1:'+backendPort;
   const origin='http://127.0.0.1:'+consolePort;
   const {publicKey,privateKey}=generateKeyPairSync('ed25519');
+  const {publicKey:trustedPublic,privateKey:trustedPrivate}=generateKeyPairSync('ed25519');
   const jwk={...publicKey.export({format:'jwk'}),kid:'qa-test-key',alg:'EdDSA',use:'sig'};
-  const grants=new Map(),hotels=[],idem=new Map();
+  const grants=new Map(),hotels=[],idem=new Map(),challenges=new Map(),linked=new Set();
   const jwt=claims=>{
     const head=b64({typ:'JWT',alg:'EdDSA',kid:'qa-test-key'});
     const payload=b64({iss:issuer,iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+900,sub:'qa-platform-admin',...claims});
@@ -65,6 +66,32 @@ test('authenticated QA: platform login, CSRF-gated PENDING registration, safe re
       idem.set(key,{id,name:body.display_name});
       return reply(res,201,{hotel_id:id,status:'PENDING',billable:false,idempotent_replay:false});
     }
+    const challengeRoute=url.pathname.match(/^\/v1\/onboarding\/hotels\/([0-9a-fA-F-]{36})\/challenge$/);
+    if(req.method==='POST'&&challengeRoute){
+      if(!req.headers.authorization?.startsWith('Bearer '))return reply(res,403,{error:'forbidden'});
+      const chunks=[];for await(const chunk of req)chunks.push(chunk);
+      const p=JSON.parse(Buffer.concat(chunks).toString());
+      if(p.deployment_id!=='qa-deployment-01'||p.property_external_id!=='qa-property-01')return reply(res,404,{error:'not trusted'});
+      const hotel=hotels.find(h=>h.id===challengeRoute[1]);
+      if(!hotel||hotel.status!=='PENDING')return reply(res,404,{error:'not pending'});
+      const id='aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',message='MARINA-FLEX-PMS-LINK-V1\n'+hotel.id+'\nqa-deployment-01\nqa-property-01';
+      challenges.set(id,{hotel_id:hotel.id,message,expires_at:new Date(Date.now()+60000).toISOString()});
+      return reply(res,201,{challenge_id:id,signed_message:message,expires_at:challenges.get(id).expires_at,
+        status:'AWAITING_TRUSTED_PMS_SIGNATURE'});
+    }
+    const confirmRoute=url.pathname.match(/^\/v1\/onboarding\/challenges\/([0-9a-fA-F-]{36})\/confirm$/);
+    if(req.method==='POST'&&confirmRoute){
+      const challenge=challenges.get(confirmRoute[1]);
+      if(!challenge)return reply(res,404,{error:'missing'});
+      if(linked.has(confirmRoute[1]))return reply(res,409,{error:'consumed'});
+      const chunks=[];for await(const chunk of req)chunks.push(chunk);
+      const p=JSON.parse(Buffer.concat(chunks).toString());
+      const valid=verify(null,Buffer.from(challenge.message),trustedPublic,Buffer.from(p.signature_b64||'','base64'));
+      if(!valid)return reply(res,403,{error:'signature'});
+      linked.add(confirmRoute[1]);
+      return reply(res,200,{hotel_id:challenge.hotel_id,deployment_id:'qa-deployment-01',
+        property_external_id:'qa-property-01',link_status:'VERIFIED',subscription_activated:false});
+    }
     return reply(res,404,{error:'not_found'});
   });
   await new Promise(r=>fake.listen(backendPort,'127.0.0.1',r));
@@ -73,14 +100,14 @@ test('authenticated QA: platform login, CSRF-gated PENDING registration, safe re
       FLEX_PUBLIC_ORIGIN:origin,FLEX_API_ORIGIN:issuer,FLEX_PARTNER_API_ORIGIN:issuer,
       FLEX_OIDC_ISSUER:issuer,FLEX_OIDC_CLIENT_ID:'flex-console-test',FLEX_API_AUDIENCE:'flex-api-test',
       FLEX_SESSION_KEY:randomBytes(32).toString('base64'),FLEX_ENVIRONMENT:'qa',
-      FLEX_ONBOARDING_API_ORIGIN:issuer,FLEX_ENABLE_QA_ONBOARDING:'true'},
+      FLEX_ONBOARDING_API_ORIGIN:issuer,FLEX_ENABLE_QA_ONBOARDING:'true',FLEX_ENABLE_QA_LINKING:'true'},
     stdio:'ignore'
   });
   try{
     let ready=false;
     for(let attempt=0;attempt<60;attempt++){
       if(child.exitCode!==null)throw Error('FLEX console process exited early');
-      try {const r=await fetch(origin+'/api/status');if(r.ok){const json=await r.json();assert.equal(json.qa_onboarding_enabled,true);ready=true;break;}}catch{}
+      try {const r=await fetch(origin+'/api/status');if(r.ok){const json=await r.json();assert.equal(json.qa_onboarding_enabled,true);assert.equal(json.qa_linking_enabled,true);ready=true;break;}}catch{}
       await sleep(100);
     }
     assert.equal(ready,true,'QA server startup');
@@ -128,6 +155,37 @@ test('authenticated QA: platform login, CSRF-gated PENDING registration, safe re
       body:JSON.stringify({display_name:'QA HOTEL 2',currency:'USD'})});
     assert.equal(unauthorizedCurrency.status,422);
     assert.equal(hotels.length,1);
+    const hotelId=hotels[0].id;
+    const challengeURL=origin+'/api/actions/hotels/'+hotelId+'/challenge';
+    const challengePayload=JSON.stringify({deployment_id:'qa-deployment-01',property_external_id:'qa-property-01'});
+    const linkNoCsrf=await fetch(challengeURL,{method:'POST',headers:{
+      Cookie:sessionCookie,Origin:origin,'Content-Type':'application/json','X-Flex-CSRF':'invalid'},
+      body:challengePayload});
+    assert.equal(linkNoCsrf.status,403);
+    const challengeResponse=await fetch(challengeURL,{method:'POST',headers:{
+      Cookie:sessionCookie,Origin:origin,'Content-Type':'application/json','X-Flex-CSRF':session.csrf},
+      body:challengePayload});
+    assert.equal(challengeResponse.status,201);
+    const challenge=await challengeResponse.json();
+    assert.equal(challenge.status,'AWAITING_TRUSTED_PMS_SIGNATURE');
+    const confirmURL=origin+'/api/actions/challenges/'+challenge.challenge_id+'/confirm';
+    const badProof=await fetch(confirmURL,{method:'POST',headers:{
+      Cookie:sessionCookie,Origin:origin,'Content-Type':'application/json','X-Flex-CSRF':session.csrf},
+      body:JSON.stringify({signature_b64:Buffer.alloc(64).toString('base64')})});
+    assert.equal(badProof.status,403);
+    const signature=sign(null,Buffer.from(challenge.signed_message),trustedPrivate).toString('base64');
+    const verified=await fetch(confirmURL,{method:'POST',headers:{
+      Cookie:sessionCookie,Origin:origin,'Content-Type':'application/json','X-Flex-CSRF':session.csrf},
+      body:JSON.stringify({signature_b64:signature})});
+    assert.equal(verified.status,200);
+    const verifiedData=await verified.json();
+    assert.equal(verifiedData.link_status,'VERIFIED');
+    assert.equal(verifiedData.subscription_activated,false);
+    const replayLink=await fetch(confirmURL,{method:'POST',headers:{
+      Cookie:sessionCookie,Origin:origin,'Content-Type':'application/json','X-Flex-CSRF':session.csrf},
+      body:JSON.stringify({signature_b64:signature})});
+    assert.equal(replayLink.status,409);
+    assert.equal(linked.size,1);
     const list=await fetch(origin+'/api/data/v1/hotels',{headers:{Cookie:sessionCookie}});
     assert.equal(list.status,200);assert.equal((await list.json()).length,1);
     const forbidden=await fetch(origin+'/api/data/v1/payouts',{headers:{Cookie:sessionCookie}});
