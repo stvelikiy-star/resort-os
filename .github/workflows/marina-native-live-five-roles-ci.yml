@@ -97,8 +97,13 @@ jobs:
           retention-days: 5
           if-no-files-found: warn
 
-  ios-five-live:
+  build-ios-live:
     needs: qa-credentials-ready
+    if: needs.qa-credentials-ready.outputs.ready == 'true'
+    uses: ./.github/workflows/marina-ios-simulator-keychain-linker-pilot-ci.yml
+
+  ios-five-live:
+    needs: [qa-credentials-ready, build-ios-live]
     if: needs.qa-credentials-ready.outputs.ready == 'true'
     name: iPhone Simulator five LIVE staff roles (MARINA_FINAL_QA)
     runs-on: macos-26-intel
@@ -118,41 +123,21 @@ jobs:
           test -n "$MARINA_NATIVE_QA_USERS_JSON" || { echo 'Missing QA environment secret'; exit 78; }
       - uses: actions/download-artifact@v4
         with:
-          name: marina-qa-ios-origin-pinned-app
-          run-id: 44909147697
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: marina-linked-ios-live-app
           path: ios-bin
-      - name: Pin checked iOS QA binary and extract
+      - name: Verify and extract the same-run launch-tested iOS QA app
+        env:
+          EXPECTED_SHA256: ${{ needs.build-ios-live.outputs.app_sha256 }}
         run: |
           set -euo pipefail
-          echo 'ced189dd4f54595867649da4e67d2e8fa186f47437af43d47fefbf41936653c8  ios-bin/MARINA_SMART_iOS_Simulator.zip' | shasum -a 256 -c -
+          [[ "$EXPECTED_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          echo "$EXPECTED_SHA256  ios-bin/ios-live.zip" | shasum -a 256 -c -
           mkdir -p "$RUNNER_TEMP/marina-five-live"
-          unzip -q ios-bin/MARINA_SMART_iOS_Simulator.zip -d "$RUNNER_TEMP/marina-five-live"
-          app=$(find "$RUNNER_TEMP/marina-five-live" -maxdepth 2 -name '*.app' -print -quit)
-          test -d "$app"
+          ditto -x -k ios-bin/ios-live.zip "$RUNNER_TEMP/marina-five-live"
+          app=$(find "$RUNNER_TEMP/marina-five-live" -maxdepth 1 -name '*.app' -print -quit)
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = kg.go.ms.staff
           echo "MARINA_NATIVE_QA_IOS_APP=$app" >> "$GITHUB_ENV"
           echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
-      - name: Sign only QA iOS Simulator app with scoped Keychain entitlement
-        run: |
-          set -euo pipefail
-          test -d "$MARINA_NATIVE_QA_IOS_APP"
-          cat > "$RUNNER_TEMP/marina-qa-simulator-keychain.plist" <<'ENTITLEMENTS'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-            <key>application-identifier</key><string>kg.go.ms.staff</string>
-            <key>keychain-access-groups</key><array><string>kg.go.ms.staff</string></array>
-          </dict></plist>
-          ENTITLEMENTS
-          # This is an ephemeral ad-hoc *Simulator* signature, not a distribution identity.
-          codesign --force --deep --sign - --timestamp=none --generate-entitlement-der --entitlements "$RUNNER_TEMP/marina-qa-simulator-keychain.plist" "$MARINA_NATIVE_QA_IOS_APP"
-          codesign --verify --deep --strict "$MARINA_NATIVE_QA_IOS_APP"
-          # Recent Xcode may emit JSON-like entitlement text rather than XML.
-          # Check the actual signed blob directly; login E2E checks Keychain access.
-          codesign -d --entitlements - "$MARINA_NATIVE_QA_IOS_APP" 2>/dev/null |
-            python3 -c 'import sys; data=sys.stdin.buffer.read(); assert b"keychain-access-groups" in data and b"kg.go.ms.staff" in data, "QA Keychain entitlement not embedded"'
-          echo 'IOS_QA_SIMULATOR_KEYCHAIN_SIGNATURE_VERIFIED'
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

@@ -26,7 +26,7 @@ ALLOWED_GOVERNANCE = frozenset({
 # product source. Git blob digests prevent widening this exception silently.
 # Approved workflow is test-only; pinned to prevent unreviewed CI drift.
 APPROVED_NATIVE_QA_BLOBS = {
-    ".github/workflows/marina-ios-simulator-keychain-linker-pilot-ci.yml": "1ebbdae30b9473b2e41dbbdbe39860e24a81bda5",
+    ".github/workflows/marina-ios-simulator-keychain-linker-pilot-ci.yml": "0df95da7243cd64667eb8d505277b67d5c846ad9",
     ".github/workflows/marina-native-android-ios-maestro-ci.yml": "077328f3a5754daf3162e3a322fc609431c8925c",
     "scripts/design/fl2-android-maestro-demo.sh": "b4372aa0fcb965a3d9337d86c2f4faf96db700c3",
     "scripts/design/fl2-native-live-role.yaml": "5c7508b1cf6e740e267bcd7d7009cd9eeaf99719",
@@ -38,7 +38,7 @@ APPROVED_NATIVE_QA_BLOBS = {
     ".github/workflows/marina-native-qa-negative-auth-ci.yml": "6d40d5205999bcceb05d454580b515b8b618b1f0",
     "scripts/design/fl2-native-qa-negative-login.yaml": "17ba220277be7f708f225bc08b751e74bc14dd32",
     "scripts/design/fl2-native-qa-negative-login.sh": "66f7f3a6d59f38430f20cbbee780256ebebfa4e9",
-    ".github/workflows/marina-native-live-five-roles-ci.yml": "944da2b15b6714abaebea032884ea6777ca1e012",
+    ".github/workflows/marina-native-live-five-roles-ci.yml": "56b49515dce5a5399e10084e487b65460bf0ee2a",
     "scripts/design/fl2-native-live-five-roles.sh": "d01d763fc413a2a5222424a473ee551d86aefbdd",
 }
 

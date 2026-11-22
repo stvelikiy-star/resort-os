@@ -4,18 +4,25 @@ on:
     branches:
       - ci/marina-native-android-ios-maestro-20261121
   workflow_dispatch:
+  workflow_call:
+    outputs:
+      app_sha256:
+        description: SHA-256 of the simulator app archive from this run
+        value: ${{ jobs.ios-simulator-keychain.outputs.app_sha256 }}
 
 permissions:
   contents: read
 
 concurrency:
-  group: marina-ios-keychain-linker-pilot
+  group: marina-ios-keychain-linker-pilot-${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
   ios-simulator-keychain:
     name: iOS-only linker entitlement and clean Simulator launch
     runs-on: macos-26-intel
+    outputs:
+      app_sha256: ${{ steps.archive.outputs.sha256 }}
     timeout-minutes: 140
     env:
       CI: 'true'
@@ -114,6 +121,20 @@ jobs:
           xcrun simctl io "$udid" screenshot ios-keychain-pilot-evidence/ios-launch.png
           test -s ios-keychain-pilot-evidence/ios-launch.png
           echo 'IOS_SIMULATOR_KEYCHAIN_LINKER_LAUNCH_PASS'
+      - name: Archive the exact simulator app that passed launch
+        if: github.event_name == 'pull_request'
+        id: archive
+        run: |
+          set -euo pipefail
+          ditto -c -k --keepParent "$IOS_QA_SIM_APP" "$RUNNER_TEMP/ios-live.zip"
+          echo "sha256=$(shasum -a 256 "$RUNNER_TEMP/ios-live.zip" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request'
+        with:
+          name: marina-linked-ios-live-app
+          path: ${{ runner.temp }}/ios-live.zip
+          retention-days: 2
+          if-no-files-found: error
       - name: Upload QA-only Simulator launch evidence
         if: always()
         uses: actions/upload-artifact@v4
