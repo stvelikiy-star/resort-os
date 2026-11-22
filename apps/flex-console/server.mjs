@@ -110,8 +110,10 @@ async function authCallback(req,res,url) {
   if(!reply.ok) return json(res,401,{error:'OIDC_TOKEN_EXCHANGE_FAILED'});
   const data=await reply.json();
   if(!data.id_token || !data.access_token) return json(res,401,{error:'OIDC_TOKENS_MISSING'});
-  await verifyJwt(data.id_token,doc,clientId,payload.nonce);
+  const identity=await verifyJwt(data.id_token,doc,clientId,payload.nonce);
   const claims=await verifyJwt(data.access_token,doc,apiAudience);
+  if(!identity.sub||!claims.sub||!fixedEqual(identity.sub,claims.sub))
+    return json(res,401,{error:'OIDC_IDENTITY_ACCESS_TOKEN_SUBJECT_MISMATCH'});
   const expiresMs=Math.min(Number(data.expires_in||900)*1000,(claims.exp*1000)-Date.now(),900000);
   if(expiresMs<10000) return json(res,401,{error:'OIDC_TOKEN_EXPIRED'});
   const session=seal({ token:data.access_token, csrf:b64u(randomBytes(32)), exp:Date.now()+expiresMs });
