@@ -15,6 +15,8 @@ FROZEN_MAIN = "2642eedc27431fdb9eaa9f7bf306904d487f4b9c"
 
 SAFE_PATHS = (
     re.compile(r"^docs/flex/[A-Za-z0-9_./-]+$"),
+    # New isolated commercial UI; explicit file set, no changes to existing admin/PMS.
+    re.compile(r"^apps/flex-console/(?:README\.md|package\.json|server\.mjs|public/(?:index\.html|app\.js|styles\.css)|test/(?:security|onboarding-e2e)\.test\.mjs)$"),
     re.compile(r"^scripts/marina_flex_[A-Za-z0-9_.-]+$"),
     re.compile(r"^services/api/app/flex_[A-Za-z0-9_]+\.py$"),
     re.compile(r"^services/api/requirements-flex-control\.txt$"),
@@ -37,6 +39,12 @@ def safe_file(path: str, status: str) -> bool:
 def run() -> int:
     if sys.argv[1:] == ["--self-test"]:
         assert safe_file("docs/flex/sql/0010_flex_partner_earnings_preview.sql", "A")
+        assert safe_file("apps/flex-console/server.mjs", "A")
+        assert safe_file("apps/flex-console/public/index.html", "A")
+        assert safe_file("apps/flex-console/test/onboarding-e2e.test.mjs", "A")
+        assert not safe_file("apps/admin/app/page.tsx", "A")
+        assert not safe_file("apps/flex-console/.env", "A")
+        assert not safe_file("apps/flex-console/server.mjs", "M")
         assert safe_file("services/api/app/flex_renewal.py", "A")
         assert safe_file(".github/workflows/marina-flex-integration-ci.yml", "A")
         assert not safe_file("services/api/app/main.py", "M")
