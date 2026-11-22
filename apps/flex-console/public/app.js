@@ -126,7 +126,7 @@ function linkWizard(){
  } else {
    const x=state.linkChallenge;
    html+='<section class="panel"><h2>'+safe(t('challenge'))+'</h2>'+
-    '<div class="muted">'+safe(t('expiresAt'))+': '+safe(date(x.expires_at))+'</div>'+
+    '<div class="muted">'+safe(t('expiresAt'))+': '+safe(x.expires_at?new Date(x.expires_at).toLocaleString(state.lang==='en'?'en-US':'ru-RU',{timeZone:'Asia/Bishkek',hour12:false}):'—')+'</div>'+
     '<pre class="signed-message" id="message-to-sign">'+safe(x.signed_message)+'</pre>'+
     '<div class="notice info">'+safe(t('challengeResult'))+'</div>'+
     '<form id="link-confirm-form">'+
