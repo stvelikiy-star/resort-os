@@ -1,0 +1,3 @@
+# Read-only FLEX control plane runtime (separate from PMS API)
+-r requirements.txt
+PyJWT[crypto]==2.10.1
