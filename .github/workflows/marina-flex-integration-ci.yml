@@ -155,9 +155,11 @@ jobs:
             marina_flex_refund_reconciliation_sql_contract.sql; do
             psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f "scripts/$sql"
           done
+          # Run catalog draft isolation checks BEFORE the historical synthetic
+          # finance fixture, so no-payment assertions genuinely start empty.
+          psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_catalog_draft_sql_contract.sql
           psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_qa_settlement_fixture.sql
           psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_partner_earnings_sql_contract.sql
-          psql -X -v ON_ERROR_STOP=1 -d flex_restored_ci -f scripts/marina_flex_catalog_draft_sql_contract.sql
       - name: Prove no PMS data and no real receipts entered QA
         run: |
           set -euo pipefail
