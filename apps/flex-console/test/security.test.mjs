@@ -50,7 +50,7 @@ test('PENDING hotel request rejects malformed or financial payloads',()=>{
    {display_name:'QA HOTEL',currency:'USD'},
    {display_name:'QA HOTEL',currency:'KGS',subscription_status:'ACTIVE'},
    {display_name:'QA HOTEL',currency:'KGS',payment:1000},
-   {display_name:'QA\\nHOTEL',currency:'KGS'},
+   {display_name:'QA'+String.fromCharCode(10)+'HOTEL',currency:'KGS'},
    {display_name:'  ',currency:'KGS'},
    null,
  ])assert.equal(testValidateHotelRegistration(p),null,JSON.stringify(p));
