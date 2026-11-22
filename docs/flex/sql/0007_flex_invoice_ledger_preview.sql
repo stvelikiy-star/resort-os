@@ -161,14 +161,14 @@ BEFORE UPDATE OR DELETE ON flex_invoice_lines
 FOR EACH ROW EXECUTE FUNCTION flex_reject_issued_invoice_line_rewrite();
 
 -- No new SKU can be appended to a finalized invoice in a later transaction.
-CREATE FUNCTION flex_reject_issued_invoice_line_append() RETURNS trigger LANGUAGE plpgsql AS $
+CREATE FUNCTION flex_reject_issued_invoice_line_append() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN
   IF EXISTS(SELECT 1 FROM flex_issued_invoice_records
             WHERE invoice_id=NEW.invoice_id) THEN
     RAISE EXCEPTION 'FLEX_ISSUED_INVOICE_IMMUTABLE';
   END IF;
   RETURN NEW;
-END $;
+END $fn$;
 CREATE TRIGGER flex_issued_invoice_lines_no_late_insert
 BEFORE INSERT ON flex_invoice_lines
 FOR EACH ROW EXECUTE FUNCTION flex_reject_issued_invoice_line_append();
