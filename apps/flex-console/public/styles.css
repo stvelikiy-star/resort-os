@@ -55,3 +55,13 @@ body.light .side{background:#e4f1f7}body.light .badge{color:#92670c}body.light s
 body.light #link-confirm-form textarea{background:#fff}
 .signed-message{max-width:100%;overflow-wrap:anywhere;white-space:pre-wrap;background:rgba(0,216,255,.05);border:1px solid var(--border);border-radius:13px;padding:16px;color:var(--cyan);font-size:12px;line-height:1.55}
 #link-result:not(:empty){margin-top:15px;color:var(--red)}
+
+.admin-form{display:grid;gap:16px;max-width:760px}
+.admin-form label{display:flex;flex-direction:column;gap:8px;color:var(--muted);font-size:13px;font-weight:700}
+.admin-form input{width:100%;max-width:560px}
+.admin-form fieldset{display:flex;flex-direction:column;gap:8px;padding:12px 0}
+.admin-form legend{color:var(--gold);font-weight:700;font-size:13px;margin-bottom:10px}
+.admin-form .check-row{display:flex;flex-direction:row;align-items:center;gap:12px;border:1px solid var(--border);padding:10px 12px;border-radius:10px;font-size:13px;cursor:pointer}
+.admin-form .check-row input{width:18px;min-height:18px;height:18px;accent-color:var(--cyan)}
+.admin-form .check-row span{color:var(--text)}
+#admin-action-status:not(:empty){color:var(--red)}
