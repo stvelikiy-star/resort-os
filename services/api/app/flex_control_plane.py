@@ -116,6 +116,11 @@ async def lifespan(app: FastAPI):
                 can_use = await conn.fetchval("SELECT pg_has_role(current_user,$1,'MEMBER')", role)
                 if not can_use:
                     raise RuntimeError(f"FLEX runtime role missing membership: {role}")
+                inherited = await conn.fetchval(
+                    "SELECT pg_has_role(current_user,$1,'USAGE')", role
+                )
+                if inherited:
+                    raise RuntimeError(f"FLEX runtime must not inherit reader privileges: {role}")
         app.state.flex_pool = pool
         yield
     finally:
