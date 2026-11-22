@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 import json
+import os
 import re
 import uuid
 
@@ -32,6 +33,10 @@ WRITER_ROLE = "flex_catalog_draft_writer"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if os.environ.get("FLEX_ENVIRONMENT") != "qa" or os.environ.get(
+        "FLEX_ENABLE_QA_CATALOG_DRAFTS"
+    ) != "true":
+        raise RuntimeError("FLEX catalog admin API may run only in explicitly approved QA")
     async with core_lifespan(app):
         async with app.state.flex_pool.acquire() as conn:
             elevated = await conn.fetchval(
