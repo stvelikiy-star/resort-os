@@ -6,6 +6,7 @@ on:
       - "services/api/app/flex_onboarding.py"
       - "scripts/marina_flex_onboarding_*"
       - "docs/flex/sql/0004_flex_hotel_onboarding_preview.sql"
+      - "docs/flex/sql/0005_flex_deployment_attestation_preview.sql"
       - ".github/workflows/marina-flex-hotel-onboarding-ci.yml"
   workflow_dispatch:
 
@@ -38,6 +39,7 @@ jobs:
       PGPASSWORD: flex_ci_ci_only
       PGDATABASE: flex_ci
       FLEX_DATABASE_URL: postgresql://flex_runtime_ci:flex_ci_runtime_only@localhost:5432/flex_ci
+      FLEX_TEST_DB_OWNER_URL: postgresql://flex_ci:flex_ci_ci_only@localhost:5432/flex_ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -56,6 +58,7 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0002_flex_platform_identity_rls_preview.sql
           psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0003_flex_price_version_guard_preview.sql
           psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0004_flex_hotel_onboarding_preview.sql
+          psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0005_flex_deployment_attestation_preview.sql
           psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_rls_isolation_contract.sql
       - name: Deny writer escalation to ACTIVE, finance and other users
         run: psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_onboarding_rls_contract.sql
