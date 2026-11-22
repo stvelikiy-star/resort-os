@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
 import {handler,testRouteAllowed,testValidateHotelRegistration,testValidateLinkPayload,testValidateCatalogAdminAction} from '../server.mjs';
 
 test('GET allowlist is narrowly scoped to read-only FLEX routes',()=>{
@@ -130,4 +132,24 @@ test('catalog and subscription proposal actions are strict and never accept paym
  assert.equal(testRouteAllowed('/v1/platform/subscription-drafts',new URLSearchParams('hotel_id=123e4567-e89b-12d3-a456-426614174000')),'catalog_admin');
  assert.equal(testRouteAllowed('/v1/platform/subscription-drafts',new URLSearchParams('hotel_id=../admin')),null);
  assert.equal(testRouteAllowed('/v1/platform/catalog',new URLSearchParams('role=admin')),null);
+});
+
+test('FLEX Console RU/KG/EN includes every UI label without malformed text',()=>{
+ const src=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ const match=src.match(/const translations = (\{[\s\S]*?\n\});\nconst main=/);
+ assert.ok(match,'Translation dictionary must be statically reviewable');
+ const dict=vm.runInNewContext('('+match[1]+')');
+ const reference=Object.keys(dict.ru).sort();
+ assert.ok(reference.length>=130,'Admin, hotel, partners and catalog labels need coverage');
+ for(const language of ['ru','kg','en']){
+   assert.deepEqual(Object.keys(dict[language]).sort(),reference,language+' untranslated or excess keys');
+   for(const [key,value] of Object.entries(dict[language])){
+     assert.equal(typeof value,'string',language+': '+key);
+     assert.ok(value.trim().length>0,language+': '+key);
+     assert.ok(!value.includes('\uFFFD'),language+': '+key+' replacement character');
+   }
+   for(const key of ['billingHold','draftOnly','priceHistory','notPublished','linked','noDrafts','adminError'])
+     assert.ok(dict[language][key].length>0,language+': '+key+' missing');
+ }
+ assert.ok(!src.includes('\uFFFD'),'Misdecoded console source');
 });
