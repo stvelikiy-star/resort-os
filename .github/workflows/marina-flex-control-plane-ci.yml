@@ -77,7 +77,8 @@ jobs:
         run: psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_price_version_sql_test.sql
       - name: Provision restricted CI-only DB identity
         run: |
-          psql -X -v ON_ERROR_STOP=1 -c "CREATE ROLE flex_runtime_ci LOGIN PASSWORD 'flex_ci_runtime_only' NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT"
-          psql -X -v ON_ERROR_STOP=1 -c "GRANT flex_hotel_reader, flex_identity_reader, flex_platform_admin_reader TO flex_runtime_ci"
+          psql -X -v ON_ERROR_STOP=1 -c "CREATE ROLE flex_runtime_ci LOGIN PASSWORD 'flex_ci_runtime_only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT"
+          psql -X -v ON_ERROR_STOP=1 -c "GRANT flex_hotel_reader, flex_identity_reader, flex_platform_admin_reader TO flex_runtime_ci WITH INHERIT FALSE, SET TRUE"
+          psql -X -v ON_ERROR_STOP=1 -c "SELECT 1 / CASE WHEN NOT pg_has_role('flex_runtime_ci','flex_platform_admin_reader','USAGE') THEN 1 ELSE 0 END"
       - name: Verify authenticated API and negative cross-hotel access
         run: python scripts/marina_flex_control_plane_http_test.py
