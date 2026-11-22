@@ -55,13 +55,15 @@ class RealHTTPIsolation(unittest.TestCase):
             else:
                 os.environ[key] = value
 
-    def token(self, subject, *, mfa=False):
+    def token(self, subject, *, mfa=False, extra=None):
         now = int(time.time())
         data = {
             "sub": subject, "iss": "marina-flex-ci-http", "aud": "marina-flex-http",
             "iat": now, "nbf": now - 1, "exp": now + 300,
             "jti": str(uuid.uuid4()), "amr": ["mfa"] if mfa else ["pwd"],
         }
+        if extra:
+            data.update(extra)
         return jwt.encode(data, self.private, algorithm="EdDSA", headers={"kid": "ci-key"})
 
     def get(self, path, sub, *, mfa=False):
@@ -115,6 +117,34 @@ class RealHTTPIsolation(unittest.TestCase):
         self.assertEqual(admin.status_code, 200, admin.text)
         self.assertEqual(len(admin.json()), 2)
         self.assertEqual(self.get("/v1/catalog", "unknown-user").status_code, 403)
+
+    def test_agent_and_investor_are_not_hotel_owners(self):
+        for subject, role, identity_key in (
+            ("sales-1", "SALES_AGENT", "agent_id"),
+            ("investor-1", "INVESTOR", "investor_id"),
+        ):
+            with self.subTest(subject=subject):
+                profile = self.get("/v1/me", subject)
+                self.assertEqual(profile.status_code, 200, profile.text)
+                self.assertEqual(profile.json()["role"], role)
+                self.assertTrue(profile.json()[identity_key])
+                self.assertEqual(profile.json()["hotels"], [])
+                self.assertEqual(self.get("/v1/hotels", subject).status_code, 403)
+                self.assertEqual(self.get("/v1/catalog", subject).status_code, 403)
+                self.assertEqual(
+                    self.get(f"/v1/hotels/{HOTEL_A}/invoices", subject).status_code, 404
+                )
+
+    def test_token_supplied_role_or_hotel_scope_is_ignored(self):
+        token = self.token("owner-a", mfa=True, extra={
+            "role": "SUPER_ADMIN", "hotel_ids": [HOTEL_B],
+        })
+        header = {"Authorization": "Bearer " + token}
+        self.assertEqual(self.client.get("/v1/hotels", headers=header).status_code, 403)
+        self.assertEqual(
+            self.client.get(f"/v1/hotels/{HOTEL_B}/invoices", headers=header).status_code,
+            404,
+        )
 
     def test_control_api_remains_read_only(self):
         for path in ("/v1/hotels", f"/v1/hotels/{HOTEL_A}/subscription"):
