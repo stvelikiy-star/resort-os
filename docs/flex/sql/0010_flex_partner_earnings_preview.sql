@@ -191,4 +191,21 @@ FOR SELECT TO flex_platform_statement_reader USING (true);
 -- and no BANK_PAID or VERIFIED payout table is asserted as implemented.
 COMMENT ON TABLE flex_partner_earnings_entries IS
  'CI-only accrual/reversal previews, not bank-paid investor or agent commissions';
+
+-- Explicitly revoke PostgreSQL's default PUBLIC EXECUTE on EVERY FLEX
+-- function. This includes SECURITY DEFINER trigger functions, which must
+-- not become standalone callable application APIs after any future deploy.
+-- Only synthetic FLEX functions are affected. Does not touch PMS functions.
+REVOKE ALL ON FUNCTION
+  flex_allocation_guard(),
+  flex_reject_history_rewrite(),
+  flex_price_version_period_guard(),
+  flex_verified_invoice_issuance_guard(),
+  flex_reject_issued_invoice_rewrite(),
+  flex_reject_issued_invoice_line_rewrite(),
+  flex_reject_issued_invoice_line_append(),
+  flex_net_payment_capacity_guard(),
+  flex_qa_partner_earnings_guard()
+FROM PUBLIC;
+
 COMMIT;
