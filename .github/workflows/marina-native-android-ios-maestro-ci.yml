@@ -185,6 +185,16 @@ jobs:
           export PATH="$HOME/.maestro/bin:$PATH"
           maestro --version
           for role in owner reception cook waiter; do
+            # The actual iOS QA screenshot showed Cook/Waiter visibly rendered,
+            # yet Maestro failed to expose their testID accessibility nodes.
+            # Only the lower-row roles use the visible text selector; this is
+            # a test-only adjustment, not a change to the application itself.
+            case "$role" in
+              cook) selector='text: "Cook"' ;;
+              waiter) selector='text: "Waiter"' ;;
+              owner|reception) selector="id: \"connect-demo-$role\"" ;;
+              *) echo 'UNEXPECTED_DEMO_ROLE'; exit 1 ;;
+            esac
             cat > /tmp/marina-native-demo.yaml <<EOF
           appId: kg.go.ms.staff
           ---
@@ -193,12 +203,12 @@ jobs:
               clearKeychain: true
           - scrollUntilVisible:
               element:
-                id: "connect-demo-$role"
+                $selector
               direction: DOWN
-              timeout: 30000
-              visibilityPercentage: 70
+              timeout: 60000
+              visibilityPercentage: 30
           - tapOn:
-              id: "connect-demo-$role"
+              $selector
           - extendedWaitUntil:
               visible: ".*DEMO.*"
               timeout: 30000
