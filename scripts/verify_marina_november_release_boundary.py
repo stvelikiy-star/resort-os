@@ -27,6 +27,10 @@ ALLOWED_GOVERNANCE = frozenset({
 APPROVED_P0_BLOBS = {
     "services/api/app/stays.py": "16f5a87445a9eaf9315b9b43e25d54c069bd69ce",
     "scripts/test_marina_pms_schedule_property_boundary.py": "701b21a7f74d4b1c210b6e89f65a95dfdd8d8771",
+    "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
+    "apps/staff/components/StaffRoleGateway.tsx": "ad307039fcee05324c5e1e2cd6a34cc732680f2a",
+    "apps/staff/components/WaiterEntry.module.css": "7218c412d73930418c4d703267bf83e5f8153c0e",
+    "scripts/test_marina_staff_legacy_dining_preservation.py": "15fb8274b823c5dcb0842aa6be4ca585b85d05a5",
 }
 
 
@@ -91,7 +95,7 @@ def main() -> int:
     print("PASS: MARINA November main source frozen at " + BASE)
     print("FACT: PR #555 integrated; PR #569 tested at " + TESTED_PR_HEAD)
     print("FACT: historical release 0.62.2 contract remains independently checked")
-    print("FACT: only blob-pinned occupied-room check-in P0 and regression are accepted beyond frozen main")
+    print("FACT: only blob-pinned occupied-room and waiter Web P0 fixes/regressions are accepted beyond frozen main")
     print("FACT: CI acceptance and external Web/Mobile/Android/runtime must be verified separately")
     print("FACT: production_cutover_authorized=false; NO-GO until external release gates pass")
     return 0
