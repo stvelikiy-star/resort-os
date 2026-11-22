@@ -1,0 +1,44 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createServer} from 'node:http';
+import {handler,testRouteAllowed} from '../server.mjs';
+
+test('GET allowlist is narrowly scoped to read-only FLEX routes',()=>{
+ const empty=new URLSearchParams();
+ assert.equal(testRouteAllowed('/v1/me',empty),'core');
+ assert.equal(testRouteAllowed('/v1/hotels',empty),'core');
+ assert.equal(testRouteAllowed('/v1/catalog',empty),'core');
+ assert.equal(testRouteAllowed('/v1/hotels/123e4567-e89b-12d3-a456-426614174000/subscription',empty),'core');
+ assert.equal(testRouteAllowed('/v1/hotels/123e4567-e89b-12d3-a456-426614174000/invoices',empty),'core');
+ assert.equal(testRouteAllowed('/v1/partner/me/earnings',new URLSearchParams('period=week')),'partner');
+ assert.equal(testRouteAllowed('/v1/platform/partner-earnings-summary',new URLSearchParams('period=month')),'partner');
+ for(const path of ['/v1/payments','/v1/hotels/abc/invoices','/v1/onboarding/hotels','/v1/payouts','/v1/admin/grants','/v1/partner/me/earnings/../../admin'])
+   assert.equal(testRouteAllowed(path,empty),null,path);
+ assert.equal(testRouteAllowed('/v1/hotels',new URLSearchParams('hotel_id=any')),null);
+ assert.equal(testRouteAllowed('/v1/partner/me/earnings',new URLSearchParams('period=year')),null);
+ assert.equal(testRouteAllowed('/v1/partner/me/earnings',new URLSearchParams('period=month&agent_id=123')),null);
+});
+test('not configured: no false session, protected data never leaked', async()=>{
+ const server=createServer(handler);
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const base='http://127.0.0.1:'+server.address().port;
+ try{
+  const status=await fetch(base+'/api/status');
+  const s=await status.json();
+  assert.equal(status.status,200); assert.equal(s.configured,false);
+  assert.equal(s.payments_enabled,false); assert.equal(s.payouts_enabled,false);
+  const r=await fetch(base+'/api/data/v1/hotels');
+  assert.equal(r.status,503);
+  assert.equal((await r.json()).error,'QA_BACKEND_NOT_CONFIGURED');
+  const p=await fetch(base+'/api/data/v1/payouts');
+  assert.ok([404,503].includes(p.status));
+  const mutation=await fetch(base+'/api/data/v1/hotels',{method:'POST'});
+  assert.equal(mutation.status,405);
+  const home=await fetch(base+'/');
+  assert.equal(home.status,200);
+  assert.match(home.headers.get('content-security-policy'),/script-src 'self'/);
+  assert.doesNotMatch(home.headers.get('content-security-policy'),/unsafe-inline/);
+  assert.equal(home.headers.get('cache-control'),'no-store, private');
+  assert.equal((await fetch(base+'/prototype.html')).status,404);
+ }finally{await new Promise((resolve,reject)=>server.close(err=>err?reject(err):resolve()));}
+});
