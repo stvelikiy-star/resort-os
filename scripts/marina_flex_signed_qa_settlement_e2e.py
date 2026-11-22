@@ -223,8 +223,8 @@ class SignedSandboxSettlement(unittest.TestCase):
                         "DELETE FROM flex_confirmed_payments WHERE 1=0",
                         "UPDATE flex_subscription_items SET unit_price=0 WHERE 1=0",
                     ):
-                        async with conn.transaction():
-                            with self.assertRaises(asyncpg.exceptions.InsufficientPrivilegeError):
+                        with self.assertRaises(asyncpg.exceptions.InsufficientPrivilegeError):
+                            async with conn.transaction():
                                 await conn.execute(sql)
             finally:
                 await conn.close()
