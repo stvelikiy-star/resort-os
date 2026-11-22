@@ -43,6 +43,34 @@ SELECT 1 / CASE WHEN
   ) AND NOT rolcanlogin)=6
 THEN 1 ELSE 0 END AS no_login_reader_roles;
 
+-- No trigger or other FLEX function may retain PostgreSQL's default
+-- EXECUTE grant for PUBLIC, even after restoring schema ACLs.
+SELECT 1 / CASE WHEN NOT EXISTS (
+  SELECT 1
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid=p.pronamespace
+  CROSS JOIN LATERAL aclexplode(
+    coalesce(p.proacl, acldefault('f', p.proowner))
+  ) acl
+  WHERE n.nspname='public' AND p.proname LIKE 'flex_%'
+    AND acl.grantee=0 AND acl.privilege_type='EXECUTE'
+) THEN 1 ELSE 0 END AS no_public_flex_function_execution;
+
+-- App readers are granted SELECT on scoped rows, never raw writes or
+-- SECURITY DEFINER entry points; ACL checks survive pg_dump/pg_restore.
+SELECT 1 / CASE WHEN NOT EXISTS (
+  SELECT 1
+  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+  JOIN pg_roles r ON r.rolname IN (
+    'flex_hotel_reader','flex_identity_reader',
+    'flex_agent_statement_reader','flex_investor_statement_reader'
+  )
+  WHERE n.nspname='public' AND c.relname LIKE 'flex_%' AND c.relkind IN ('r','p')
+    AND (has_table_privilege(r.oid,c.oid,'INSERT')
+         OR has_table_privilege(r.oid,c.oid,'UPDATE')
+         OR has_table_privilege(r.oid,c.oid,'DELETE'))
+) THEN 1 ELSE 0 END AS read_only_roles_have_no_table_writes;
+
 -- Missing hotel scope => no data, even after restoring the backup.
 BEGIN;
 SET LOCAL ROLE flex_hotel_reader;
