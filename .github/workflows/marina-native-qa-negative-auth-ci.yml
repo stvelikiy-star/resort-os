@@ -99,23 +99,16 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = kg.go.ms.staff
           echo "MARINA_QA_APP=$app" >> "$GITHUB_ENV"
           echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
-      - name: Ad-hoc sign QA iOS Simulator with Keychain entitlement (no distribution)
+      - name: Preserve original verified unsigned iOS Simulator binary for negative-login QA
         run: |
           set -euo pipefail
+          # This test only verifies that an invalid login fails. It must not
+          # modify the SHA-pinned QA binary or claim to verify SecureStore.
+          # A previous post-build ad-hoc signature caused SBMainWorkspace to
+          # deny launch; the unchanged unsigned app has passed native launch.
           test -d "$MARINA_QA_APP"
-          cat > "$RUNNER_TEMP/marina-negative-qa-keychain.plist" <<'ENTITLEMENTS'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0"><dict>
-            <key>application-identifier</key><string>kg.go.ms.staff</string>
-            <key>keychain-access-groups</key><array><string>kg.go.ms.staff</string></array>
-          </dict></plist>
-          ENTITLEMENTS
-          codesign --force --deep --sign - --timestamp=none --generate-entitlement-der --entitlements "$RUNNER_TEMP/marina-negative-qa-keychain.plist" "$MARINA_QA_APP"
-          codesign --verify --deep --strict "$MARINA_QA_APP"
-          codesign -d --entitlements - "$MARINA_QA_APP" 2>/dev/null |
-            python3 -c 'import sys; data=sys.stdin.buffer.read(); assert b"keychain-access-groups" in data and b"kg.go.ms.staff" in data, "QA Keychain entitlement not embedded"'
-          echo 'IOS_NEGATIVE_QA_SIMULATOR_KEYCHAIN_SIGNATURE_VERIFIED'
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$MARINA_QA_APP/Info.plist")" = kg.go.ms.staff
+          echo 'IOS_NEGATIVE_AUTH_USES_ORIGINAL_VERIFIED_SIMULATOR_APP'
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
