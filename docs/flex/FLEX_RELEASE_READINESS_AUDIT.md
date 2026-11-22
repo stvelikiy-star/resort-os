@@ -39,6 +39,14 @@
 - Новая интеграционная CI проверяет десять preview миграций по порядку, PostgreSQL backup/restore в отдельную БД, RLS/индексы/исторические триггеры, регрессии ledger и недопустимость изменения исходной гостиничной PMS.
 - Backup/restore здесь сделан **только в GitHub Actions на одноразовой PostgreSQL**, без внешнего зашифрованного R2 и без реальных коммерческих данных. Нельзя выдавать это за подтверждённую производственную стратегию DR.
 
+### Отдельная проверка фактического основного релиза (добавлена по GitHub check-runs)
+
+На `main` SHA `2642eedc27431fdb9eaa9f7bf306904d487f4b9c` за 22.11.2026 видно 29 check-runs: 24 SUCCESS, два `external-smoke` FAILURE и три SKIPPED. Оба FAIL пришли из попытки `GET https://api-production-f1171.up.railway.app/health/ready`, получив HTTP 404 с текстом `Application not found`. Тест был остановлен до проверки публичного Web/Admin/Staff.
+
+**Интерпретация:** это подтверждённый отказ внешнего smoke на старом Railway endpoint, а НЕ доказательство недоступности действующего `app.ms.go.kg`. Нужна инвентаризация актуальных public URL/deployment ID, соответствие health routes и повторное внешнее smoke с разных сетей. Не заменять адреса и не отключать smoke без независимой проверки.
+
+**Источники GitHub:** [external smoke failure 07:26 UTC](https://github.com/stvelikiy-star/resort-os/actions/runs/44998263467/job/137133921512), [external smoke failure 06:46 UTC](https://github.com/stvelikiy-star/resort-os/actions/runs/44995222731/job/137124692295).
+
 ## C. Критические пробелы P0
 
 1. **Согласование коммерческих условий.** Материалы тарифов и инвесторов являются предложениями. Для продаваемого SKU нужны договор, версия цены, налогообложение, возврат и право на период. Старые отельные договоры grandfathered.
