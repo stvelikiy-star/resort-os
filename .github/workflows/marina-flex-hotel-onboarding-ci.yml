@@ -1,0 +1,72 @@
+name: MARINA FLEX Hotel Onboarding Security
+
+on:
+  pull_request:
+    paths:
+      - "services/api/app/flex_onboarding.py"
+      - "scripts/marina_flex_onboarding_*"
+      - "docs/flex/sql/0004_flex_hotel_onboarding_preview.sql"
+      - ".github/workflows/marina-flex-hotel-onboarding-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pending-hotel-onboarding:
+    name: FLEX verified admin registration, idempotency and RLS
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: flex_ci
+          POSTGRES_USER: flex_ci
+          POSTGRES_PASSWORD: flex_ci_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flex_ci -d flex_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: flex_ci
+      PGPASSWORD: flex_ci_ci_only
+      PGDATABASE: flex_ci
+      FLEX_DATABASE_URL: postgresql://flex_runtime_ci:flex_ci_runtime_only@localhost:5432/flex_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PostgreSQL and test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          python -m pip install --disable-pip-version-check -r services/api/requirements-flex-control.txt
+      - name: Compile isolated onboarding API
+        run: python -m py_compile services/api/app/flex_onboarding.py scripts/marina_flex_onboarding_http_test.py
+      - name: Create disposable FLEX PostgreSQL with scoped writer
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0001_flex_control_plane_preview.sql
+          psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0002_flex_platform_identity_rls_preview.sql
+          psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0003_flex_price_version_guard_preview.sql
+          psql -X -v ON_ERROR_STOP=1 -f docs/flex/sql/0004_flex_hotel_onboarding_preview.sql
+          psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_rls_isolation_contract.sql
+      - name: Deny writer escalation to ACTIVE, finance and other users
+        run: psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_onboarding_rls_contract.sql
+      - name: Create non-inheriting disposable runtime account
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -c "CREATE ROLE flex_runtime_ci LOGIN PASSWORD 'flex_ci_runtime_only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT"
+          psql -X -v ON_ERROR_STOP=1 -c "GRANT flex_hotel_reader, flex_identity_reader, flex_platform_admin_reader, flex_onboarding_writer TO flex_runtime_ci WITH INHERIT FALSE, SET TRUE"
+          psql -X -v ON_ERROR_STOP=1 -c "SELECT 1 / CASE WHEN NOT pg_has_role('flex_runtime_ci','flex_onboarding_writer','USAGE') THEN 1 ELSE 0 END"
+      - name: Exercise real signed-token HTTP registration
+        run: python scripts/marina_flex_onboarding_http_test.py
+      - name: Verify the ledger and PMS were not modified
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -c "SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_confirmed_payments) = 0 THEN 1 ELSE 0 END"
+          psql -X -v ON_ERROR_STOP=1 -c "SELECT 1 / CASE WHEN (SELECT count(*) FROM flex_subscriptions) = 2 THEN 1 ELSE 0 END"
