@@ -99,6 +99,52 @@ ALTER TABLE flex_audit_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE flex_platform_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE flex_platform_hotel_grants ENABLE ROW LEVEL SECURITY;
 
+-- A distinct identity-only role can resolve the caller's grants.
+-- The actor subject comes exclusively from a verified short-lived JWT.
+CREATE ROLE flex_identity_reader NOLOGIN;
+GRANT USAGE ON SCHEMA public TO flex_identity_reader;
+GRANT SELECT ON flex_platform_memberships, flex_platform_hotel_grants,
+  flex_agents, flex_investors TO flex_identity_reader;
+
+ALTER TABLE flex_platform_memberships FORCE ROW LEVEL SECURITY;
+ALTER TABLE flex_platform_hotel_grants FORCE ROW LEVEL SECURITY;
+ALTER TABLE flex_agents FORCE ROW LEVEL SECURITY;
+ALTER TABLE flex_investors FORCE ROW LEVEL SECURITY;
+CREATE POLICY flex_identity_self ON flex_platform_memberships
+FOR SELECT TO flex_identity_reader
+USING (subject_id = NULLIF(current_setting('flex.authorized_subject_id', true),''));
+CREATE POLICY flex_identity_self_grants ON flex_platform_hotel_grants
+FOR SELECT TO flex_identity_reader
+USING (subject_id = NULLIF(current_setting('flex.authorized_subject_id', true),''));
+CREATE POLICY flex_identity_self_agent ON flex_agents
+FOR SELECT TO flex_identity_reader
+USING (platform_subject_id = NULLIF(current_setting('flex.authorized_subject_id', true),''));
+CREATE POLICY flex_identity_self_investor ON flex_investors
+FOR SELECT TO flex_identity_reader
+USING (platform_subject_id = NULLIF(current_setting('flex.authorized_subject_id', true),''));
+
+-- The global reader is available to the trusted server ONLY after a DB-derived
+-- SUPER_ADMIN or BILLING role check. It is not exposed as a login role.
+CREATE ROLE flex_platform_admin_reader NOLOGIN;
+GRANT USAGE ON SCHEMA public TO flex_platform_admin_reader;
+GRANT SELECT ON flex_hotels, flex_subscriptions, flex_subscription_items,
+  flex_invoices, flex_invoice_lines, flex_skus, flex_price_versions
+TO flex_platform_admin_reader;
+CREATE POLICY flex_admin_read_hotels ON flex_hotels
+FOR SELECT TO flex_platform_admin_reader USING (true);
+CREATE POLICY flex_admin_read_subscriptions ON flex_subscriptions
+FOR SELECT TO flex_platform_admin_reader USING (true);
+CREATE POLICY flex_admin_read_subscription_items ON flex_subscription_items
+FOR SELECT TO flex_platform_admin_reader USING (true);
+CREATE POLICY flex_admin_read_invoices ON flex_invoices
+FOR SELECT TO flex_platform_admin_reader USING (true);
+CREATE POLICY flex_admin_read_invoice_lines ON flex_invoice_lines
+FOR SELECT TO flex_platform_admin_reader USING (true);
+CREATE POLICY flex_admin_read_catalog ON flex_skus
+FOR SELECT TO flex_platform_admin_reader USING (true);
+CREATE POLICY flex_admin_read_prices ON flex_price_versions
+FOR SELECT TO flex_platform_admin_reader USING (true);
+
 -- No app user can log in as reader; only a trusted DB runtime may SET LOCAL ROLE
 -- and SET LOCAL flex.authorized_hotel_id in a transaction after verifying JWT
 -- + database-backed hotel membership. An injected request header is insufficient.
