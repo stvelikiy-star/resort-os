@@ -10,6 +10,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
+import json
 import re
 import uuid
 
@@ -251,8 +252,12 @@ async def add_future_price(
         try:
             async with conn.transaction():
                 await as_writer(conn, principal)
+                await conn.fetchval(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+                    "FLEX_PRICE_" + sku,
+                )
                 sku_row = await conn.fetchrow(
-                    "SELECT product_status,is_core FROM flex_skus WHERE sku=$1 FOR UPDATE", sku
+                    "SELECT product_status,is_core FROM flex_skus WHERE sku=$1", sku
                 )
                 if sku_row is None:
                     raise HTTPException(404, detail="SKU not found")
@@ -306,7 +311,7 @@ async def drafts(
                     "period_start": r["period_start"].isoformat(),
                     "period_end": r["period_end"].isoformat(),
                     "state": "DRAFT", "enforcement": "OFF",
-                    "currency": "KGS", "items": __import__("json").loads(r["items"]),
+                    "currency": "KGS", "items": json.loads(r['items']) if isinstance(r['items'], str) else r['items'],
                     "proposed_monthly_total": str(r["proposed_monthly_total"]),
                     "created_at": r["created_at"].isoformat(),
                 }
@@ -325,8 +330,12 @@ async def create_configuration_draft(
         try:
             async with conn.transaction():
                 await as_writer(conn, principal)
+                await conn.fetchval(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+                    "FLEX_DRAFT_" + str(payload.hotel_id),
+                )
                 hotel = await conn.fetchval(
-                    "SELECT status FROM flex_hotels WHERE id=$1 FOR UPDATE", payload.hotel_id
+                    "SELECT status FROM flex_hotels WHERE id=$1", payload.hotel_id
                 )
                 if hotel not in {"PENDING", "ACTIVE"}:
                     raise HTTPException(404, detail="Hotel is not available for a draft")
@@ -368,7 +377,7 @@ async def create_configuration_draft(
                     "RETURNING id,created_at",
                     payload.hotel_id, version, payload.title,
                     payload.period_start, payload.period_end,
-                    __import__("json").dumps(snapshots, ensure_ascii=False),
+                    json.dumps(snapshots, ensure_ascii=False),
                     total, principal.subject_id,
                 )
                 return {
