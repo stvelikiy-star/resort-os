@@ -111,7 +111,7 @@ async def register_hotel(
             )
             previous = await conn.fetchrow(
                 'SELECT hotel_id,payload_sha256 FROM flex_hotel_onboarding_requests '
-                'WHERE actor_subject_id=$1 AND idempotency_key=$2 FOR UPDATE',
+                'WHERE actor_subject_id=$1 AND idempotency_key=$2',
                 principal.subject_id, idempotency_key,
             )
             if previous is not None:
