@@ -11,9 +11,9 @@ BEGIN
   -- Lock the SKU to serialize two concurrent price publications.
   PERFORM 1 FROM flex_skus WHERE sku=NEW.sku FOR UPDATE;
   IF EXISTS (
-    SELECT 1 FROM flex_price_versions old
-    WHERE old.sku=NEW.sku
-      AND (old.version >= NEW.version OR old.valid_from >= NEW.valid_from)
+    SELECT 1 FROM flex_price_versions existing_price
+    WHERE existing_price.sku=NEW.sku
+      AND (existing_price.version >= NEW.version OR existing_price.valid_from >= NEW.valid_from)
   ) THEN
     RAISE EXCEPTION 'FLEX_PRICE_VERSION_NOT_MONOTONIC' USING ERRCODE='23514';
   END IF;
