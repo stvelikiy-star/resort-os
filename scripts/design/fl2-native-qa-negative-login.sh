@@ -18,10 +18,26 @@ fi
 if [[ "$platform" = android ]];then
   apk='android-bin/app-release.apk'
   test -s "$apk" || { echo 'BLOCKED: verified QA APK missing'; exit 78; }
+  adb wait-for-device
+  # A stale Pixel Launcher ANR masked the negative-login screen in CI
+  # (run 45049095691). Require full Android boot before UI testing.
+  boot_ready=false
+  for attempt in $(seq 1 45); do
+    if [[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then
+      boot_ready=true
+      break
+    fi
+    sleep 2
+  done
+  test "$boot_ready" = true || { echo 'ANDROID_EMULATOR_BOOT_INCOMPLETE'; exit 78; }
   adb install -r "$apk" >/dev/null
   adb shell pm path kg.go.ms.staff | grep -q 'package:'
-  adb shell monkey -p kg.go.ms.staff -c android.intent.category.LAUNCHER 1 >/dev/null
-  sleep 3
+  # Launch the app via ActivityManager, not Monkey/Pixel Launcher. The
+  # launcher itself had shown "isn't responding" on the failure screenshot.
+  adb shell am force-stop kg.go.ms.staff || true
+  adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p kg.go.ms.staff >/dev/null
+  sleep 8
+  echo 'ANDROID_QA_DIRECT_APP_LAUNCH_AFTER_BOOT_PASS'
 fi
 curl -fsSL https://get.maestro.mobile.dev -o /tmp/marina-maestro-qa-negative-install.sh
 bash /tmp/marina-maestro-qa-negative-install.sh >/dev/null
