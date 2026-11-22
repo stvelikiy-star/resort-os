@@ -18,6 +18,8 @@ const qaEnvironment = process.env.FLEX_ENVIRONMENT === 'qa';
 const onboardingApiOrigin = (process.env.FLEX_ONBOARDING_API_ORIGIN || '').replace(/\/$/, '');
 const qaOnboarding = qaEnvironment && process.env.FLEX_ENABLE_QA_ONBOARDING === 'true' && Boolean(onboardingApiOrigin);
 const qaLinking = qaOnboarding && process.env.FLEX_ENABLE_QA_LINKING === 'true';
+const catalogAdminApiOrigin = (process.env.FLEX_CATALOG_ADMIN_API_ORIGIN || '').replace(/\/$/, '');
+const qaCatalogAdmin = qaEnvironment && process.env.FLEX_ENABLE_QA_CATALOG_DRAFTS === 'true' && Boolean(catalogAdminApiOrigin);
 
 const secret = rawSecret ? Buffer.from(rawSecret, 'base64') : null;
 const configured = Boolean(publicOrigin && issuer && clientId && apiAudience && apiOrigin && partnerApiOrigin && secret?.length === 32);
@@ -29,6 +31,9 @@ if (configured && (![issuer, apiOrigin, partnerApiOrigin].every(v => v.startsWit
 if (qaOnboarding && !(onboardingApiOrigin.startsWith('https://') || (localOrigin && /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(onboardingApiOrigin)))) {
   throw new Error('FLEX QA onboarding origin must use HTTPS');
 }
+if (qaCatalogAdmin && !(catalogAdminApiOrigin.startsWith('https://') ||
+   (localOrigin && /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(catalogAdminApiOrigin))))
+  throw new Error('FLEX QA catalog admin requires a trusted HTTPS origin');
 const secureCookie = publicOrigin.startsWith('https://');
 const cookies = { login: 'flex_login', session: 'flex_session' };
 const noStore = { 'Cache-Control': 'no-store, private', 'Pragma': 'no-cache', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY', 'Cross-Origin-Resource-Policy': 'same-origin', 'Permissions-Policy': 'camera=(), microphone=(), geolocation=()' };
@@ -238,9 +243,104 @@ async function trustedLinkAction(req,res,url) {
   return json(res,200,{hotel_id:reply.hotel_id,link_status:'VERIFIED',subscription_activated:false});
 }
 
+
+/* Every commercial administration action is append-only and QA-scoped.
+ * No generic reverse proxy, paid state, live subscription or entitlement writes.
+ */
+const catalogSkuAction=/^\/api\/actions\/catalog\/skus$/;
+const catalogPriceAction=/^\/api\/actions\/catalog\/skus\/([A-Z][A-Z0-9_]{1,79})\/prices$/;
+const configurationDraftAction=/^\/api\/actions\/subscription-drafts$/;
+const catalogVersionsRead=/^\/v1\/platform\/catalog\/skus\/([A-Z][A-Z0-9_]{1,79})\/versions$/;
+const catalogReadOnly=new Set(['/v1/platform/catalog','/v1/platform/subscription-drafts']);
+const amountPattern=/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/;
+function validateCatalogAdminAction(kind,body) {
+  if(!body || typeof body!=='object'||Array.isArray(body))return null;
+  const keys=Object.keys(body);
+  const exact=allowed=>keys.length===allowed.length && allowed.every(k=>keys.includes(k));
+  if(kind==='sku') {
+    if(!exact(['sku','title','capability_key']))return null;
+    if(typeof body.sku!=='string'||!(/^[A-Z][A-Z0-9_]{1,79}$/.test(body.sku)))return null;
+    if(typeof body.title!=='string'||body.title.trim().length<2||body.title.trim().length>160)return null;
+    if(typeof body.capability_key!=='string'||!(/^[a-z][a-z0-9_.:-]{2,119}$/.test(body.capability_key)))return null;
+    return {sku:body.sku,title:body.title.trim(),capability_key:body.capability_key};
+  }
+  if(kind==='price') {
+    if(!exact(['monthly_price','currency','valid_from']))return null;
+    if(typeof body.monthly_price!=='string'||!amountPattern.test(body.monthly_price)||body.currency!=='KGS')return null;
+    if(typeof body.valid_from!=='string'||!(/(?:Z|[+-]\d{2}:\d{2})$/.test(body.valid_from)))return null;
+    const when=Date.parse(body.valid_from),now=Date.now();
+    if(!Number.isFinite(when)||when<=now+86400000||when>now+366*86400000)return null;
+    return {monthly_price:body.monthly_price,currency:'KGS',valid_from:new Date(when).toISOString()};
+  }
+  if(kind==='draft') {
+    if(!exact(['hotel_id','title','period_start','period_end','skus']))return null;
+    if(typeof body.hotel_id!=='string'||!flexUuidRe.test(body.hotel_id))return null;
+    if(typeof body.title!=='string'||body.title.trim().length<2||body.title.trim().length>120)return null;
+    const datere=/^\d{4}-\d{2}-\d{2}$/;
+    if(![body.period_start,body.period_end].every(x=>typeof x==='string'&&datere.test(x)&&
+      Number.isFinite(Date.parse(x))&&new Date(x).toISOString().slice(0,10)===x))return null;
+    if(body.period_end<body.period_start)return null;
+    if(!Array.isArray(body.skus)||body.skus.length<1||body.skus.length>50||
+       new Set(body.skus).size!==body.skus.length||!body.skus.every(x=>typeof x==='string'&&/^[A-Z][A-Z0-9_]{1,79}$/.test(x)))return null;
+    return {hotel_id:body.hotel_id,title:body.title.trim(),period_start:body.period_start,
+      period_end:body.period_end,skus:body.skus};
+  }
+  return null;
+}
+async function catalogAdminPost(req,res,url) {
+  if(!configured||!qaCatalogAdmin)return json(res,503,{error:'QA_CATALOG_ADMIN_NOT_ENABLED'});
+  if(!isSameOrigin(req))return json(res,403,{error:'ORIGIN_NOT_ALLOWED'});
+  if(!/^application\/json(?:\s*;|$)/i.test(String(req.headers['content-type']||'')))
+    return json(res,415,{error:'JSON_REQUIRED'});
+  const session=unseal(cookiesFrom(req)[cookies.session]);
+  if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
+  if(!session.csrf||!fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
+  const priceMatch=url.pathname.match(catalogPriceAction);
+  const kind=catalogSkuAction.test(url.pathname)?'sku':priceMatch?'price':
+    configurationDraftAction.test(url.pathname)?'draft':null;
+  if(!kind)return json(res,404,{error:'ACTION_NOT_ALLOWED'});
+  let raw='';
+  for await(const part of req) {
+    raw+=part.toString();
+    if(Buffer.byteLength(raw,'utf8')>4096)return json(res,413,{error:'BODY_TOO_LARGE'});
+  }
+  let parsed;
+  try{parsed=JSON.parse(raw)}catch{return json(res,400,{error:'INVALID_JSON'})}
+  const payload=validateCatalogAdminAction(kind,parsed);
+  if(!payload)return json(res,422,{error:'INVALID_QA_CONFIGURATION'});
+  const path=kind==='sku'?'/v1/platform/catalog/skus':
+    kind==='price'?'/v1/platform/catalog/skus/'+priceMatch[1]+'/prices':
+    '/v1/platform/subscription-drafts';
+  const upstream=await fetch(catalogAdminApiOrigin+path,{
+    method:'POST',
+    headers:{Authorization:'Bearer '+session.token,'Content-Type':'application/json','Accept':'application/json'},
+    body:JSON.stringify(payload),redirect:'manual',signal:AbortSignal.timeout(10000)
+  });
+  if(upstream.status>=300&&upstream.status<400)return json(res,502,{error:'UNEXPECTED_UPSTREAM_REDIRECT'});
+  if(!(upstream.headers.get('content-type')||'').includes('application/json'))return json(res,502,{error:'UPSTREAM_NON_JSON'});
+  const response=await upstream.text();
+  if(response.length>12000)return json(res,502,{error:'UPSTREAM_TOO_LARGE'});
+  let result;
+  try{result=JSON.parse(response)}catch{return json(res,502,{error:'UPSTREAM_INVALID_JSON'})}
+  if(!upstream.ok)return json(res,upstream.status,{error:'FLEX_QA_ADMIN_REJECTED',detail:
+    typeof result.detail==='string'?result.detail:'Backend rejected the request'});
+  if(kind==='sku' && !(result.status==='PLANNED'&&result.published===false&&result.entitlement_changed===false))
+    return json(res,502,{error:'UNEXPECTED_SKU_STATE'});
+  if(kind==='price' && !(result.entitlement_changed===false&&result.payment_collected===false))
+    return json(res,502,{error:'UNEXPECTED_PRICE_STATE'});
+  if(kind==='draft' && !(result.state==='DRAFT'&&result.enforcement==='OFF'&&
+     result.subscription_activated===false&&result.payments_enabled===false))
+    return json(res,502,{error:'UNEXPECTED_DRAFT_STATE'});
+  return json(res,201,result);
+}
+
 function routeAllowed(path, search) {
   if(search && [...search.keys()].some(k=>k!=='period')) return null;
   if(['/v1/me','/v1/hotels','/v1/catalog'].includes(path) && !search.size) return 'core';
+  if((path==='/v1/platform/catalog'||catalogVersionsRead.test(path))&&!search.size)return 'catalog_admin';
+  if(path==='/v1/platform/subscription-drafts'&&
+     (!search.size||(search.size===1&&flexUuidRe.test(search.get('hotel_id')||''))))
+    return 'catalog_admin';
   if(hotelPattern.test(path) && !search.size) return 'core';
   if(['/v1/partner/me/earnings','/v1/platform/partner-earnings-summary'].includes(path)
      && (!search.size || (search.size===1 && ['day','week','month'].includes(search.get('period'))))) return 'partner';
@@ -253,7 +353,8 @@ async function proxy(req,res,url) {
   const path=url.pathname.replace(/^\/api\/data/,'');
   const target=routeAllowed(path,url.searchParams);
   if(!target) return json(res,404,{error:'READ_ONLY_ENDPOINT_NOT_AVAILABLE'});
-  const backend=(target==='partner'?partnerApiOrigin:apiOrigin)+path+url.search;
+  if(target==='catalog_admin'&&!qaCatalogAdmin)return json(res,503,{error:'QA_CATALOG_ADMIN_NOT_ENABLED'});
+  const backend=(target==='partner'?partnerApiOrigin:target==='catalog_admin'?catalogAdminApiOrigin:apiOrigin)+path+url.search;
   const upstream=await fetch(backend,{method:'GET',headers:{'Authorization':'Bearer '+session.token,'Accept':'application/json'},redirect:'manual',signal:AbortSignal.timeout(10000)});
   if(upstream.status>=300 && upstream.status<400) return json(res,502,{error:'UNEXPECTED_UPSTREAM_REDIRECT'});
   const contentType=upstream.headers.get('content-type')||'';
@@ -274,11 +375,12 @@ async function staticFile(res, pathname) {
 export async function handler(req,res) {
   try {
     const url=new URL(req.url,'http://localhost');
-    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
-    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,payments_enabled:false,payouts_enabled:false});
+    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
+    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,payments_enabled:false,payouts_enabled:false});
     if(url.pathname==='/api/session') { const s=unseal(cookiesFrom(req)[cookies.session]);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
     if(req.method==='POST'&&(linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))return await trustedLinkAction(req,res,url);
+    if(req.method==='POST'&&(catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)))return await catalogAdminPost(req,res,url);
     if(url.pathname==='/api/auth/login') return await authLogin(res);
     if(url.pathname==='/api/auth/callback') return await authCallback(req,res,url);
     if(url.pathname==='/api/auth/logout') return redirect(res,'/',{'Set-Cookie':cookie(cookies.session,'',0)});
@@ -290,3 +392,4 @@ if(process.env.NODE_ENV!=='test') createServer(handler).listen(port,host,()=>con
 export const testRouteAllowed=routeAllowed;
 export const testValidateHotelRegistration=validateHotelRegistration;
 export const testValidateLinkPayload=validateLinkPayload;
+export const testValidateCatalogAdminAction=validateCatalogAdminAction;
