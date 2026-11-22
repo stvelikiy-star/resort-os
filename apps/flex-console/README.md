@@ -66,7 +66,9 @@ All four values are necessary; no toggle or fake signature is available from bro
 
 The synthetic E2E test generates **disposable test signing keys in memory**; they are never reused by any actual MARINA SMART deployment. Keep trusted production/PMS secrets away from this QA environment.
 
-**Not yet implemented:** catalog publication and price-version administration, subscriptions state changes, agent/investor contract writes, or live deployment. These need dedicated safe transactional APIs, never imitation HTML mutations.
+**Current P0 progress (QA, separate API):** SUPER_ADMIN can create PLANNED SKU, append a future KGS price version, inspect price history, and save DRAFT/OFF subscription configuration proposals through `services/api/app/flex_catalog_admin.py` and an isolated `0011` schema. Configure `FLEX_ENVIRONMENT=qa`, `FLEX_ENABLE_QA_CATALOG_DRAFTS=true`, and `FLEX_CATALOG_ADMIN_API_ORIGIN=https://<trusted-private-qa-api>` on the BFF; the Python API itself independently refuses non-QA startup. No entitled function is activated by any of these actions.
+
+**Still NOT implemented or approved:** publishing a new SKU as AVAILABLE, editing live subscriptions or entitlements, agent/investor contract writes, payment acceptance, and real cloud FLEX deployment. These require dedicated reviewed APIs and independent QA. The BILLING role displays an explicit payment hold instead of agent earnings.
 
 ## Separate managed QA environment only
 
