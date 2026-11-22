@@ -8,11 +8,11 @@ INSERT INTO flex_skus(sku,title,capability_key,product_status) VALUES
  ('BASE_PMS','Core PMS','base_pms','AVAILABLE'),
  ('AI_ASSISTANT','AI Assistant','ai_assistant','AVAILABLE'),
  ('UNFINISHED_MODULE','Unfinished module','unfinished','PLANNED');
-INSERT INTO flex_price_versions(sku,version,monthly_price,currency,valid_from) VALUES
- ('BASE_PMS',1,10000.00,'KGS','2026-01-01T00:00:00+00'),
- ('BASE_PMS',2,11000.00,'KGS','2027-01-01T00:00:00+00'),
- ('AI_ASSISTANT',1,4000.00,'KGS','2026-01-01T00:00:00+00'),
- ('UNFINISHED_MODULE',1,9999.00,'KGS','2026-01-01T00:00:00+00');
+INSERT INTO flex_price_versions(sku,version,monthly_price,currency,valid_from,valid_to) VALUES
+ ('BASE_PMS',1,10000.00,'KGS','2026-01-01T00:00:00+00','2027-01-01T00:00:00+00'),
+ ('BASE_PMS',2,11000.00,'KGS','2027-01-01T00:00:00+00',NULL),
+ ('AI_ASSISTANT',1,4000.00,'KGS','2026-01-01T00:00:00+00',NULL),
+ ('UNFINISHED_MODULE',1,9999.00,'KGS','2026-01-01T00:00:00+00',NULL);
 INSERT INTO flex_platform_memberships(subject_id,role,active)
  VALUES ('owner-a','HOTEL_OWNER',true),
  ('owner-b','HOTEL_OWNER',true),
