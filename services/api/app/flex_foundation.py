@@ -60,7 +60,7 @@ def decide_feature_access(
         return AccessDecision(True, False, "ENFORCEMENT_OFF", enforcement)
 
     state = feature_state if feature_state in FEATURE_STATES else "OFF"
-    if state == "GRACE" and valid_until is not None and now >= valid_until:
+    if state == "GRACE" and (valid_until is None or now is None or now >= valid_until):
         state = "READ_ONLY"
     authorized = state in {"ON", "GRACE"} or (state == "READ_ONLY" and operation == "READ")
     reason = "ENTITLED" if authorized else ("READ_ONLY" if state == "READ_ONLY" else "NOT_ENTITLED")
