@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 import json
 import os
@@ -143,11 +144,12 @@ class NewConfigurationDraft(BaseModel):
 
 
 def ensure_draft_period(payload: NewConfigurationDraft) -> None:
+    today = datetime.now(ZoneInfo('Asia/Bishkek')).date()
     if (
         payload.period_end < payload.period_start
         or (payload.period_end - payload.period_start).days > 366
-        or payload.period_start < date.today() - timedelta(days=1)
-        or payload.period_start > date.today() + timedelta(days=366)
+        or payload.period_start < today - timedelta(days=1)
+        or payload.period_start > today + timedelta(days=366)
     ):
         raise HTTPException(422, detail="Draft dates must be current or future, at most 366 days")
 
@@ -348,8 +350,8 @@ async def create_configuration_draft(
                     "SELECT s.sku, p.id AS price_id,p.version,p.monthly_price,p.currency "
                     "FROM flex_skus s JOIN LATERAL ( "
                     "SELECT id,version,monthly_price,currency FROM flex_price_versions "
-                    "WHERE sku=s.sku AND valid_from<($2::date + interval '1 day') "
-                    "AND (valid_to IS NULL OR valid_to>($2::date)) "
+                    "WHERE sku=s.sku AND valid_from <= ($2::date::timestamp AT TIME ZONE 'Asia/Bishkek') "
+                    "AND (valid_to IS NULL OR valid_to > ($2::date::timestamp AT TIME ZONE 'Asia/Bishkek')) "
                     "ORDER BY valid_from DESC,version DESC LIMIT 1 "
                     ") p ON true WHERE s.sku = ANY($1::text[]) AND s.product_status='AVAILABLE' "
                     "AND s.is_core=false ORDER BY s.sku",
