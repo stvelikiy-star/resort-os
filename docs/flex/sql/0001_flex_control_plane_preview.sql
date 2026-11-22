@@ -278,4 +278,24 @@ CREATE INDEX flex_agent_accruals_attr ON flex_agent_commission_accruals(attribut
 
 -- No platform login, RLS claim, user credentials, banking provider or payouts.
 -- Explicit RLS role policies and service boundary are the gate before any live use.
+-- Defend the financial dimensions at the database boundary.
+-- An invoice cannot contain a different currency than its line or payment,
+-- and a quoted price version cannot be reassigned to another SKU.
+ALTER TABLE flex_price_versions ADD CONSTRAINT flex_price_version_composite
+  UNIQUE (id,sku);
+ALTER TABLE flex_subscription_items ADD CONSTRAINT flex_subscription_item_price_sku
+  FOREIGN KEY (price_version_id,sku) REFERENCES flex_price_versions(id,sku);
+ALTER TABLE flex_invoice_lines ADD CONSTRAINT flex_invoice_line_price_sku
+  FOREIGN KEY (price_version_id,sku) REFERENCES flex_price_versions(id,sku);
+ALTER TABLE flex_invoices ADD CONSTRAINT flex_invoice_hotel_currency
+  UNIQUE (id,hotel_id,currency);
+ALTER TABLE flex_invoices ADD CONSTRAINT flex_invoice_currency
+  UNIQUE (id,currency);
+ALTER TABLE flex_invoice_lines ADD CONSTRAINT flex_invoice_line_currency
+  FOREIGN KEY (invoice_id,currency) REFERENCES flex_invoices(id,currency);
+ALTER TABLE flex_payment_intents ADD CONSTRAINT flex_intent_invoice_currency
+  FOREIGN KEY (invoice_id,currency) REFERENCES flex_invoices(id,currency);
+ALTER TABLE flex_confirmed_payments ADD CONSTRAINT flex_confirmed_payment_currency
+  FOREIGN KEY (invoice_id,hotel_id,currency) REFERENCES flex_invoices(id,hotel_id,currency);
+
 COMMIT;
