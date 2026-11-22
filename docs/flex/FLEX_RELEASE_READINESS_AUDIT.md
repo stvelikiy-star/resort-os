@@ -43,6 +43,8 @@
 
 На `main` SHA `2642eedc27431fdb9eaa9f7bf306904d487f4b9c` за 22.11.2026 видно 29 check-runs: 24 SUCCESS, два `external-smoke` FAILURE и три SKIPPED. Оба FAIL пришли из попытки `GET https://api-production-f1171.up.railway.app/health/ready`, получив HTTP 404 с текстом `Application not found`. Тест был остановлен до проверки публичного Web/Admin/Staff.
 
+**Проверка провайдеров (только чтение, 22.11.2026):** в Railway-проекте `MARINA SMART Pilot` (production) нет ни одного сервиса, поэтому обращаться к прежнему `api-production-f1171.up.railway.app` как к текущему API нельзя. В Vercel проекте `marina-smart-web-gateway` есть один `READY` production deployment; при этом `get_project.live=false`, а в списке прикреплённых доменов только `*.vercel.app`, **без** `app.ms.go.kg`. Это не доказывает доступность фактического домена MARINA SMART.
+
 **Интерпретация:** это подтверждённый отказ внешнего smoke на старом Railway endpoint, а НЕ доказательство недоступности действующего `app.ms.go.kg`. Нужна инвентаризация актуальных public URL/deployment ID, соответствие health routes и повторное внешнее smoke с разных сетей. Не заменять адреса и не отключать smoke без независимой проверки.
 
 **Источники GitHub:** [external smoke failure 07:26 UTC](https://github.com/stvelikiy-star/resort-os/actions/runs/44998263467/job/137133921512), [external smoke failure 06:46 UTC](https://github.com/stvelikiy-star/resort-os/actions/runs/44995222731/job/137124692295).
