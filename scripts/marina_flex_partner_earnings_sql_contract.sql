@@ -134,12 +134,12 @@ BEGIN
   -- pro-rata share of the source refund.
   BEGIN
     INSERT INTO flex_partner_earnings_entries(
-      rule_version_id,agent_id,allocation_id,source_allocation_reversal_id,entry_type,amount
-    ) VALUES(ar_a,ag_a,p_b,reversal,'REVERSAL',1.00);
+      rule_version_id,investor_id,allocation_id,source_allocation_reversal_id,entry_type,amount
+    ) VALUES(ir_b,inv_b,p_b,reversal,'REVERSAL',1.00);
     SET CONSTRAINTS flex_qa_partner_earnings_capacity IMMEDIATE;
     RAISE EXCEPTION 'CI_WRONG_ALLOCATION_REVERSAL_ACCEPTED';
   EXCEPTION WHEN check_violation THEN
-    IF SQLERRM <> 'FLEX_PARTNER_SCOPE_OR_SOURCE_INVALID' THEN RAISE; END IF;
+    IF SQLERRM <> 'FLEX_PARTNER_REVERSAL_WRONG_SOURCE' THEN RAISE; END IF;
   END;
 
   -- Fund is not the same as paid payout: the QA ledger must NEVER include
