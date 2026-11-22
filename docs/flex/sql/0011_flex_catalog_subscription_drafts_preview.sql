@@ -39,6 +39,28 @@ CREATE POLICY flex_admin_read_configuration_drafts
   ON flex_subscription_configuration_drafts
   FOR SELECT TO flex_platform_admin_reader USING (true);
 
+-- The older 0003 guard used SELECT FOR UPDATE on flex_skus, which requires
+-- UPDATE privilege. Replace only its row-lock implementation with an
+-- advisory transaction lock: isolated catalog writer gets NO UPDATE permission
+-- on existing SKU definitions, and version monotonicity remains protected.
+CREATE OR REPLACE FUNCTION flex_price_version_period_guard()
+RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended('FLEX_PRICE_'||NEW.sku,0)
+  );
+  IF EXISTS (
+    SELECT 1 FROM flex_price_versions existing_price
+    WHERE existing_price.sku=NEW.sku
+      AND (existing_price.version>=NEW.version
+        OR existing_price.valid_from>=NEW.valid_from)
+  ) THEN
+    RAISE EXCEPTION 'FLEX_PRICE_VERSION_NOT_MONOTONIC'
+      USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END $;
+
 -- The only writer role; the dedicated API runtime must have NOINHERIT membership.
 -- It has *no* rights on flex_subscriptions, *_items, hotel links, invoice,
 -- payment, provider, partner earning, entitlement or PMS tables.
