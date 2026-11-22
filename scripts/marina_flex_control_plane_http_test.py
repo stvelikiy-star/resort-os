@@ -102,6 +102,20 @@ class RealHTTPIsolation(unittest.TestCase):
         own = self.get(f"/v1/hotels/{HOTEL_B}/invoices", "administrator", mfa=True)
         self.assertEqual(own.status_code, 200, own.text)
 
+    def test_available_catalog_only_no_future_or_planned_price(self):
+        owner = self.get("/v1/catalog", "owner-a")
+        self.assertEqual(owner.status_code, 200, owner.text)
+        self.assertEqual(
+            {p["sku"]: p["monthly_list_price"] for p in owner.json()},
+            {"AI_ASSISTANT": "4000.00", "BASE_PMS": "10000.00"},
+        )
+        admin_without_mfa = self.get("/v1/catalog", "administrator")
+        self.assertEqual(admin_without_mfa.status_code, 403)
+        admin = self.get("/v1/catalog", "administrator", mfa=True)
+        self.assertEqual(admin.status_code, 200, admin.text)
+        self.assertEqual(len(admin.json()), 2)
+        self.assertEqual(self.get("/v1/catalog", "unknown-user").status_code, 403)
+
     def test_control_api_remains_read_only(self):
         for path in ("/v1/hotels", f"/v1/hotels/{HOTEL_A}/subscription"):
             r = self.client.post(path, headers={
