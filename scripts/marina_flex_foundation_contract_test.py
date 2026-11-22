@@ -15,6 +15,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services" / "api"))
 from app.flex_foundation import (  # noqa: E402
     InvoiceBalance,
+    PlatformPrincipal,
+    platform_action_allowed,
     allocate_confirmed_payment,
     decide_feature_access,
     money,
@@ -190,6 +192,52 @@ class MoneyRules(unittest.TestCase):
             ))
         with self.assertRaises(ValueError):
             allocate_confirmed_payment("10", (InvoiceBalance("x", Decimal("-1")),))
+
+
+class PlatformRoleIsolation(unittest.TestCase):
+    def test_owner_only_own_hotel(self):
+        owner = PlatformPrincipal("hotel-owner", "HOTEL_OWNER", hotel_ids=frozenset({"hotel-a"}))
+        self.assertTrue(platform_action_allowed(owner, action="VIEW_HOTEL_BILLING", hotel_id="hotel-a"))
+        self.assertTrue(platform_action_allowed(owner, action="REQUEST_HOTEL_FEATURE", hotel_id="hotel-a"))
+        self.assertFalse(platform_action_allowed(owner, action="VIEW_HOTEL_BILLING", hotel_id="hotel-b"))
+        self.assertFalse(platform_action_allowed(owner, action="VIEW_HOTEL_BILLING"))
+        self.assertFalse(platform_action_allowed(owner, action="MANAGE_CATALOG", hotel_id="hotel-a"))
+
+    def test_sales_agent_cannot_see_another_agent_or_hotels(self):
+        agent = PlatformPrincipal("sales-1", "SALES_AGENT", agent_id="agent-1")
+        self.assertTrue(platform_action_allowed(agent, action="VIEW_AGENT_EARNINGS", agent_id="agent-1"))
+        self.assertFalse(platform_action_allowed(agent, action="VIEW_AGENT_EARNINGS", agent_id="agent-2"))
+        self.assertFalse(platform_action_allowed(agent, action="VIEW_HOTEL_BILLING", hotel_id="hotel-a"))
+        self.assertFalse(platform_action_allowed(agent, action="VIEW_INVESTOR_EARNINGS", investor_id="inv-1"))
+
+    def test_investor_cannot_see_others(self):
+        investor = PlatformPrincipal("inv-user", "INVESTOR", investor_id="inv-1")
+        self.assertTrue(platform_action_allowed(investor, action="VIEW_INVESTOR_EARNINGS", investor_id="inv-1"))
+        self.assertFalse(platform_action_allowed(investor, action="VIEW_INVESTOR_EARNINGS", investor_id="inv-2"))
+        self.assertFalse(platform_action_allowed(investor, action="VIEW_AGENT_EARNINGS", agent_id="agent-1"))
+        self.assertFalse(platform_action_allowed(investor, action="RECONCILE_PAYMENTS"))
+
+    def test_platform_finance_requires_mfa_and_separation(self):
+        admin = PlatformPrincipal("platform-root", "SUPER_ADMIN", mfa_verified=False)
+        self.assertTrue(platform_action_allowed(admin, action="PLATFORM_DASHBOARD"))
+        self.assertFalse(platform_action_allowed(admin, action="MANAGE_CATALOG"))
+        admin_mfa = PlatformPrincipal("platform-root", "SUPER_ADMIN", mfa_verified=True)
+        self.assertTrue(platform_action_allowed(admin_mfa, action="MANAGE_CATALOG"))
+        self.assertFalse(platform_action_allowed(admin_mfa, action="EXECUTE_PAYOUT"))
+        billing = PlatformPrincipal("accountant", "BILLING", mfa_verified=True)
+        self.assertTrue(platform_action_allowed(billing, action="RECONCILE_PAYMENTS"))
+        self.assertFalse(platform_action_allowed(billing, action="MANAGE_INVESTOR_CONTRACTS"))
+
+    def test_unknown_role_or_action_denied(self):
+        self.assertFalse(platform_action_allowed(
+            PlatformPrincipal("person", "AGENT"), action="VIEW_AGENT_EARNINGS", agent_id="a"
+        ))
+        self.assertFalse(platform_action_allowed(
+            PlatformPrincipal("", "SUPER_ADMIN", mfa_verified=True), action="PLATFORM_DASHBOARD"
+        ))
+        self.assertFalse(platform_action_allowed(
+            PlatformPrincipal("person", "INVESTOR", investor_id="inv"), action="WHATEVER"
+        ))
 
 
 if __name__ == "__main__":
