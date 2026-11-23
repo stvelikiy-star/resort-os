@@ -207,3 +207,31 @@ test('SUPER ADMIN draft dates mirror the API bounds without sending malformed pe
  const translations=vm.runInNewContext('('+match[1]+')');
  for(const lang of ['ru','kg','en'])assert.ok(translations[lang].draftDatesError.length>30);
 });
+
+
+test('commercial hotel card presents honest role-bound tabs without inventing usage or partner figures',()=>{
+ const source=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ const section=source.slice(source.indexOf('function hotelCardTabs(){'),source.indexOf('async function hotelDetail(){'));
+ const context={state:{me:{role:'HOTEL_OWNER'},hotelTab:'overview'},safe:x=>String(x),t:x=>x};
+ const tabs=vm.runInNewContext('('+section.trim()+')',context);
+ const owner=tabs();
+ assert.match(owner,/data-hotel-tab="overview"/);
+ assert.match(owner,/data-hotel-tab="finance"/);
+ assert.match(owner,/data-hotel-tab="usage"/);
+ assert.doesNotMatch(owner,/data-hotel-tab="relations"/);
+ assert.doesNotMatch(owner,/data-hotel-tab="history"/);
+ context.state.me.role='SUPER_ADMIN';
+ const admin=tabs();
+ assert.match(admin,/data-hotel-tab="relations"/);
+ assert.match(admin,/data-hotel-tab="history"/);
+ context.state.me.role='HOTEL_OWNER';
+ context.state.hotelTab='relations';
+ tabs();
+ assert.equal(context.state.hotelTab,'overview','restricted tab resets for owner');
+ const detail=source.slice(source.indexOf('async function hotelDetail(){'),source.indexOf('async function catalog(){'));
+ assert.match(detail,/hotelTabPending/);
+ assert.match(detail,/if\(\['usage','relations','history'\].includes\(state.hotelTab\)\)/);
+ assert.match(detail,/const subscription=hotelReadResult\(sub,true\)/);
+ assert.match(detail,/const invoices=hotelReadResult\(inv\)/);
+ assert.doesNotMatch(detail,/Math\.random/);
+});
