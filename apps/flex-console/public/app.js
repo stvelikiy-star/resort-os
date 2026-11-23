@@ -45,7 +45,7 @@ async function submitIdentityForm(form){
      state.identityStep=data.twoFactorRedirect===true?'totp':'session';
    }else if(form.id==='flex-identity-totp'){
      const code=String(form.elements.code.value||'').trim();
-     if(!/^\\d{6}$/.test(code))throw Error('INVALID_TOTP_CODE');
+     if(!/^\d{6}$/.test(code))throw Error('INVALID_TOTP_CODE');
      await identityRequest('two-factor/verify-totp',{code,trustDevice:false});
      form.elements.code.value='';
      state.identityStep='session';
