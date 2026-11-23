@@ -5,6 +5,7 @@ on:
       # Release candidate gate: every FLEX change must check the SAME head SHA.
       - ".github/workflows/marina-flex-*.yml"
       - "apps/flex-console/**"
+      - "apps/flex-api-qa/**"
       - "docs/flex/**"
       - "services/api/app/flex_*.py"
       - "scripts/marina_flex_*"
@@ -28,6 +29,8 @@ jobs:
         run: pip install --disable-pip-version-check -r services/api/requirements-flex-control.txt
       - name: Strict admin models, MFA and draft-only invariant
         run: python scripts/marina_flex_catalog_admin_contract_test.py
+      - name: Isolated Vercel Neon QA API requires TLS, no privilege escalation or payment routes
+        run: python -m unittest discover -s apps/flex-api-qa/test -p "test_*.py" -v
       - name: All edits isolated from PMS, banks, and existing November release
         run: |
           python scripts/marina_flex_release_scope_guard.py --self-test
