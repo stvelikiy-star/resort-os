@@ -43,7 +43,7 @@ jobs:
           node-version: '22'
       - name: Install pinned FLEX Console auth dependencies
         working-directory: apps/flex-console
-        run: npm install --ignore-scripts --no-fund --no-audit
+        run: npm ci --ignore-scripts --no-fund --no-audit
       - name: Prepare disposable CI PostgreSQL schema (never Neon)
         working-directory: apps/flex-console
         run: |
@@ -61,6 +61,8 @@ jobs:
       - name: Syntax + isolated HTTP security tests
         working-directory: apps/flex-console
         run: npm run check
+      - name: Pinned identity-gate and browser unit tests (no skipped MFA imports)
+        run: NODE_ENV=test node --test apps/flex-console/test/*.test.mjs
       - name: First invitation, TOTP and signed platform token on disposable PostgreSQL
         working-directory: apps/flex-console
         run: node test/first-login-postgres.mjs

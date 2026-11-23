@@ -18,6 +18,7 @@ SAFE_PATHS = (
     # New isolated commercial UI; explicit file set, no changes to existing admin/PMS.
     re.compile(r"^apps/flex-console/(?:README\.md|package\.json|server\.(?:mjs|js)|vercel\.json|auth/(?:identity-gate|identity-enabled|schema-config)\.mjs|public/(?:index\.html|app\.js|styles\.css)|test/(?:security|onboarding-e2e|vercel-qa|identity-gate)\.test\.mjs)$"),
     re.compile(r"^apps/flex-console/(?:auth/(?:first-invite|mfa-bridge)\.mjs|public/enroll\.(?:js|html)|test/first-login-postgres\.mjs)$"),
+    re.compile(r"^apps/flex-console/(?:package\-lock\.json|public/marina-smart-logo\.webp)$"),
     re.compile(r"^apps/flex-api-qa/(?:index\.py|requirements\.txt|vercel\.json|app/(?:__init__|flex_(?:control_plane|foundation|partner_portal|onboarding|catalog_admin))\.py|test/test_neon_probe\.py)$"),
     re.compile(r"^scripts/marina_flex_[A-Za-z0-9_.-]+$"),
     re.compile(r"^services/api/app/flex_[A-Za-z0-9_]+\.py$"),
@@ -47,6 +48,8 @@ def run() -> int:
         assert safe_file("apps/flex-console/test/vercel-qa.test.mjs", "A")
         assert safe_file("apps/flex-console/server.js", "A")
         assert safe_file("apps/flex-console/vercel.json", "A")
+        assert safe_file("apps/flex-console/package-lock.json", "A")
+        assert safe_file("apps/flex-console/public/marina-smart-logo.webp", "A")
         assert safe_file("apps/flex-console/auth/identity-gate.mjs", "A")
         assert safe_file("apps/flex-console/auth/identity-enabled.mjs", "A")
         assert safe_file("apps/flex-console/auth/schema-config.mjs", "A")
