@@ -1,4 +1,4 @@
-"""No live Neon required. The QA diagnostic must always fail closed."""
+"""Existing FLEX API wiring and least-privilege fail-closed guards."""
 import os
 import sys
 import unittest
@@ -39,9 +39,34 @@ class NeonProbePolicy(unittest.TestCase):
     def test_no_pms_or_payment_routes(self):
         client = TestClient(app)
         for path in ["/v1/payments", "/v1/payouts", "/v1/onboarding/hotels",
-                     "/v1/platform/catalog/skus", "/v1/me"]:
+                     "/v1/platform/catalog/skus"]:
             with self.subTest(path=path):
                 self.assertEqual(client.post(path).status_code, 404)
+
+    def test_existing_business_read_routes_reused(self):
+        methods = {
+            (method, route.path)
+            for route in app.routes
+            for method in getattr(route, "methods", ())
+        }
+        for path in (
+            "/v1/me", "/v1/hotels", "/v1/catalog",
+            "/v1/hotels/{hotel_id}/subscription",
+            "/v1/hotels/{hotel_id}/invoices",
+            "/v1/partner/me/earnings",
+            "/v1/platform/partner-earnings-summary",
+        ):
+            self.assertIn(("GET", path), methods)
+        for method, path in methods:
+            if path.startswith("/v1/"):
+                self.assertEqual(method, "GET")
+            self.assertNotIn("payment", path)
+            self.assertNotIn("payout", path)
+            self.assertNotIn("settlement", path)
+
+    def test_core_identity_without_token_fails_closed(self):
+        r = TestClient(app).get("/v1/me")
+        self.assertEqual(r.status_code, 401)
 
     def test_sql_guard_checks_no_direct_privileges(self):
         self.assertIn("rolbypassrls", _CHECK_SQL)
