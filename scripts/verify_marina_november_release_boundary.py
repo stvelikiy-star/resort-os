@@ -27,7 +27,7 @@ ALLOWED_GOVERNANCE = frozenset({
 # Approved workflow is test-only; pinned to prevent unreviewed CI drift.
 APPROVED_NATIVE_QA_BLOBS = {
     ".github/workflows/marina-ios-simulator-keychain-linker-pilot-ci.yml": "060f5ed2fe396a7db4b706995df1b4105f1d5952",
-    ".github/workflows/marina-native-android-ios-maestro-ci.yml": "077328f3a5754daf3162e3a322fc609431c8925c",
+    ".github/workflows/marina-native-android-ios-maestro-ci.yml": "459c78da0a2bf5e96c2cbee2abbddac9f008b44f",
     "scripts/design/fl2-android-maestro-demo.sh": "b4372aa0fcb965a3d9337d86c2f4faf96db700c3",
     "scripts/design/fl2-native-live-role.yaml": "69e7fa4bd88ffa3c6fe20ba7e552ed0b6a7108d6",
     "scripts/design/fl2-native-live-role.sh": "12df57b660f8bb3bdb0d6bc922bdab2f2d3d8cbd",
