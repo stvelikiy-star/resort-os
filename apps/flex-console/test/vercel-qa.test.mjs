@@ -13,6 +13,7 @@ test('isolated Vercel QA uses Node HTTP entrypoint and fails closed without back
   const server=readFileSync(new URL('../server.js',import.meta.url),'utf8');
   assert.ok(server.includes('createServer(handler)'));
   assert.ok(server.includes("from './server.mjs'"));
+  assert.ok(!server.includes('.listen('), 'Vercel must own the listener');
   assert.ok(!server.includes('/v1/payments'));
 });
 
@@ -26,4 +27,16 @@ test('importing QA handler for Vercel does not start an accidental TCP listener'
   assert.equal(cmd.error?.code,undefined,'Import must exit without live TCP server');
   assert.equal(cmd.status,0,cmd.stderr);
   assert.equal(cmd.stdout,'OK');
+});
+
+test('Vercel production entrypoint exports a server but never binds to TCP',()=>{
+  const dir=new URL('..',import.meta.url).pathname;
+  const cmd=spawnSync(process.execPath,['--input-type=module','-e',
+   "import('./server.js').then(({default:server})=> { if(server.listening)process.exit(2); process.stdout.write('UNBOUND') })"],{
+    cwd:dir,timeout:5000,encoding:'utf8',
+    env:{...process.env,NODE_ENV:'production',PORT:'0',FLEX_ENVIRONMENT:'qa'}
+  });
+  assert.equal(cmd.error?.code,undefined,'Vercel import must not keep the Node event loop alive');
+  assert.equal(cmd.status,0,cmd.stderr);
+  assert.equal(cmd.stdout,'UNBOUND');
 });
