@@ -6,6 +6,7 @@ on:
       # Release candidate gate: every FLEX change must check the SAME head SHA.
       - ".github/workflows/marina-flex-*.yml"
       - "apps/flex-console/**"
+      - "apps/flex-api-qa/**"
       - "docs/flex/**"
       - "services/api/app/flex_*.py"
       - "scripts/marina_flex_*"
