@@ -285,7 +285,7 @@ function futurePriceForm(){
  '<div id="admin-action-status" role="status" aria-live="polite"></div></form></section>';
 }
 async function versionsPage(){
- if(state.me?.role!=='SUPER_ADMIN'||!state.status?.qa_catalog_admin_enabled)
+ if(state.me?.role!=='SUPER_ADMIN'||!(state.status?.qa_catalog_read_only_enabled||state.status?.qa_catalog_admin_enabled))
    return heading(t('priceHistory'))+info(t('operationBlocked'));
  const sku=state.priceSku;
  if(!sku||!/^[A-Z][A-Z0-9_]{1,79}$/.test(sku))return heading(t('priceHistory'))+empty(t('noSelected'));
@@ -416,7 +416,7 @@ async function hotelDetail(){
  if(sub.status==='rejected'&&sub.reason.status===403)throw sub.reason;
  if(inv.status==='rejected'&&inv.reason.status===403)throw inv.reason;
  let draftHistory='';
- if(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled){
+ if(state.me?.role==='SUPER_ADMIN'&&(state.status?.qa_catalog_read_only_enabled||state.status?.qa_catalog_admin_enabled)){
   try {
    const drafts=await api('/v1/platform/subscription-drafts?hotel_id='+id);
    draftHistory='<section class="panel"><h2>'+safe(t('draftList'))+'</h2>'+
@@ -433,7 +433,7 @@ async function hotelDetail(){
  '<section class="panel"><h2>'+safe(t('invoices'))+'</h2>'+frozenBadge()+(invoices?.length?table([t('invoice'),t('status'),t('total'),t('due')],invoices.map(i=>'<tr><td>'+safe(i.number||i.id)+'</td><td><span class="chip">'+safe(i.status)+'</span></td><td>'+money(i.total,i.currency)+'</td><td>'+safe(date(i.due_at))+'</td></tr>')):empty(t('noInvoices')))+'</section>'+draftHistory+info(t('warning'),'info');
 }
 async function catalog(){
- if(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled){
+ if(state.me?.role==='SUPER_ADMIN'&&(state.status?.qa_catalog_read_only_enabled||state.status?.qa_catalog_admin_enabled)){
   const items=await api('/v1/platform/catalog');
   state.catalogItems=items;
   return heading(t('adminCatalog'),t('helpQa'))+toolbar()+adminCatalogButtons()+
@@ -443,7 +443,7 @@ async function catalog(){
       items.map(i=>'<tr><td>'+safe(i.sku)+'</td><td>'+safe(i.name)+'</td>'+
        '<td><span class="chip">'+safe(i.status)+'</span></td>'+
        '<td>'+safe(i.latest_price?money(i.latest_price.monthly_price,i.latest_price.currency):'—')+'</td>'+
-       '<td><button type="button" class="subtle" data-sku-price="'+safe(i.sku)+'">'+safe(t('newPrice'))+'</button> / '+
+       '<td>'+(state.status?.qa_catalog_admin_enabled?'<button type="button" class="subtle" data-sku-price="'+safe(i.sku)+'">'+safe(t('newPrice'))+'</button> / ':'')+
        '<button type="button" class="subtle" data-sku-versions="'+safe(i.sku)+'">'+safe(t('openHistory'))+'</button></td></tr>'
       )):empty(t('noCatalog')))+'</section>'+info(t('notPublished'),'info');
  }
