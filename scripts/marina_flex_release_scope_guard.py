@@ -17,7 +17,7 @@ SAFE_PATHS = (
     re.compile(r"^docs/flex/[A-Za-z0-9_./-]+$"),
     # New isolated commercial UI; explicit file set, no changes to existing admin/PMS.
     re.compile(r"^apps/flex-console/(?:README\.md|package\.json|server\.(?:mjs|js)|vercel\.json|public/(?:index\.html|app\.js|styles\.css)|test/(?:security|onboarding-e2e|vercel-qa)\.test\.mjs)$"),
-    re.compile(r"^apps/flex-api-qa/(?:index\\.py|requirements\\.txt|test/test_neon_probe\\.py)$"),
+    re.compile(r"^apps/flex-api-qa/(?:index\.py|requirements\.txt|test/test_neon_probe\.py)$"),
     re.compile(r"^scripts/marina_flex_[A-Za-z0-9_.-]+$"),
     re.compile(r"^services/api/app/flex_[A-Za-z0-9_]+\.py$"),
     re.compile(r"^services/api/requirements-flex-control\.txt$"),
