@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 
-from .flex_control_plane import (
+from .flex_control_plane import qa_password_read_allowed, (
     lifespan as core_lifespan,
     resolve_platform_principal,
 )
@@ -88,7 +88,7 @@ async def own_earnings(
         scope, party_id = "flex.authorized_agent_id", principal.agent_id
         column = "agent_id"
     elif principal.role == "INVESTOR" and principal.investor_id:
-        if not principal.mfa_verified:
+        if not (principal.mfa_verified or qa_password_read_allowed(principal)):
             raise HTTPException(403, detail="Investor MFA required")
         role = "flex_investor_statement_reader"
         scope, party_id = "flex.authorized_investor_id", principal.investor_id
@@ -128,7 +128,7 @@ async def admin_earnings_summary(
     period: str = Query("month", pattern="^(day|week|month)$"),
     principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    if principal.role != "SUPER_ADMIN" or not principal.mfa_verified:
+    if principal.role != "SUPER_ADMIN" or not (principal.mfa_verified or qa_password_read_allowed(principal)):
         raise HTTPException(403, detail="Platform SUPER_ADMIN with MFA required")
     start, end = _window(period)
     async with request.app.state.flex_pool.acquire() as conn:
