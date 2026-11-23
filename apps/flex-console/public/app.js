@@ -6,7 +6,79 @@ const translations = {
  en:{commercial:'COMMERCIAL CONTROL PLANE',warning:'Live payments and payouts are disabled. Hotel PMS data remains untouched.',lang:'Language',login:'Sign in',logout:'Sign out',welcome:'Control center',overview:'Overview',hotels:'Hotels',catalog:'Feature catalog',obligations:'Partner earnings',subscription:'My subscription',earnings:'My earnings',notConfigured:'Isolated QA environment is not configured',configHelp:'Real data requires the dedicated FLEX API and OIDC/MFA. No fictional financial data is displayed.',loginPrompt:'Sign in through the separate platform identity provider to view data.',hotelList:'Hotel registry',search:'Search hotels',hotel:'Hotel',status:'Status',currency:'Currency',actions:'Actions',open:'Open',noHotels:'No hotels registered yet.',back:'All hotels',invoices:'Invoices',invoice:'Invoice number',total:'Amount',due:'Due date',noInvoices:'No invoices',noSubscription:'No active subscription.',planStatus:'Subscription',enforcement:'Enforcement',periodStart:'Period start',periodEnd:'Period end',grace:'Grace period',features:'Published features',sku:'SKU code',price:'Monthly price',noCatalog:'No published features yet',accessDenied:'Access denied',error:'Unable to load data',retry:'Retry',agent:'Sales agent',investor:'Investor',net:'Net earned after reversals',gross:'Gross earned',refunds:'Reversed',paid:'Actually paid out',events:'Entries',notImplemented:'Verified payouts are not yet implemented.',periodDay:'Day',periodWeek:'Week',periodMonth:'Month',role:'Role',billingHold:'BILLING role: payment management remains disabled until separately approved.',readOnly:'Read-only',noData:'No data this period',activeHotels:'Registered hotels',activeSku:'Published features',groups:'Group',sum:'Earnings',helpQa:'Figures come only from FLEX QA APIs—not from PMS or mockups.',ownerHotels:'Your hotels',selected:'Hotel details',openBack:'Back',noSelected:'No assigned hotels',go:'Go',period:'Period',expires:'Expires',count:'Count',noPartners:'No earnings entries',emptyTitle:'No data',addHotel:'Add hotel',createHotel:'Register QA hotel',registerHotel:'Register in QA',name:'Hotel name',cancel:'Cancel',refresh:'Refresh',export:'Export CSV',onlyQa:'Creates a PENDING record in separate FLEX QA only. Does not activate a subscription or modify PMS.',notEnabled:'Hotel onboarding requires isolated FLEX QA and MFA.',created:'Hotel registered in QA',saving:'Saving...',allStatuses:'All statuses',registered:'Registration',qaScope:'Synthetic test data only. Do not use real contracts or payments.',linkHotel:'Link to MARINA SMART',linkTitle:'Verify hotel ownership',linkHelp:'A trusted MARINA SMART deployment signature is required. Creating a challenge never links or activates a subscription.',linkDisabled:'Trusted linking requires isolated FLEX QA and an approved MARINA SMART signer.',deployment:'Trusted deployment ID',property:'Property ID in MARINA SMART',createChallenge:'Request link verification',challenge:'Message to be signed',expiresAt:'Expires',signature:'Trusted deployment signature (Base64)',confirmLink:'Verify signature',linked:'Trusted link verified; subscription remains inactive.',challengeResult:'Verification request created. Hand this message to the trusted MARINA SMART deployment signer.',linkError:'Link verification rejected',badSignature:'The signature must come from a trusted deployment, not a guessed value.',hotelError:'Hotel registration rejected by server',searchHelp:'Filter by name and status',adminCatalog:'Catalog administration',createSku:'Add planned feature',newPrice:'New price version',priceHistory:'Price history',skuTitle:'Feature title',capability:'Server capability',startPrice:'Price effective from',savePlanned:'Create PLANNED SKU',savePrice:'Save future price',skuVersion:'Version',sourceStatus:'Catalog',configure:'Subscription configuration draft',configurationDraft:'New subscription draft',draftList:'Draft version history',draftTitle:'Package title',selectFunctions:'Features to propose',saveDraft:'Save draft',draftOnly:'Commercial proposal only. No payment, subscription activation, entitlement or invoice. Not a signed contract.',notPublished:'New SKU remains PLANNED until separately reviewed and published. It is not available to hotels.',priceChanged:'A new price version was appended; prior history is retained.',draftCreated:'Draft saved. Hotel access remains unchanged.',noDrafts:'No drafts yet',noSelectable:'Approved AVAILABLE SKUs with effective prices are required first.',draftSettings:'Subscription configuration',yearPrice:'Monthly KGS',operationBlocked:'Catalog administration requires isolated FLEX QA and verified admin MFA.',adminError:'Backend rejected the request',openHistory:'History',monthlyEstimate:'Estimated monthly KGS',onlyFuture:'Price becomes effective only on the selected future date.'}
 };
 const main=document.getElementById('content'), nav=document.getElementById('nav');
-const state={lang:localStorage.getItem('flex_lang')||'ru',theme:localStorage.getItem('flex_theme')||'dark',view:'overview',period:'month',me:null,status:null,hotelId:null,search:'',serial:0,hotelStatus:'',lastCreated:null,registerKey:null,registerName:null,linkChallenge:null,linkSuccess:false,catalogItems:[],priceSku:null};
+
+/* Separate Better Auth identity sign-in. This never authorizes FLEX API,
+ * assigns a role, produces a JWT or marks MFA complete based on browser state.
+ */
+const identityCopy={
+ ru:{heading:'Вход в MARINA SMART FLEX',email:'Электронная почта',password:'Пароль',signIn:'Продолжить',mfa:'Код из приложения-аутентификатора',verify:'Подтвердить код',onlyIdentity:'Вход в учётную запись не предоставляет доступ SUPER ADMIN. Права откроются только после проверенного MFA и серверного подтверждения роли.',signedIn:'Учётная запись подключена. Коммерческий доступ ещё не активирован.',signOut:'Выйти из учётной записи',failed:'Не удалось подтвердить учётную запись',disabled:'Вход ещё не настроен',totpHint:'Введите шесть цифр из приложения-аутентификатора.'},
+ kg:{heading:'MARINA SMART FLEX системасына кирүү',email:'Электрондук почта',password:'Сырсөз',signIn:'Улантуу',mfa:'Аутентификатор колдонмосундагы код',verify:'Кодду ырастоо',onlyIdentity:'Каттоо эсебине кирүү SUPER ADMIN укугун бербейт. Укук MFA жана серверде роль текшерилгенден кийин гана берилет.',signedIn:'Каттоо эсебине кирдиңиз. Коммерциялык мүмкүнчүлүктөр азырынча ачыла элек.',signOut:'Каттоо эсебинен чыгуу',failed:'Каттоо эсеби ырасталган жок',disabled:'Кирүү али жөндөлө элек',totpHint:'Аутентификатор колдонмосундагы алты орундуу кодду киргизиңиз.'},
+ en:{heading:'Sign in to MARINA SMART FLEX',email:'Email',password:'Password',signIn:'Continue',mfa:'Authenticator code',verify:'Verify code',onlyIdentity:'Signing in does not grant SUPER ADMIN access. Commercial permissions require verified MFA and a server-authorized role.',signedIn:'Identity session active. Commercial access is not yet enabled.',signOut:'Sign out of identity',failed:'Unable to verify identity',disabled:'Identity sign-in is not configured yet',totpHint:'Enter the six-digit code from your authenticator app.'}
+};
+function identityText(key){return (identityCopy[state.lang]||identityCopy.ru)[key];}
+async function identityRequest(endpoint,body){
+ const response=await fetch('/api/identity/'+endpoint,{
+   method:'POST',credentials:'same-origin',cache:'no-store',redirect:'error',
+   headers:{'Content-Type':'application/json','Accept':'application/json'},
+   body:JSON.stringify(body)
+ });
+ const payload=await response.json().catch(()=>({}));
+ if(!response.ok)throw Error('IDENTITY_REJECTED');
+ return payload;
+}
+async function identitySession(){
+ try {
+   const response=await fetch('/api/identity/get-session',{credentials:'same-origin',cache:'no-store'});
+   return response.ok?await response.json():null;
+ } catch{return null;}
+}
+async function submitIdentityForm(form){
+ const btn=form.querySelector('button[type="submit"]');
+ if(btn)btn.disabled=true;
+ try{
+   if(form.id==='flex-identity-signin'){
+     const data=await identityRequest('sign-in/email',{
+       email:String(form.elements.email.value||'').trim(),
+       password:String(form.elements.password.value||'')
+     });
+     form.elements.password.value='';
+     state.identityStep=data.twoFactorRedirect===true?'totp':'session';
+   }else if(form.id==='flex-identity-totp'){
+     const code=String(form.elements.code.value||'').trim();
+     if(!/^\\d{6}$/.test(code))throw Error('INVALID_TOTP_CODE');
+     await identityRequest('two-factor/verify-totp',{code,trustDevice:false});
+     form.elements.code.value='';
+     state.identityStep='session';
+   }
+   state.identityError='';
+   state.identitySession=await identitySession();
+   // Never set state.me: platform authorization is separate from identity.
+   render();
+ }catch{
+   state.identityError=identityText('failed');
+   if(btn)btn.disabled=false;
+   render();
+ }
+}
+function identityPanel(){
+ const text=identityText;
+ const note='<p class="muted">'+safe(text('onlyIdentity'))+'</p>';
+ if(state.identitySession?.user)return '<section class="panel gold"><h2>'+safe(text('heading'))+'</h2>'+
+   '<p>'+safe(text('signedIn'))+'</p>'+note+
+   '<button type="button" class="outline" data-identity-logout="yes">'+safe(text('signOut'))+'</button></section>';
+ if(state.identityStep==='totp')return '<section class="panel gold"><h2>'+safe(text('mfa'))+'</h2>'+
+   '<p class="muted">'+safe(text('totpHint'))+'</p><form id="flex-identity-totp">'+
+   '<label>'+safe(text('mfa'))+'<input name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" required></label>'+
+   '<button class="primary" type="submit">'+safe(text('verify'))+'</button></form>'+
+   (state.identityError?'<p role="alert">'+safe(state.identityError)+'</p>':'')+note+'</section>';
+ return '<section class="panel gold"><h2>'+safe(text('heading'))+'</h2><form id="flex-identity-signin">'+
+   '<label>'+safe(text('email'))+'<input name="email" type="email" autocomplete="username" required maxlength="254"></label>'+
+   '<label>'+safe(text('password'))+'<input name="password" type="password" autocomplete="current-password" required minlength="12"></label>'+
+   '<button class="primary" type="submit">'+safe(text('signIn'))+'</button></form>'+
+   (state.identityError?'<p role="alert">'+safe(state.identityError)+'</p>':'')+note+'</section>';
+}
+
+const state={lang:localStorage.getItem('flex_lang')||'ru',theme:localStorage.getItem('flex_theme')||'dark',view:'overview',period:'month',me:null,status:null,hotelId:null,search:'',serial:0,hotelStatus:'',lastCreated:null,registerKey:null,registerName:null,linkChallenge:null,linkSuccess:false,catalogItems:[],priceSku:null,identityStep:'email',identityError:'',identitySession:null};
 const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=k=>(translations[state.lang]||translations.ru)[k]||translations.ru[k]||k;
 const fmt=v=>v===null||v===undefined?'—':new Intl.NumberFormat(state.lang==='kg'?'ky-KG':state.lang==='en'?'en-US':'ru-RU',{maximumFractionDigits:2}).format(Number(v));
@@ -285,6 +357,11 @@ function showLogin(){
  nav.innerHTML='';
  document.getElementById('session-button').textContent=t('login');
  const configured=state.status?.configured;
+ if(state.status?.identity_ready) {
+   main.innerHTML=heading(identityText('heading'))+identityPanel()+
+     info(safe(configured?t('loginPrompt'):t('configHelp')),'info');
+   return;
+ }
  main.innerHTML=heading(configured?t('loginPrompt'):t('notConfigured'))+
  '<div class="panel gold"><h2>MARINA FLEX · CONTROL PLANE</h2><p class="muted">'+safe(configured?t('loginPrompt'):t('configHelp'))+'</p>'+
  (configured?'<button class="primary" type="button" data-login="yes">'+safe(t('login'))+'</button>':'')+'</div>'+
@@ -392,6 +469,7 @@ async function start(){
  document.body.classList.toggle('light',state.theme==='light');
  try {const r=await fetch('/api/status',{cache:'no-store'});state.status=await r.json();}catch{state.status={configured:false};}
  if(state.status.configured){try{state.me=await api('/v1/me');}catch(e){if(e.status!==401)state.error=e;}}
+ if(state.status.identity_ready)state.identitySession=await identitySession();
  if(state.me){const role=state.me.role;state.view=role==='SUPER_ADMIN'?'overview':role==='HOTEL_OWNER'?'subscription':role==='BILLING'?'billing-hold':'earnings';}
  render();
 }
@@ -408,10 +486,16 @@ main.addEventListener('click',e=>{
  if(b.dataset.refresh)render();
  if(b.dataset.export){b.disabled=true;exportVisible().catch(err=>{main.insertAdjacentHTML('afterbegin',info(t('error')+': '+err.message,'error'))}).finally(()=>{b.disabled=false})}
  if(b.dataset.login)location.assign('/api/auth/login');
+ if(b.dataset.identityLogout){
+   identityRequest('sign-out',{}).then(()=>{
+     state.identitySession=null;state.identityStep='email';state.identityError='';render();
+   }).catch(()=>{state.identityError=identityText('failed');render()});
+ }
 });
 main.addEventListener('input',e=>{if(e.target.id==='hotel-search'){state.search=e.target.value;const rows=main.querySelectorAll('tbody tr');rows.forEach(tr=>tr.hidden=!tr.querySelector('td')?.textContent.toLocaleLowerCase().includes(state.search.toLocaleLowerCase()));}});
 main.addEventListener('change',e=>{if(e.target.id==='hotel-status'){state.hotelStatus=e.target.value;render()}});
 main.addEventListener('submit',e=>{
+ if(e.target.id==='flex-identity-signin'||e.target.id==='flex-identity-totp'){e.preventDefault();submitIdentityForm(e.target)}
  if(e.target.id==='hotel-registration'){e.preventDefault();submitRegistration(e.target)}
  if(e.target.id==='link-challenge-form'){e.preventDefault();handleLinkForm(e.target,'challenge')}
  if(e.target.id==='link-confirm-form'){e.preventDefault();handleLinkForm(e.target,'confirm')}
