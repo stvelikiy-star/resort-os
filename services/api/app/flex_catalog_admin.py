@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .flex_control_plane import (
     qa_password_read_allowed,
+    _switch_to_reader,
     lifespan as core_lifespan,
     resolve_platform_principal,
 )
@@ -70,12 +71,18 @@ def require_admin(principal: PlatformPrincipal, *, read_only: bool = False) -> N
         raise HTTPException(403, detail="Verified FLEX SUPER_ADMIN with MFA required")
 
 
-async def as_writer(conn, principal: PlatformPrincipal, *, read_only: bool = False) -> None:
-    require_admin(principal, read_only=read_only)
+async def as_writer(conn, principal: PlatformPrincipal) -> None:
+    require_admin(principal)
     await conn.execute(
         "SELECT set_config('flex.actor_subject_id',$1,true)", principal.subject_id
     )
     await conn.execute("SET LOCAL ROLE " + WRITER_ROLE)
+
+
+async def as_reader(conn, principal: PlatformPrincipal) -> None:
+    """Never assume draft-writer membership for read-only admin routes."""
+    require_admin(principal, read_only=True)
+    await _switch_to_reader(conn, "flex_platform_admin_reader", "flex.unused", "1")
 
 
 class NewSku(BaseModel):
@@ -183,7 +190,7 @@ async def catalog(
     require_admin(principal, read_only=True)
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            await as_writer(conn, principal, read_only=True)
+            await as_reader(conn, principal)
             rows = await conn.fetch(
                 "SELECT s.sku,s.title,s.capability_key,s.product_status,s.is_core,"
                 " p.version,p.monthly_price,p.currency,p.valid_from,p.valid_to "
@@ -214,7 +221,7 @@ async def price_versions(
         raise HTTPException(404, detail="Unknown SKU")
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            await as_writer(conn, principal, read_only=True)
+            await as_reader(conn, principal)
             found = await conn.fetchval("SELECT true FROM flex_skus WHERE sku=$1", sku)
             if not found:
                 raise HTTPException(404, detail="Unknown SKU")
@@ -305,7 +312,7 @@ async def drafts(
     require_admin(principal, read_only=True)
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            await as_writer(conn, principal, read_only=True)
+            await as_reader(conn, principal)
             rows = await conn.fetch(
                 "SELECT id,hotel_id,version,title,period_start,period_end,enforcement,state,"
                 " currency,items,proposed_monthly_total,created_by,created_at "
