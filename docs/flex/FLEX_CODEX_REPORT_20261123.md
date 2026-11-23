@@ -120,3 +120,30 @@ Read-only Git comparison `b0f99f300a93356b379fa0f607157722f95636a5...c849fab1708
 ## Supplementary reference discovery — Library API map (not a substitute for D)
 
 A personal Library document named `MARINA_FLEX_UI_Backend_Integration_Map.md` dated 2026-11-22 was located. It lists existing isolated routes (`GET /v1/me`, `/v1/hotels`, `/v1/hotels/{id}/subscription`, `/v1/hotels/{id}/invoices`, `/v1/catalog`, partner earnings, admin summary), but **does not define the six exact new reconciliation contracts**, their response schemas, or verification assertions. The requested `FLEX_RECONCILIATION_CODEX.md` remains missing. This partial discovery does not authorize inventing the six contracts. Gate D = BLOCKED / FAIL.
+
+## Source #588 reconciliation applied — 2026-11-23
+
+The two source commits `f1c4683b3d71a785bf441574f20c5ba40a78bdc1` and `c849fab1708414148cee9804b581b766be71e2a1` were staged on a **temporary local clone** of the exact #591 HEAD using `git cherry-pick --no-commit`, without modifying main or any existing DB. Git reported **no merge conflicts**. Eleven FLEX-only files were reconciled; the existing Future Luxury palette, logo, frozen-operation banner, and language strings in `public/app.js` were preserved.
+
+Merged file set:
+- `apps/flex-api-qa/app/flex_control_plane.py`
+- `apps/flex-api-qa/app/flex_partner_portal.py`
+- `apps/flex-console/auth/identity-enabled.mjs`
+- `apps/flex-console/auth/mfa-bridge.mjs`
+- `apps/flex-console/public/app.js` (merged rather than overwritten)
+- `apps/flex-console/public/enroll.html`
+- `apps/flex-console/public/enroll.js`
+- `apps/flex-console/server.mjs`
+- `apps/flex-console/test/first-login-postgres.mjs`
+- `services/api/app/flex_control_plane.py`
+- `services/api/app/flex_partner_portal.py`
+
+Isolated pre-commit evidence:
+- `npm ci --ignore-scripts --no-audit --no-fund`: **PASS**.
+- `NODE_ENV=test node --test test/*.test.mjs`: **19/19 PASS, zero skipped**.
+- `python3 scripts/marina_flex_release_scope_guard.py --self-test`: **PASS**.
+- `python3 scripts/marina_flex_release_scope_guard.py`: **PASS** on full-history checkout, **118 isolated additive FLEX files** against frozen main.
+- `node --check apps/flex-console/public/app.js`: **PASS**.
+- Runtime permissions still restrict password-only sessions to QA Preview. No authority to mutate invoices, payments, payouts or ENFORCE has been added.
+
+**Historical notes above saying the #588 delta was not imported describe the state before this reconciliation.** The new code is included in this branch after the reconciliation commit, but **complete Gate 0 still requires new SHA GitHub CI evidence**, and Gate 3 requires real isolated staging authentication evidence. Neither should be inferred from local tests.

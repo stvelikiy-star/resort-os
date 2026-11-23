@@ -17,6 +17,7 @@ el('enroll').onsubmit=async event=>{
     const password=form.elements.password.value;
     if(invite){await post('first-invite',{token:invite,password});invite='';}
     const session=await post('sign-in/email',{email:form.elements.email.value,password,rememberMe:false});
+    if(session.platform_session){location.replace('/');return;}
     if(session.twoFactorRedirect){location.replace('/');return;}
     const setup=await post('two-factor/enable',{password});
     const key=new URL(setup.totpURI).searchParams.get('secret');
