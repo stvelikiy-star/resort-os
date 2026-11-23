@@ -6,7 +6,13 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "NODE_ENV=test node --test test/*.test.mjs",
-    "check": "node --check server.mjs && node --check public/app.js && npm test"
+    "check": "node --check server.mjs && node --check server.js && node --check auth/identity-gate.mjs && node --check auth/identity-enabled.mjs && node --check public/app.js && npm test"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "better-auth": "1.7.27",
+    "pg": "8.16.3"
+  }
 }

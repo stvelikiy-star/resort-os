@@ -46,7 +46,7 @@ test('authenticated QA: platform login, CSRF-gated PENDING registration, safe re
       if(!item||params.get('code_verifier')?.length<40)return reply(res,400,{error:'invalid_grant'});
       grants.delete(params.get('code'));
       return reply(res,200,{token_type:'Bearer',expires_in:900,id_token:jwt({aud:'flex-console-test',nonce:item.nonce}),
-        access_token:jwt({aud:'flex-api-test'})});
+        access_token:jwt({aud:'flex-api-test',sub:item.accessSub||'qa-platform-admin'})});
     }
     if(req.headers.authorization?.startsWith('Bearer ')&&req.url==='/v1/me')return reply(res,200,{role:'SUPER_ADMIN',hotels:[]});
     if(req.headers.authorization?.startsWith('Bearer ')&&req.url==='/v1/hotels')return reply(res,200,hotels);
@@ -128,6 +128,19 @@ test('authenticated QA: platform login, CSRF-gated PENDING registration, safe re
     const sessionCookie=allSet.map(x=>x.split(';')[0]).find(x=>x.startsWith('flex_session='));
     assert.ok(sessionCookie,'encrypted HttpOnly session cookie');
     assert.match(allSet.join(';'),/HttpOnly/);
+    const secondLogin=await fetch(origin+'/api/auth/login',{redirect:'manual'});
+    const secondAuthorize=new URL(secondLogin.headers.get('location'));
+    grants.set('qa-mismatched-subject',{
+      nonce:secondAuthorize.searchParams.get('nonce'),
+      accessSub:'some-other-identity'
+    });
+    const identityMixup=await fetch(origin+'/api/auth/callback?state='+
+      encodeURIComponent(secondAuthorize.searchParams.get('state'))+
+      '&code=qa-mismatched-subject',{
+        redirect:'manual',headers:{Cookie:cookieHead(secondLogin)}
+      });
+    assert.equal(identityMixup.status,401,'mismatched OIDC subjects must never be accepted');
+    assert.equal((await identityMixup.json()).error,'OIDC_IDENTITY_ACCESS_TOKEN_SUBJECT_MISMATCH');
     const sessions=await fetch(origin+'/api/session',{headers:{Cookie:sessionCookie}});
     assert.equal(sessions.status,200);
     const session=await sessions.json();assert.ok(session.csrf);

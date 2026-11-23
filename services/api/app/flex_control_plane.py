@@ -16,7 +16,7 @@ import re
 import time
 import uuid
 from contextlib import asynccontextmanager
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import asyncpg
 import jwt
@@ -24,13 +24,26 @@ from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from jwt.exceptions import PyJWTError
 
-from .db import clean_asyncpg_url
 from .flex_foundation import PlatformPrincipal, platform_action_allowed
 
 MAX_TOKEN_BYTES = 8192
 MAX_TOKEN_AGE_SECONDS = 900
 SUBJECT_RE = re.compile(r"^[a-zA-Z0-9_:.@/\-]{2,180}$")
 KID_RE = re.compile(r"^[a-zA-Z0-9_\-]{2,80}$")
+
+
+def clean_asyncpg_url(value: str) -> str:
+    """Discard only Prisma's schema parameter; preserve TLS and other options.
+
+    This FLEX-local helper intentionally does not import the operational PMS
+    database module, start its workers, or access any hotel database.
+    """
+    parts = urlsplit(value)
+    query = [(key, val) for key, val in
+             parse_qsl(parts.query, keep_blank_values=True)
+             if key.lower() != "schema"]
+    return urlunsplit((parts.scheme, parts.netloc, parts.path,
+                       urlencode(query), parts.fragment))
 
 
 def _same_db_target(a: str, b: str) -> bool:
@@ -50,6 +63,12 @@ def _flex_dsn() -> str:
     if legacy and _same_db_target(raw, legacy):
         raise RuntimeError("FLEX database must be separate from PMS database")
     return clean_asyncpg_url(raw)
+
+
+def qa_password_reads() -> bool:
+    return (os.environ.get("FLEX_ENVIRONMENT") == "qa"
+            and os.environ.get("VERCEL_ENV") == "preview"
+            and os.environ.get("FLEX_QA_PASSWORD_LOGIN") == "true")
 
 
 def verify_platform_token(authorization: str | None) -> tuple[str, bool]:
@@ -96,6 +115,8 @@ def verify_platform_token(authorization: str | None) -> tuple[str, bool]:
             raise ValueError("Token lifetime or subject rejected")
         amr = claims.get("amr")
         mfa = isinstance(amr, list) and "mfa" in amr
+        if qa_password_reads() and not mfa and amr != ["pwd"]:
+            raise ValueError("Expected password login")
         return subject, mfa
     except (PyJWTError, ValueError, TypeError, UnicodeError):
         raise HTTPException(401, detail="Invalid bearer token") from None
@@ -192,7 +213,7 @@ def _require_hotel_read(principal: PlatformPrincipal, hotel_id: uuid.UUID):
 
 def _reader_for(principal: PlatformPrincipal) -> str:
     if principal.role == "SUPER_ADMIN":
-        if not principal.mfa_verified:
+        if not (principal.mfa_verified or qa_password_reads()):
             raise HTTPException(403, detail="MFA required")
         return "flex_platform_admin_reader"
     return "flex_hotel_reader"
@@ -217,7 +238,7 @@ async def me(principal: PlatformPrincipal = Depends(resolve_platform_principal))
 async def hotels(
     request: Request, principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    if principal.role != "SUPER_ADMIN" or not principal.mfa_verified:
+    if principal.role != "SUPER_ADMIN" or not (principal.mfa_verified or qa_password_reads()):
         raise HTTPException(403, detail="Admin with MFA required")
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
@@ -301,7 +322,7 @@ async def commercial_catalog(
     """
     if principal.role not in {"HOTEL_OWNER", "SUPER_ADMIN"}:
         raise HTTPException(403, detail="Catalog not available to this role")
-    if principal.role == "SUPER_ADMIN" and not principal.mfa_verified:
+    if principal.role == "SUPER_ADMIN" and not (principal.mfa_verified or qa_password_reads()):
         raise HTTPException(403, detail="MFA required")
     if principal.role == "HOTEL_OWNER" and not principal.hotel_ids:
         raise HTTPException(403, detail="No assigned hotel")

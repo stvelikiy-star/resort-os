@@ -16,7 +16,9 @@ FROZEN_MAIN = "2642eedc27431fdb9eaa9f7bf306904d487f4b9c"
 SAFE_PATHS = (
     re.compile(r"^docs/flex/[A-Za-z0-9_./-]+$"),
     # New isolated commercial UI; explicit file set, no changes to existing admin/PMS.
-    re.compile(r"^apps/flex-console/(?:README\.md|package\.json|server\.mjs|public/(?:index\.html|app\.js|styles\.css)|test/(?:security|onboarding-e2e)\.test\.mjs)$"),
+    re.compile(r"^apps/flex-console/(?:README\.md|package\.json|server\.(?:mjs|js)|vercel\.json|auth/(?:identity-gate|identity-enabled|schema-config)\.mjs|public/(?:index\.html|app\.js|styles\.css)|test/(?:security|onboarding-e2e|vercel-qa|identity-gate)\.test\.mjs)$"),
+    re.compile(r"^apps/flex-console/(?:auth/(?:first-invite|mfa-bridge)\.mjs|public/enroll\.(?:js|html)|test/first-login-postgres\.mjs)$"),
+    re.compile(r"^apps/flex-api-qa/(?:index\.py|requirements\.txt|vercel\.json|app/(?:__init__|flex_(?:control_plane|foundation|partner_portal|onboarding|catalog_admin))\.py|test/test_neon_probe\.py)$"),
     re.compile(r"^scripts/marina_flex_[A-Za-z0-9_.-]+$"),
     re.compile(r"^services/api/app/flex_[A-Za-z0-9_]+\.py$"),
     re.compile(r"^services/api/requirements-flex-control\.txt$"),
@@ -42,6 +44,22 @@ def run() -> int:
         assert safe_file("apps/flex-console/server.mjs", "A")
         assert safe_file("apps/flex-console/public/index.html", "A")
         assert safe_file("apps/flex-console/test/onboarding-e2e.test.mjs", "A")
+        assert safe_file("apps/flex-console/test/vercel-qa.test.mjs", "A")
+        assert safe_file("apps/flex-console/server.js", "A")
+        assert safe_file("apps/flex-console/vercel.json", "A")
+        assert safe_file("apps/flex-console/auth/identity-gate.mjs", "A")
+        assert safe_file("apps/flex-console/auth/identity-enabled.mjs", "A")
+        assert safe_file("apps/flex-console/auth/schema-config.mjs", "A")
+        assert safe_file("apps/flex-console/test/identity-gate.test.mjs", "A")
+        assert not safe_file("apps/flex-console/auth/.env", "A")
+        assert safe_file("apps/flex-api-qa/index.py", "A")
+        assert safe_file("apps/flex-api-qa/app/flex_control_plane.py", "A")
+        assert safe_file("apps/flex-api-qa/app/flex_catalog_admin.py", "A")
+        assert safe_file("apps/flex-api-qa/vercel.json", "A")
+        assert not safe_file("apps/flex-api-qa/app/pms_holds.py", "A")
+        assert safe_file("apps/flex-api-qa/requirements.txt", "A")
+        assert safe_file("apps/flex-api-qa/test/test_neon_probe.py", "A")
+        assert not safe_file("apps/flex-api-qa/.env", "A")
         assert not safe_file("apps/admin/app/page.tsx", "A")
         assert not safe_file("apps/flex-console/.env", "A")
         assert not safe_file("apps/flex-console/server.mjs", "M")
