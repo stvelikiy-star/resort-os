@@ -42,7 +42,7 @@ APPROVED_NATIVE_QA_BLOBS = {
     "scripts/design/fl2-native-qa-negative-login.yaml": "5b93dac84c91b9279bd71b9772fb4c98f5b0e1eb",
     "scripts/design/fl2-native-qa-negative-login.sh": "95207036fe6d063f76d6f80b57f97182b0dfa5d4",
     ".github/workflows/marina-native-live-five-roles-ci.yml": "78391acf5b4dff5ebbb59f690ff8cde447ce23cf",
-    "scripts/design/fl2-native-live-five-roles.sh": "ed1fd5c69b6aff2ee2f6fbf89cb614142e0686f2",
+    "scripts/design/fl2-native-live-five-roles.sh": "979105718516bf2d70dc009a43725bf855447000",
 }
 
 APPROVED_P0_BLOBS = {
