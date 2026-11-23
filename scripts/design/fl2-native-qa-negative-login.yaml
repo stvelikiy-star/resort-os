@@ -4,6 +4,15 @@ appId: kg.go.ms.staff
 - launchApp:
     clearState: true
     clearKeychain: true
+- runFlow:
+    when:
+      platform: Android
+      visible: "Pixel Launcher isn't responding"
+    commands:
+      - tapOn:
+          text: "Wait"
+- assertNotVisible:
+    text: "Pixel Launcher isn't responding"
 - extendedWaitUntil:
     visible:
       id: "login-username"
