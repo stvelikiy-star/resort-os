@@ -54,7 +54,7 @@ jobs:
           set -euo pipefail
           test -s android-bin/app-release.apk
           echo "$ANDROID_QA_APK_SHA256  android-bin/app-release.apk" | sha256sum -c -
-          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/45063587493" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='62a2d682cb90524493200858f8bbc50a200da7e5' and d['conclusion']=='success'"
+          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/44909147697" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='62a2d682cb90524493200858f8bbc50a200da7e5' and d['conclusion']=='success'"
           echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
       - uses: actions/setup-java@v4
         with:
@@ -165,7 +165,7 @@ jobs:
           set -euo pipefail
           test -s ios-bin/ios-live.zip
           echo "$IOS_QA_SIM_ZIP_SHA256  ios-bin/ios-live.zip" | shasum -a 256 -c -
-          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/44909147697" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='9131f3dbd83b3d9617246337b56d166ea22789be'"
+          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/45063587493" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='9131f3dbd83b3d9617246337b56d166ea22789be'"
           # Pin the successful iOS build job, not the parent run (which failed later at COOK UI).
           curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/137450788298" | python3 -c "import json,sys; j=json.load(sys.stdin); assert j['conclusion']=='success' and j['run_id']==45063587493"
           mkdir -p "$RUNNER_TEMP/marina-native-qa-app"
