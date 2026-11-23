@@ -40,7 +40,7 @@ jobs:
           set -euo pipefail
           test -s android-bin/app-release.apk
           echo "$ANDROID_QA_APK_SHA256  android-bin/app-release.apk" | sha256sum -c -
-          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/44909147697" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='62a2d682cb90524493200858f8bbc50a200da7e5' and d['conclusion']=='success'"
+          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/45063587493" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='62a2d682cb90524493200858f8bbc50a200da7e5' and d['conclusion']=='success'"
           echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
       - uses: actions/setup-java@v4
         with:
@@ -86,7 +86,7 @@ jobs:
       IOS_QA_SIM_ZIP_SHA256: '4b880f67282b17fcd08a809072a00a199ddbe83859ea15552360f39342601b62'
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch verified unsigned iOS Simulator app (no rebuild)
+      - name: Fetch verified LIVE-login iOS Simulator app (no rebuild)
         uses: actions/download-artifact@v4
         with:
           name: marina-linked-ios-live-app
