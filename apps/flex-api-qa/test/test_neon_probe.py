@@ -92,7 +92,7 @@ class NeonProbePolicy(unittest.TestCase):
         for path in ("/v1/platform/catalog", "/v1/platform/subscription-drafts"):
             with self.subTest(path=path):
                 self.assertEqual(client.get(path).status_code, 401)
-                self.assertEqual(client.post(path, json={}).status_code, 404)
+                self.assertEqual(client.post(path, json={}).status_code, 405)
         for route in app.routes:
             if getattr(route, "path", "").startswith("/v1/platform/"):
                 self.assertNotIn("POST", getattr(route, "methods", set()))
