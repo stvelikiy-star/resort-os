@@ -5,6 +5,8 @@ on:
       - '.github/workflows/marina-native-qa-negative-auth-ci.yml'
       - 'scripts/design/fl2-native-qa-negative-login.yaml'
       - 'scripts/design/fl2-native-qa-negative-login.sh'
+      - 'scripts/design/fl2-native-qa-session-contract.py'
+      - 'scripts/design/fl2-native-live-role.yaml'
   workflow_dispatch:
 
 permissions:
@@ -13,14 +15,29 @@ permissions:
 
 concurrency:
   group: marina-native-qa-negative-auth
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
+  server-session-rbac:
+    name: QA five-role login, logout revocation and forbidden owner routes
+    runs-on: ubuntu-24.04
+    environment: marina-native-qa
+    timeout-minutes: 12
+    env:
+      MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify server auth and revocation for five synthetic roles
+        run: python3 -u scripts/design/fl2-native-qa-session-contract.py
+
   android-invalid-login:
     name: Android 35 invalid login to MARINA_FINAL_QA
     runs-on: ubuntu-24.04
+    environment: marina-native-qa
     timeout-minutes: 55
     env:
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
       MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
       ANDROID_QA_APK_SHA256: 'f22aedddc4232b6ea85ed7e6de0cbc0f84cadf720900e1cc5332f971da9bb1f4'
     steps:
@@ -72,45 +89,101 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
+  ios-live-pinned-five:
+    name: iOS pinned LIVE five roles + logout/restart (MARINA_FINAL_QA)
+    runs-on: macos-26-intel
+    environment: marina-native-qa
+    timeout-minutes: 85
+    env:
+      CI: 'true'
+      MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_BUILD_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
+      IOS_QA_SIM_ZIP_SHA256: '4b880f67282b17fcd08a809072a00a199ddbe83859ea15552360f39342601b62'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: marina-linked-ios-live-app
+          run-id: 45063587493
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ios-bin
+      - name: Verify proven iOS QA app and prepare simulator
+        run: |
+          set -euo pipefail
+          test -n "$MARINA_NATIVE_QA_USERS_JSON"
+          echo "$IOS_QA_SIM_ZIP_SHA256  ios-bin/ios-live.zip" | shasum -a 256 -c -
+          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/137450788298" | python3 -c "import json,sys; j=json.load(sys.stdin); assert j['conclusion']=='success' and j['run_id']==45063587493"
+          mkdir -p "$RUNNER_TEMP/marina-pinned-ios"
+          ditto -x -k ios-bin/ios-live.zip "$RUNNER_TEMP/marina-pinned-ios"
+          app=$(find "$RUNNER_TEMP/marina-pinned-ios" -maxdepth 1 -name '*.app' -print -quit)
+          test -d "$app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = kg.go.ms.staff
+          udid=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; j=json.load(sys.stdin); a=[x for v in j["devices"].values() for x in v if x.get("isAvailable") and "iPhone" in x.get("name","")]; print(a[0]["udid"] if a else "")')
+          test -n "$udid"
+          echo "IOS_SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+          echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" "$app"
+          xcrun simctl launch "$udid" kg.go.ms.staff
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Five role LIVE login and native sign-out/restart
+        run: bash scripts/design/fl2-native-live-five-roles.sh ios
+      - name: Upload evidence for synthetic five roles and logout
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-ios-pinned-five-live-and-logout-qa
+          path: native-five-roles-evidence/
+          retention-days: 5
+          if-no-files-found: warn
+
   ios-invalid-login:
     name: iOS simulator invalid login to MARINA_FINAL_QA
     runs-on: macos-26-intel
+    environment: marina-native-qa
     timeout-minutes: 70
     env:
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
       MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
-      IOS_QA_SIM_ZIP_SHA256: 'ced189dd4f54595867649da4e67d2e8fa186f47437af43d47fefbf41936653c8'
+      IOS_QA_SIM_ZIP_SHA256: '4b880f67282b17fcd08a809072a00a199ddbe83859ea15552360f39342601b62'
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch verified unsigned iOS Simulator app (no rebuild)
+      - name: Fetch verified LIVE-login iOS Simulator app (no rebuild)
         uses: actions/download-artifact@v4
         with:
-          name: marina-qa-ios-origin-pinned-app
-          run-id: 44909147697
+          name: marina-linked-ios-live-app
+          run-id: 45063587493
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ios-bin
       - name: Verify exact iOS app archive and source build provenance
         run: |
           set -euo pipefail
-          test -s ios-bin/MARINA_SMART_iOS_Simulator.zip
-          echo "$IOS_QA_SIM_ZIP_SHA256  ios-bin/MARINA_SMART_iOS_Simulator.zip" | shasum -a 256 -c -
-          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/44909147697" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='62a2d682cb90524493200858f8bbc50a200da7e5' and d['conclusion']=='success'"
+          test -s ios-bin/ios-live.zip
+          echo "$IOS_QA_SIM_ZIP_SHA256  ios-bin/ios-live.zip" | shasum -a 256 -c -
+          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/45063587493" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='9131f3dbd83b3d9617246337b56d166ea22789be'"
+          # Pin the successful iOS build job, not the parent run (which failed later at COOK UI).
+          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/137450788298" | python3 -c "import json,sys; j=json.load(sys.stdin); assert j['conclusion']=='success' and j['run_id']==45063587493"
           mkdir -p "$RUNNER_TEMP/marina-native-qa-app"
-          unzip -q ios-bin/MARINA_SMART_iOS_Simulator.zip -d "$RUNNER_TEMP/marina-native-qa-app"
+          ditto -x -k ios-bin/ios-live.zip "$RUNNER_TEMP/marina-native-qa-app"
           app=$(find "$RUNNER_TEMP/marina-native-qa-app" -name '*.app' -maxdepth 2 -print -quit)
           test -d "$app"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = kg.go.ms.staff
           echo "MARINA_QA_APP=$app" >> "$GITHUB_ENV"
           echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
-      - name: Preserve original verified unsigned iOS Simulator binary for negative-login QA
+      - name: Keep verified Keychain-enabled iOS Simulator binary unchanged
         run: |
           set -euo pipefail
-          # This test only verifies that an invalid login fails. It must not
-          # modify the SHA-pinned QA binary or claim to verify SecureStore.
-          # A previous post-build ad-hoc signature caused SBMainWorkspace to
-          # deny launch; the unchanged unsigned app has passed native launch.
+          # This job reuses the iOS simulator app proven to launch and accept
+          # OWNER + RECEPTION logins. Never re-sign or modify its bytes.
+          # The negative-auth assertion still must pass independently.
           test -d "$MARINA_QA_APP"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$MARINA_QA_APP/Info.plist")" = kg.go.ms.staff
-          echo 'IOS_NEGATIVE_AUTH_USES_ORIGINAL_VERIFIED_SIMULATOR_APP'
+          echo 'IOS_NEGATIVE_AUTH_USES_LIVE_LOGIN_VERIFIED_SIMULATOR_APP'
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

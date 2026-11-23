@@ -4,18 +4,38 @@ appId: kg.go.ms.staff
 - launchApp:
     clearState: true
     clearKeychain: true
+- runFlow:
+    when:
+      platform: Android
+      visible: "Pixel Launcher isn't responding"
+    commands:
+      - tapOn:
+          text: "Wait"
+- assertNotVisible:
+    text: "Pixel Launcher isn't responding"
 - extendedWaitUntil:
     visible:
       id: "login-username"
     timeout: 90000
 - tapOn:
     id: "login-username"
-- inputText: ${MAESTRO_NONEXISTENT_QA_USERNAME}
+- inputText: ${MAESTRO_QA_EXISTING_USERNAME}
 - tapOn:
     id: "login-password"
 - inputText: ${MAESTRO_INVALID_QA_PASSWORD}
 - tapOn:
     id: "login-submit"
+# The first iOS keyboard launch may display an OS typing tutorial.
+# Only dismiss the system tutorial, never an app authentication error.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - runFlow:
+          when:
+            visible: "Speed up your typing"
+          commands:
+            - tapOn: "Continue"
 - extendedWaitUntil:
     visible: "Wrong username or password"
     timeout: 45000

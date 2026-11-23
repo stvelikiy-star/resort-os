@@ -62,3 +62,15 @@ for role in OWNER RECEPTION COOK WAITER STORE_STAFF;do
   unset MARINA_QA_USERNAME MARINA_QA_PASSWORD MARINA_QA_ROLE
 done
 echo "MARINA_NATIVE_LIVE_QA_5_OF_5_ROLE_LOGIN_PASS_$platform"
+# Verify a normal staff logout and a cold restart on the SAME native install.
+# This test has no credentials: login again must be mandatory.
+if ! maestro test scripts/design/fl2-native-qa-logout-restart.yaml >"$private/logout-restart.log" 2>&1; then
+  if [[ "$platform" == android ]]; then
+    adb exec-out screencap -p >"native-five-roles-evidence/failure-logout-restart.png" || true
+  else
+    xcrun simctl io "$IOS_SIMULATOR_UDID" screenshot "native-five-roles-evidence/failure-logout-restart.png" || true
+  fi
+  echo "MARINA_NATIVE_LOGOUT_RESTART_FAIL_$platform (private log not uploaded)"
+  exit 1
+fi
+echo "MARINA_NATIVE_LOGOUT_RESTART_LOGIN_REQUIRED_PASS_$platform"
