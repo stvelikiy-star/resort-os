@@ -99,3 +99,20 @@ Exact discovered PR graph:
 7. **P1** Review the dependent Draft PR stack; close only after verified code inclusion and deliberate owner approval.
 
 **Explicit freeze:** `payments_enabled=false`; `payouts_enabled=false`; invoices to pay, QR payments, agent/investor payouts and automatic `ENFORCE` remain disabled. Cash is a future option, **not developed here**.
+
+## Update — verified #588 delta after requested base (2026-11-23)
+
+Read-only Git comparison `b0f99f300a93356b379fa0f607157722f95636a5...c849fab1708414148cee9804b581b766be71e2a1` returned **2 commits, 11 modified files, +75/-26 lines**. The exact differences are **not yet included in #591**; both branches now diverge. The added changes concern:
+
+- `apps/flex-console/auth/identity-enabled.mjs`, `mfa-bridge.mjs`: QA-preview-only `FLEX_QA_PASSWORD_LOGIN` mode, password-authenticated session signing; production/TOTP behavior remains distinct. Copying these requires specific negative JWT/session tests and browser E2E evidence.
+- `apps/flex-console/server.mjs`: QA-origin-only Vercel protection bypass header for API service-to-service GETs, plus session and status plumbing. Requires origin/secret constraints to be rechecked, without exposing the secret.
+- `services/api/app/flex_control_plane.py` and bundled `apps/flex-api-qa/app/flex_control_plane.py`: password-only **read** permission in QA Preview, signed JWT `amr=['pwd']` constraint, no role claims taken from the user.
+- `services/api/app/flex_partner_portal.py` and bundled copy: corresponding restricted QA read-only checks for investor/admin.
+- `apps/flex-console/public/app.js`, `enroll.html`, `enroll.js`: UI behavior and enrollment text changes.
+- `apps/flex-console/test/first-login-postgres.mjs`: +22 lines of password login regression assertions.
+
+**Decision:** Do not silently claim parity or close #588. Before consolidation, review each hunk and preserve the original #591 base and frozen payment/ENFORCE conditions. This delta is an unmerged dependency and remains a Gate 0 blocker.
+
+**Gate 0 verification refinement:** #588's own HEAD reports 37/37 GitHub workflow checks SUCCESS; that proves its own commit, **not** the two-branch combined candidate. The #591 HEAD includes a separate red historical `Release RC Truth CI` unrelated to FLEX. Current #591 14/14 FLEX CI tests PASS; Gate 0 remains NO-GO because no single verified combined candidate has passed scope and security acceptance.
+
+**GET contract specification search:** GitHub base SHA, HEAD #588, main, latest checked FLEX UI branch and Project file search contain no `docs/flex/FLEX_RECONCILIATION_CODEX.md`. Its exact six response schemas are not known. No substitute payment-related routes have been invented.
