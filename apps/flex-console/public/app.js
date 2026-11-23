@@ -11,9 +11,9 @@ const main=document.getElementById('content'), nav=document.getElementById('nav'
  * assigns a role, produces a JWT or marks MFA complete based on browser state.
  */
 const identityCopy={
- ru:{heading:'Вход в MARINA SMART FLEX',email:'Электронная почта',password:'Пароль',signIn:'Продолжить',mfa:'Код из приложения-аутентификатора',verify:'Подтвердить код',onlyIdentity:'Вход в учётную запись не предоставляет доступ SUPER ADMIN. Права откроются только после проверенного MFA и серверного подтверждения роли.',signedIn:'Учётная запись подключена. Коммерческий доступ ещё не активирован.',signOut:'Выйти из учётной записи',failed:'Не удалось подтвердить учётную запись',disabled:'Вход ещё не настроен',totpHint:'Введите шесть цифр из приложения-аутентификатора.'},
- kg:{heading:'MARINA SMART FLEX системасына кирүү',email:'Электрондук почта',password:'Сырсөз',signIn:'Улантуу',mfa:'Аутентификатор колдонмосундагы код',verify:'Кодду ырастоо',onlyIdentity:'Каттоо эсебине кирүү SUPER ADMIN укугун бербейт. Укук MFA жана серверде роль текшерилгенден кийин гана берилет.',signedIn:'Каттоо эсебине кирдиңиз. Коммерциялык мүмкүнчүлүктөр азырынча ачыла элек.',signOut:'Каттоо эсебинен чыгуу',failed:'Каттоо эсеби ырасталган жок',disabled:'Кирүү али жөндөлө элек',totpHint:'Аутентификатор колдонмосундагы алты орундуу кодду киргизиңиз.'},
- en:{heading:'Sign in to MARINA SMART FLEX',email:'Email',password:'Password',signIn:'Continue',mfa:'Authenticator code',verify:'Verify code',onlyIdentity:'Signing in does not grant SUPER ADMIN access. Commercial permissions require verified MFA and a server-authorized role.',signedIn:'Identity session active. Commercial access is not yet enabled.',signOut:'Sign out of identity',failed:'Unable to verify identity',disabled:'Identity sign-in is not configured yet',totpHint:'Enter the six-digit code from your authenticator app.'}
+ ru:{heading:'Вход в MARINA SMART FLEX',email:'Электронная почта',password:'Пароль',signIn:'Продолжить',mfa:'Код из приложения-аутентификатора',verify:'Подтвердить код',onlyIdentity:'Вход в учётную запись не предоставляет доступ SUPER ADMIN. Права откроются только после проверенного MFA и серверного подтверждения роли.',signedIn:'Учётная запись подключена. Коммерческий доступ ещё не активирован.',signOut:'Выйти из учётной записи',failed:'Не удалось подтвердить учётную запись',disabled:'Вход ещё не настроен',totpHint:'Введите шесть цифр из приложения-аутентификатора.',passwordOnly:'Для входа используйте почту и пароль. Доступ определяется сервером по вашей роли.'},
+ kg:{heading:'MARINA SMART FLEX системасына кирүү',email:'Электрондук почта',password:'Сырсөз',signIn:'Улантуу',mfa:'Аутентификатор колдонмосундагы код',verify:'Кодду ырастоо',onlyIdentity:'Каттоо эсебине кирүү SUPER ADMIN укугун бербейт. Укук MFA жана серверде роль текшерилгенден кийин гана берилет.',signedIn:'Каттоо эсебине кирдиңиз. Коммерциялык мүмкүнчүлүктөр азырынча ачыла элек.',signOut:'Каттоо эсебинен чыгуу',failed:'Каттоо эсеби ырасталган жок',disabled:'Кирүү али жөндөлө элек',totpHint:'Аутентификатор колдонмосундагы алты орундуу кодду киргизиңиз.',passwordOnly:'Кирүү үчүн электрондук почта менен сырсөздү колдонуңуз. Мүмкүнчүлүктөрдү сервер ролуңуз боюнча аныктайт.'},
+ en:{heading:'Sign in to MARINA SMART FLEX',email:'Email',password:'Password',signIn:'Continue',mfa:'Authenticator code',verify:'Verify code',onlyIdentity:'Signing in does not grant SUPER ADMIN access. Commercial permissions require verified MFA and a server-authorized role.',signedIn:'Identity session active. Commercial access is not yet enabled.',signOut:'Sign out of identity',failed:'Unable to verify identity',disabled:'Identity sign-in is not configured yet',totpHint:'Enter the six-digit code from your authenticator app.',passwordOnly:'Sign in with your email and password. The server determines access from your assigned role.'}
 };
 function identityText(key){return (identityCopy[state.lang]||identityCopy.ru)[key];}
 async function identityRequest(endpoint,body){
@@ -64,7 +64,7 @@ async function submitIdentityForm(form){
 }
 function identityPanel(){
  const text=identityText;
- const note='<p class="muted">'+safe(text('onlyIdentity'))+'</p>';
+ const note='<p class="muted">'+safe(text(state.status?.password_login_ready?'passwordOnly':'onlyIdentity'))+'</p>';
  if(state.identitySession?.user)return '<section class="panel gold"><h2>'+safe(text('heading'))+'</h2>'+
    '<p>'+safe(text('signedIn'))+'</p>'+note+
    '<button type="button" class="outline" data-identity-logout="yes">'+safe(text('signOut'))+'</button></section>';
@@ -92,7 +92,13 @@ const empty=(message)=>'<div class="empty"><strong>'+safe(t('emptyTitle'))+'</st
 const kv=(title,value)=>'<div class="metric"><small>'+safe(title)+'</small><strong>'+safe(value??'—')+'</strong></div>';
 const table=(columns,rows)=>'<div class="table-wrap"><table class="table"><thead><tr>'+columns.map(c=>'<th>'+safe(c)+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>';
 const money=(v,currency='KGS')=>v===null||v===undefined?'—':fmt(v)+' '+safe(currency);
-async function api(path){const r=await fetch('/api/data'+path,{credentials:'same-origin',cache:'no-store'});let data={};try{data=await r.json()}catch{}if(!r.ok){const e=new Error(data.error||('HTTP '+r.status));e.status=r.status;throw e}return data}
+// Keep the short-lived backend JWT current through a still-live, verified
+// HttpOnly Better Auth cookie. Never store passwords/JWT in browser storage.
+async function refreshPlatformSession(){
+ const response=await fetch('/api/session',{credentials:'same-origin',cache:'no-store'});
+ if(!response.ok){const e=new Error('LOGIN_REQUIRED');e.status=401;throw e;}
+}
+async function api(path){if(state.status?.password_login_ready)await refreshPlatformSession();const r=await fetch('/api/data'+path,{credentials:'same-origin',cache:'no-store'});let data={};try{data=await r.json()}catch{}if(!r.ok){const e=new Error(data.error||('HTTP '+r.status));e.status=r.status;throw e}return data}
 function csvCell(v){
  const raw=String(v??'');
  const protectedText=/^[\s]*[=+@-]/.test(raw)?"'"+raw:raw;
@@ -478,6 +484,13 @@ async function start(){
  if(state.status.identity_ready)state.identitySession=await identitySession();
  if(state.me){const role=state.me.role;state.view=role==='SUPER_ADMIN'?'overview':role==='HOTEL_OWNER'?'subscription':role==='BILLING'?'billing-hold':'earnings';}
  render();
+ if(state.status?.password_login_ready){
+   setInterval(()=>{
+     if(state.me && document.visibilityState==='visible')refreshPlatformSession().catch(()=>{
+       state.me=null;render();
+     });
+   },120000);
+ }
 }
 nav.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b){state.view=b.dataset.view;state.hotelId=null;state.search='';render();}});
 main.addEventListener('click',e=>{
