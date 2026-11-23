@@ -20,7 +20,8 @@ import asyncpg
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .flex_control_plane import qa_password_read_allowed, (
+from .flex_control_plane import (
+    qa_password_read_allowed,
     lifespan as core_lifespan,
     resolve_platform_principal,
 )
