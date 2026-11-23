@@ -26,7 +26,7 @@ ALLOWED_GOVERNANCE = frozenset({
 # product source. Git blob digests prevent widening this exception silently.
 # Approved workflow is test-only; pinned to prevent unreviewed CI drift.
 APPROVED_NATIVE_QA_BLOBS = {
-    ".github/workflows/marina-ios-simulator-keychain-linker-pilot-ci.yml": "0df95da7243cd64667eb8d505277b67d5c846ad9",
+    ".github/workflows/marina-ios-simulator-keychain-linker-pilot-ci.yml": "060f5ed2fe396a7db4b706995df1b4105f1d5952",
     ".github/workflows/marina-native-android-ios-maestro-ci.yml": "077328f3a5754daf3162e3a322fc609431c8925c",
     "scripts/design/fl2-android-maestro-demo.sh": "b4372aa0fcb965a3d9337d86c2f4faf96db700c3",
     "scripts/design/fl2-native-live-role.yaml": "5c7508b1cf6e740e267bcd7d7009cd9eeaf99719",
