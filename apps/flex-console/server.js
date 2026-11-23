@@ -4,8 +4,7 @@
 import { createServer } from 'node:http';
 import { handler } from './server.mjs';
 
-const server = createServer(handler);
-if (process.env.NODE_ENV !== 'test') {
-  server.listen(Number(process.env.PORT || 3000), process.env.HOST || '0.0.0.0');
-}
-export default server;
+// Vercel owns the HTTP listener. Listening here as well crashes its runtime
+// with ERR_SERVER_ALREADY_LISTEN, even when the build itself is READY.
+// For standalone development run: npm start (starts server.mjs directly).
+export default createServer(handler);
