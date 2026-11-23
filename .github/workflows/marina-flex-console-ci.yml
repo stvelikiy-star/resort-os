@@ -20,6 +20,20 @@ jobs:
   isolated-console:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: flex_ci
+          POSTGRES_USER: ci_no_login
+          POSTGRES_PASSWORD: ci_no_secret
+        ports:
+          - 55449:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_no_login -d flex_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 8
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,6 +44,10 @@ jobs:
       - name: Install pinned FLEX Console auth dependencies
         working-directory: apps/flex-console
         run: npm install --ignore-scripts --no-fund --no-audit
+      - name: Prepare disposable CI PostgreSQL schema (never Neon)
+        working-directory: apps/flex-console
+        run: |
+          node --input-type=module -e "import pg from 'pg'; const pool=new pg.Pool({connectionString:'postgresql://ci_no_login:ci_no_secret@127.0.0.1:55449/flex_ci'}); await pool.query('CREATE SCHEMA IF NOT EXISTS flex_auth'); await pool.end();"
       - name: Generate isolated Better Auth + TOTP SQL for review (never apply)
         working-directory: apps/flex-console
         env:
