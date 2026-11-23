@@ -30,6 +30,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          # Check the exact PR head, never the synthetic PR merge with unrelated current main.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
@@ -87,6 +89,9 @@ jobs:
       PGDATABASE: flex_ci
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Check the exact PR head, never the synthetic PR merge with unrelated current main.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Install matching PostgreSQL client tools
         run: |
           sudo apt-get update -qq
