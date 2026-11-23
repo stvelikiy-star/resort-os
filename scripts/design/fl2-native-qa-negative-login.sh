@@ -33,12 +33,8 @@ if [[ "$platform" = android ]];then
   adb install -r "$apk" || { echo ANDROID_QA_APK_INSTALL_FAILED; exit 1; }
   package_path=$(adb shell pm path kg.go.ms.staff)
   [[ "$package_path" == *package:* ]] || { echo ANDROID_QA_PACKAGE_MISSING; exit 1; }
-  # Launch the app via ActivityManager, not Monkey/Pixel Launcher. The
-  # launcher itself had shown "isn't responding" on the failure screenshot.
-  adb shell am force-stop kg.go.ms.staff || true
-  adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p kg.go.ms.staff || { echo ANDROID_QA_ACTIVITY_START_FAILED; exit 1; }
-  sleep 8
-  echo 'ANDROID_QA_DIRECT_APP_LAUNCH_AFTER_BOOT_PASS'
+  # The Maestro flow launches the verified APK and checks the login form.
+  echo 'ANDROID_QA_APK_INSTALLED_AFTER_BOOT_PASS'
 fi
 curl -fsSL https://get.maestro.mobile.dev -o /tmp/marina-maestro-qa-negative-install.sh
 bash /tmp/marina-maestro-qa-negative-install.sh >/dev/null
