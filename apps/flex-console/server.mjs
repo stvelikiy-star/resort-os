@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { handleFlexIdentity, identityReadiness } from './auth/identity-gate.mjs';
+import { handleFlexIdentity, identityReadiness, validatePasswordSession } from './auth/identity-gate.mjs';
 import {createMfaSigner} from './auth/mfa-bridge.mjs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
@@ -393,7 +393,24 @@ export async function handler(req,res) {
     }:null);
     if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
     if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,identity_ready:identityReadiness(process.env).ready,password_login_ready:passwordLoginReady,payments_enabled:false,payouts_enabled:false});
-    if(url.pathname==='/api/session') { const s=unseal(cookiesFrom(req)[cookies.session]);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
+    if(url.pathname==='/api/session') {
+      const session=unseal(cookiesFrom(req)[cookies.session]);
+      if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
+      if(!passwordLoginReady)return json(res,200,{authenticated:true,csrf:session.csrf||null,qa_onboarding_enabled:qaOnboarding});
+      // The signed 5-minute JWT can renew only while its original Better Auth
+      // session still exists and is verified. Logout/recovery revocation stops renewal.
+      let payload;
+      try{payload=JSON.parse(Buffer.from(session.token.split('.')[1],'base64url').toString());}
+      catch{return json(res,401,{error:'SESSION_INVALID'});}
+      if(!Array.isArray(payload.amr) || !payload.amr.includes('pwd') || !payload.sub)
+        return json(res,401,{error:'SESSION_INVALID'});
+      if(!await validatePasswordSession(req,payload.sub))
+        return json(res,401,{error:'LOGIN_REQUIRED',reauthenticate:true},{'Set-Cookie':cookie(cookies.session,'',0)});
+      const nearingExpiry=session.exp-Date.now()<180000;
+      const renewed=nearingExpiry?{...mfaSigner(payload.sub,'password'),csrf:session.csrf}:session;
+      return json(res,200,{authenticated:true,csrf:renewed.csrf||null,qa_onboarding_enabled:qaOnboarding},
+        nearingExpiry?{'Set-Cookie':cookie(cookies.session,seal(renewed),300)}:{});
+    }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
     if(req.method==='POST'&&(linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))return await trustedLinkAction(req,res,url);
     if(req.method==='POST'&&(catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)))return await catalogAdminPost(req,res,url);
