@@ -52,3 +52,10 @@ test('pinned Better Auth TOTP staging module can import without creating session
   const staging=await import('../auth/identity-enabled.mjs');
   assert.equal(typeof staging.handleEnabledIdentity,'function');
 });
+
+test('schema generator imports the canonical Better Auth config, no drift',()=>{
+ const s=readFileSync(new URL('../auth/schema-config.mjs',import.meta.url),'utf8');
+ assert.match(s,/createFlexAuthConfig/);
+ assert.match(s,/FLEX_AUTH_SCHEMA_DRY_RUN/);
+ assert.doesNotMatch(s,/\bcreate\s+table\b/i);
+});

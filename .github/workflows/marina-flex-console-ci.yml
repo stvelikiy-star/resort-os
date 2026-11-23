@@ -30,6 +30,16 @@ jobs:
       - name: Install pinned FLEX Console auth dependencies
         working-directory: apps/flex-console
         run: npm install --ignore-scripts --no-fund --no-audit
+      - name: Generate isolated Better Auth + TOTP SQL for review (never apply)
+        working-directory: apps/flex-console
+        env:
+          FLEX_AUTH_SCHEMA_DRY_RUN: "true"
+          BETTER_AUTH_SECRET: "github-ci-only-test-secret-not-for-deployment-123456789"
+        run: |
+          npx --yes auth@1.7.27 generate --config auth/schema-config.mjs --output /tmp/flex-auth-schema.sql --yes
+          test -s /tmp/flex-auth-schema.sql
+          echo "FLEX_AUTH_SCHEMA_GENERATED"
+          cat /tmp/flex-auth-schema.sql
       - name: Syntax + isolated HTTP security tests
         working-directory: apps/flex-console
         run: npm run check
