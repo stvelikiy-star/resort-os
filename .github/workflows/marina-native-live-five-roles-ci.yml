@@ -4,6 +4,8 @@ on:
     paths:
       - '.github/workflows/marina-native-live-five-roles-ci.yml'
       - 'scripts/design/fl2-native-live-five-roles.sh'
+      - 'scripts/design/fl2-native-live-role.yaml'
+      - 'scripts/design/fl2-native-live-role.sh'
 
 permissions:
   contents: read
