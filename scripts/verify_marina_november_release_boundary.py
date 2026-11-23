@@ -39,8 +39,9 @@ APPROVED_NATIVE_QA_BLOBS = {
     "scripts/design/fl2-native-qa-negative-login.yaml": "1e1843e93a9c28fba0e45d06bdb01bf2d1b89734",
     "scripts/design/fl2-native-qa-negative-login.sh": "95207036fe6d063f76d6f80b57f97182b0dfa5d4",
     "scripts/design/fl2-native-qa-session-contract.py": "7d47beab4c3fac61cd3defea8f86d8d70c2835c8",
-    ".github/workflows/marina-native-live-five-roles-ci.yml": "e3c85495f10758fddd7c40b3f85e5052f3b5da9a",
-    "scripts/design/fl2-native-live-five-roles.sh": "d01d763fc413a2a5222424a473ee551d86aefbdd",
+    "scripts/design/fl2-native-qa-logout-restart.yaml": "d107612040190b3e6eefeb3900c68a839bd72e05",
+    ".github/workflows/marina-native-live-five-roles-ci.yml": "a0a72a07cd4112ec23cd351cc6f20a066bccb792",
+    "scripts/design/fl2-native-live-five-roles.sh": "bd1088c60ba9f1aa8c5abd21e477f245fcd18e6d",
 }
 
 APPROVED_P0_BLOBS = {
