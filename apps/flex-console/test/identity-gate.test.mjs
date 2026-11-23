@@ -80,3 +80,14 @@ test('identity sign-in UI uses Better Auth TOTP but does not grant platform role
   assert.doesNotMatch(src,/state\.me\s*=\s*state\.identitySession/);
   assert.doesNotMatch(src,/state\.me\s*=\s*\{[^}]*SUPER_ADMIN/);
 });
+
+
+test('password-only QA never loops a verified identity back to a second password form',()=>{
+  const src=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+  assert.match(src,/if\(state\.identitySession\?\.user\)return '<section class="panel gold">/);
+  assert.match(src,/data-identity-logout="yes"/);
+  const panel=src.split("function identityPanel(){",2)[1].split("\nconst state=",1)[0];
+  assert.doesNotMatch(panel,/state\.identitySession\?\.user && !state\.status\?\.password_login/);
+  assert.match(src,/if\(state\.me\)/);
+  assert.doesNotMatch(src,/state\.me\s*=\s*state\.identitySession/);
+});
