@@ -23,7 +23,25 @@ appId: kg.go.ms.staff
     timeout: 90000
 - tapOn:
     id: "login-username"
-- inputText: ${MAESTRO_QA_USERNAME}
+# iOS Simulator occasionally loses most characters when Maestro types
+# a long synthetic username key-by-key. Clipboard insertion is atomic.
+# Fail closed if the actual field differs; never proceed to password.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - evalScript: ${maestro.copiedText = MAESTRO_QA_USERNAME}
+      - pasteText
+      - copyTextFrom:
+          id: "login-username"
+      - assertTrue:
+          condition: ${maestro.copiedText === MAESTRO_QA_USERNAME}
+          label: "Complete synthetic QA username present before password"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - inputText: ${MAESTRO_QA_USERNAME}
 - tapOn:
     id: "login-password"
 - inputText: ${MAESTRO_QA_PASSWORD}
