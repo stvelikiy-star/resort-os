@@ -20,7 +20,7 @@ import asyncpg
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .flex_control_plane import (
+from .flex_control_plane import qa_password_read_allowed, (
     lifespan as core_lifespan,
     resolve_platform_principal,
 )
@@ -62,13 +62,15 @@ app = FastAPI(
 )
 
 
-def require_admin(principal: PlatformPrincipal) -> None:
-    if principal.role != "SUPER_ADMIN" or not principal.mfa_verified:
+def require_admin(principal: PlatformPrincipal, *, read_only: bool = False) -> None:
+    if principal.role != "SUPER_ADMIN" or not (
+        principal.mfa_verified or (read_only and qa_password_read_allowed(principal))
+    ):
         raise HTTPException(403, detail="Verified FLEX SUPER_ADMIN with MFA required")
 
 
-async def as_writer(conn, principal: PlatformPrincipal) -> None:
-    require_admin(principal)
+async def as_writer(conn, principal: PlatformPrincipal, *, read_only: bool = False) -> None:
+    require_admin(principal, read_only=read_only)
     await conn.execute(
         "SELECT set_config('flex.actor_subject_id',$1,true)", principal.subject_id
     )
@@ -177,10 +179,10 @@ async def catalog(
     request: Request,
     principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    require_admin(principal)
+    require_admin(principal, read_only=True)
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            await as_writer(conn, principal)
+            await as_writer(conn, principal, read_only=True)
             rows = await conn.fetch(
                 "SELECT s.sku,s.title,s.capability_key,s.product_status,s.is_core,"
                 " p.version,p.monthly_price,p.currency,p.valid_from,p.valid_to "
@@ -206,12 +208,12 @@ async def price_versions(
     sku: str, request: Request,
     principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    require_admin(principal)
+    require_admin(principal, read_only=True)
     if not SKU_RE.fullmatch(sku):
         raise HTTPException(404, detail="Unknown SKU")
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            await as_writer(conn, principal)
+            await as_writer(conn, principal, read_only=True)
             found = await conn.fetchval("SELECT true FROM flex_skus WHERE sku=$1", sku)
             if not found:
                 raise HTTPException(404, detail="Unknown SKU")
@@ -299,10 +301,10 @@ async def drafts(
     hotel_id: uuid.UUID | None = Query(None),
     principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    require_admin(principal)
+    require_admin(principal, read_only=True)
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            await as_writer(conn, principal)
+            await as_writer(conn, principal, read_only=True)
             rows = await conn.fetch(
                 "SELECT id,hotel_id,version,title,period_start,period_end,enforcement,state,"
                 " currency,items,proposed_monthly_total,created_by,created_at "
