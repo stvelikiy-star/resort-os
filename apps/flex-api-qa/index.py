@@ -92,13 +92,11 @@ if _ENABLE_ONBOARDING:
 # to flex_platform_admin_reader and never require catalog writer membership.
 # Only the explicitly enabled flag may register POST draft mutations.
 _ROUTES.append(flex_catalog_admin.app)
-_seen = {"/health"}
+_seen = {("/health", "GET")}
 for source in _ROUTES:
     for route in source.routes:
         if not isinstance(route, APIRoute) or not route.path.startswith("/v1/"):
             continue
-        if route.path in _seen:
-            raise RuntimeError("FLEX_ROUTE_COLLISION: " + route.path)
         if not (route.methods <= {"GET", "POST"}):
             raise RuntimeError("FLEX_UNEXPECTED_MUTATION_ROUTE")
         if "POST" in route.methods:
@@ -106,7 +104,10 @@ for source in _ROUTES:
                 continue
             if source not in (flex_onboarding.app, flex_catalog_admin.app):
                 raise RuntimeError("FLEX_UNAUTHORIZED_WRITE_ROUTE")
-        _seen.add(route.path)
+        keys = {(route.path, method) for method in route.methods}
+        if _seen.intersection(keys):
+            raise RuntimeError("FLEX_ROUTE_COLLISION: " + route.path)
+        _seen.update(keys)
         app.router.routes.append(route)
 
 
