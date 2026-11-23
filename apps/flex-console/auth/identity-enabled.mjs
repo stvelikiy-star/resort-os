@@ -19,20 +19,39 @@ export function createFlexAuthConfig({database,baseURL}) {
     plugins:[twoFactor({issuer:'MARINA SMART FLEX'})]
   });
 }
-let handler;
-function getHandler() {
+// Neon pooled connections reject the 'options=-c search_path' startup
+// parameter. The dedicated runtime login has a DB-scoped search_path
+// configured on the server; prove it before serving any identity request.
+let handlerPromise;
+async function getHandler() {
   if(!identityReadiness(process.env).ready) throw Error('FLEX_IDENTITY_NOT_READY');
-  if(handler) return handler;
-  const database=new pg.Pool({
-    connectionString:process.env.FLEX_AUTH_DATABASE_URL,
-    options:'-c search_path=flex_auth,pg_catalog',
-    max:3,
-    ssl:{rejectUnauthorized:true}
-  });
-  const auth=createFlexAuthConfig({database,baseURL:process.env.BETTER_AUTH_URL});
-  handler=toNodeHandler(auth);
-  return handler;
+  if(handlerPromise) return handlerPromise;
+  handlerPromise=(async()=>{
+    const database=new pg.Pool({
+      connectionString:process.env.FLEX_AUTH_DATABASE_URL,
+      max:3,
+      ssl:{rejectUnauthorized:true}
+    });
+    try {
+      const {rows}=await database.query(
+        "SELECT current_database() AS db, current_user AS role, " +
+        "current_schema() AS schema, " +
+        "has_schema_privilege(current_user,'flex_private','USAGE') AS commercial_access"
+      );
+      const row=rows[0];
+      if(!row || row.db!=='flex_qa' || row.role!=='flex_auth_runtime' ||
+         row.schema!=='flex_auth' || row.commercial_access!==false)
+        throw Error('FLEX_AUTH_DATABASE_SCOPE_INVALID');
+      const auth=createFlexAuthConfig({database,baseURL:process.env.BETTER_AUTH_URL});
+      return toNodeHandler(auth);
+    } catch (err) {
+      await database.end();
+      throw err;
+    }
+  })();
+  return handlerPromise;
 }
 export async function handleEnabledIdentity(req,res) {
-  return getHandler()(req,res);
+  const handler=await getHandler();
+  return handler(req,res);
 }
