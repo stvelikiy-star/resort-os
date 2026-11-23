@@ -31,7 +31,7 @@ APPROVED_NATIVE_QA_BLOBS = {
     ".github/workflows/marina-ios-simulator-keychain-linker-pilot-ci.yml": "0e4e2adf456706346760415f98f1e8e9a808bb96",
     ".github/workflows/marina-native-android-ios-maestro-ci.yml": "dc33e47bb732fe40f89f9d6a207d733ec313a0d8",
     "scripts/design/fl2-android-maestro-demo.sh": "b4372aa0fcb965a3d9337d86c2f4faf96db700c3",
-    "scripts/design/fl2-native-live-role.yaml": "c405c4d9aed93362d7f14b07c80b0eb32ad67de5",
+    "scripts/design/fl2-native-live-role.yaml": "7bee19e1cc24b570a21bee7586577c9e00ed3c72",
     "scripts/design/fl2-native-live-dashboard.yaml": "51d2207ff63287cbb5f77dd3f02a5a0d2e254fa6",
     "scripts/design/fl2-native-live-role.sh": "3f182262269a0e50e7f177769eab8e9149ce5cc7",
     "scripts/design/fl2-native-live-role.README.md": "8e2e78527633902591c6fa56dd53b18afb9ab077",
