@@ -68,3 +68,15 @@ test('schema generator imports the canonical Better Auth config, no drift',()=>{
  assert.match(s,/FLEX_AUTH_SCHEMA_DRY_RUN/);
  assert.doesNotMatch(s,/\bcreate\s+table\b/i);
 });
+
+test('identity sign-in UI uses Better Auth TOTP but does not grant platform roles',()=>{
+  const src=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+  assert.match(src,/identity_ready/);
+  assert.match(src,/sign-in\/email/);
+  assert.match(src,/two-factor\/verify-totp/);
+  assert.match(src,/trustDevice:false/);
+  assert.match(src,/identitySession=await identitySession\(\)/);
+  assert.match(src,/Never set state\.me/);
+  assert.doesNotMatch(src,/state\.me\s*=\s*state\.identitySession/);
+  assert.doesNotMatch(src,/state\.me\s*=\s*\{[^}]*SUPER_ADMIN/);
+});
