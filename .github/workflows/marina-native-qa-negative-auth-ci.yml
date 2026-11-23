@@ -75,27 +75,31 @@ jobs:
   ios-invalid-login:
     name: iOS simulator invalid login to MARINA_FINAL_QA
     runs-on: macos-26-intel
+    environment: marina-native-qa
     timeout-minutes: 70
     env:
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
       MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
-      IOS_QA_SIM_ZIP_SHA256: 'ced189dd4f54595867649da4e67d2e8fa186f47437af43d47fefbf41936653c8'
+      IOS_QA_SIM_ZIP_SHA256: '4b880f67282b17fcd08a809072a00a199ddbe83859ea15552360f39342601b62'
     steps:
       - uses: actions/checkout@v4
       - name: Fetch verified unsigned iOS Simulator app (no rebuild)
         uses: actions/download-artifact@v4
         with:
-          name: marina-qa-ios-origin-pinned-app
-          run-id: 44909147697
+          name: marina-linked-ios-live-app
+          run-id: 45063587493
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ios-bin
       - name: Verify exact iOS app archive and source build provenance
         run: |
           set -euo pipefail
-          test -s ios-bin/MARINA_SMART_iOS_Simulator.zip
-          echo "$IOS_QA_SIM_ZIP_SHA256  ios-bin/MARINA_SMART_iOS_Simulator.zip" | shasum -a 256 -c -
-          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/44909147697" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='62a2d682cb90524493200858f8bbc50a200da7e5' and d['conclusion']=='success'"
+          test -s ios-bin/ios-live.zip
+          echo "$IOS_QA_SIM_ZIP_SHA256  ios-bin/ios-live.zip" | shasum -a 256 -c -
+          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/44909147697" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='9131f3dbd83b3d9617246337b56d166ea22789be'"
+          # Pin the successful iOS build job, not the parent run (which failed later at COOK UI).
+          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/137450788298" | python3 -c "import json,sys; j=json.load(sys.stdin); assert j['conclusion']=='success' and j['run_id']==45063587493"
           mkdir -p "$RUNNER_TEMP/marina-native-qa-app"
-          unzip -q ios-bin/MARINA_SMART_iOS_Simulator.zip -d "$RUNNER_TEMP/marina-native-qa-app"
+          ditto -x -k ios-bin/ios-live.zip "$RUNNER_TEMP/marina-native-qa-app"
           app=$(find "$RUNNER_TEMP/marina-native-qa-app" -name '*.app' -maxdepth 2 -print -quit)
           test -d "$app"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = kg.go.ms.staff
