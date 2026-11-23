@@ -175,6 +175,23 @@ test('read-only FLEX admin catalogue remains visible while write endpoints stay 
  assert.match(browser,/qa_catalog_read_only_enabled\|\|state\.status\?\.qa_catalog_admin_enabled/);
  assert.match(browser,/state\.status\?\.qa_catalog_admin_enabled\?'<button type="button"/);
 });
+test('one-time recovery has complete RU/KG/EN copy and never exposes its token in the URL after load',()=>{
+ const js=readFileSync(new URL('../public/recover.js',import.meta.url),'utf8');
+ const html=readFileSync(new URL('../public/recover.html',import.meta.url),'utf8');
+ const match=js.match(/const translations=(\{[\s\S]*?\n\});\nconst form=/);
+ assert.ok(match,'Recovery locale dictionary must be statically testable');
+ const translations=vm.runInNewContext('('+match[1]+')');
+ const keys=Object.keys(translations.ru).sort();
+ for(const lang of ['ru','kg','en']){
+   assert.deepEqual(Object.keys(translations[lang]).sort(),keys,lang+' incomplete recovery copy');
+   for(const value of Object.values(translations[lang]))assert.ok(typeof value==='string'&&value.length>2);
+ }
+ assert.match(js,/history\.replaceState\(null,'',location\.pathname\)/);
+ assert.match(js,/response\.status!==204/);
+ assert.match(js,/form\.hidden=true/);
+ assert.match(html,/autocomplete="new-password"/);
+ assert.match(html,/id="recover-lang"/);
+});
 test('dashboard login finishes on signed password platform session before TOTP',()=>{
  const source=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
  assert.match(source,/if\(data\.platform_session===true\)\{location\.replace\('\/'\);return;\}/);
