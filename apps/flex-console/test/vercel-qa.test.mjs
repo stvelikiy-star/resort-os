@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 
 test('isolated Vercel QA uses Node HTTP entrypoint and fails closed without backend',()=>{
   const config=JSON.parse(readFileSync(new URL('../vercel.json',import.meta.url),'utf8'));
-  assert.equal(config.functions['server.js'].includeFiles,'public/**');
+  assert.equal(config.functions['server.js'].includeFiles,'{public,auth}/**');
   assert.ok(!config.rewrites,'No unexpected rewrites to external systems');
   const h=config.headers[0].headers;
   assert.ok(h.some(x=>x.key==='Cache-Control'&&x.value.includes('no-store')));

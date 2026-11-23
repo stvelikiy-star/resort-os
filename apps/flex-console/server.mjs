@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { handleFlexIdentity, identityReadiness } from './auth/identity-gate.mjs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -379,8 +380,9 @@ async function staticFile(res, pathname) {
 export async function handler(req,res) {
   try {
     const url=new URL(req.url,'http://localhost');
+    if(url.pathname==='/api/identity' || url.pathname.startsWith('/api/identity/')) return await handleFlexIdentity(req,res);
     if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
-    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,payments_enabled:false,payouts_enabled:false});
+    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
     if(url.pathname==='/api/session') { const s=unseal(cookiesFrom(req)[cookies.session]);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
     if(req.method==='POST'&&(linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))return await trustedLinkAction(req,res,url);

@@ -27,6 +27,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install pinned FLEX Console auth dependencies
+        working-directory: apps/flex-console
+        run: npm install --ignore-scripts --no-fund --no-audit
       - name: Syntax + isolated HTTP security tests
         working-directory: apps/flex-console
         run: npm run check
