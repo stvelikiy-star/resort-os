@@ -155,6 +155,17 @@ test('FLEX Console RU/KG/EN includes every UI label without malformed text',()=>
 });
 
 
+test('QA password session renews only after live Better Auth verification',()=>{
+ const server=readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
+ const identity=readFileSync(new URL('../auth/identity-enabled.mjs',import.meta.url),'utf8');
+ const browser=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ assert.match(server,/await validatePasswordSession\(req,payload\.sub\)/);
+ assert.match(server,/nearingExpiry\?\{\.\.\.mfaSigner\(payload\.sub,'password'\),csrf:session\.csrf\}:session/);
+ assert.match(identity,/session\?\.user\?\.id===subject && session\.user\.emailVerified===true/);
+ assert.match(identity,/new Date\(session\.session\.expiresAt\)\.getTime\(\)>Date\.now\(\)/);
+ assert.match(browser,/if\(state\.status\?\.password_login_ready\)await refreshPlatformSession\(\)/);
+ assert.match(browser,/},120000\)/);
+});
 test('dashboard login finishes on signed password platform session before TOTP',()=>{
  const source=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
  assert.match(source,/if\(data\.platform_session===true\)\{location\.replace\('\/'\);return;\}/);
