@@ -27,7 +27,7 @@ concurrency:
 jobs:
   qa-credentials-ready:
     name: Protected QA credentials available (no values logged)
-    if: github.event.pull_request.number == 573 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/marina-native-android-ios-maestro-20261121'
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'ci/marina-native-android-ios-maestro-20261121'
     runs-on: ubuntu-24.04
     environment: marina-native-qa
     outputs:
