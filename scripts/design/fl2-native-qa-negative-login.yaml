@@ -37,9 +37,12 @@ appId: kg.go.ms.staff
           commands:
             - tapOn: "Continue"
 - extendedWaitUntil:
-    visible: "Wrong username or password"
+    visible:
+      id: "login-error"
+      text: "Wrong username or password|Неверный логин или пароль|Логин же сырсөз туура эмес"
     timeout: 45000
 - assertVisible:
     id: "login-error"
+    text: "Wrong username or password|Неверный логин или пароль|Логин же сырсөз туура эмес"
 - assertNotVisible:
     id: "tab-overview"
