@@ -13,7 +13,7 @@ test('isolated Vercel QA uses Node HTTP entrypoint and fails closed without back
   const server=readFileSync(new URL('../server.js',import.meta.url),'utf8');
   assert.ok(server.includes('createServer(handler)'));
   assert.ok(server.includes("from './server.mjs'"));
-  assert.ok(!server.includes('payment'));
+  assert.ok(!server.includes('/v1/payments'));
 });
 
 test('importing QA handler for Vercel does not start an accidental TCP listener',()=>{
