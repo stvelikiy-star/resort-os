@@ -49,6 +49,8 @@ const claims=JSON.parse(Buffer.from(payload,'base64url'));assert.equal(claims.ex
 process.env.FLEX_ENVIRONMENT='qa';
 process.env.VERCEL_ENV='preview';
 process.env.FLEX_QA_PASSWORD_LOGIN='true';
+// Start a separate login scenario with its own rate-limit window in the disposable CI database.
+await db.query('TRUNCATE flex_auth."rateLimit"');
 const simpleAuth=createFlexAuthConfig({database:db,baseURL:origin});
 const tryPassword=async value=>{
   const request=new Request(origin+'/api/identity/sign-in/email',{method:'POST',headers:{origin,'content-type':'application/json'},
@@ -60,6 +62,9 @@ const tryPassword=async value=>{
 minted=undefined;
 assert.equal((await tryPassword('wrong-password-test')).status,401);
 assert.equal(minted,undefined);
-assert.equal((await (await tryPassword(password)).json()).platform_session,true);
+const accepted=await tryPassword(password);
+const result=await accepted.json();
+assert.equal(accepted.status,200,result.code || result.message);
+assert.equal(result.platform_session,true);
 assert.deepEqual(JSON.parse(Buffer.from(minted.token.split('.')[1],'base64url')).amr,['pwd']);
 await db.end(); console.log('PASS invite concurrency, mailbox-bound credentials, TOTP enrollment, login, negative TOTP, Ed25519 JWT');
