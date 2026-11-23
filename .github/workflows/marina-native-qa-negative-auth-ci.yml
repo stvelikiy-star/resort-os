@@ -5,6 +5,7 @@ on:
       - '.github/workflows/marina-native-qa-negative-auth-ci.yml'
       - 'scripts/design/fl2-native-qa-negative-login.yaml'
       - 'scripts/design/fl2-native-qa-negative-login.sh'
+      - 'scripts/design/fl2-native-live-role.yaml'
   workflow_dispatch:
 
 permissions:
@@ -19,8 +20,10 @@ jobs:
   android-invalid-login:
     name: Android 35 invalid login to MARINA_FINAL_QA
     runs-on: ubuntu-24.04
+    environment: marina-native-qa
     timeout-minutes: 55
     env:
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
       MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
       ANDROID_QA_APK_SHA256: 'f22aedddc4232b6ea85ed7e6de0cbc0f84cadf720900e1cc5332f971da9bb1f4'
     steps:
@@ -105,16 +108,15 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = kg.go.ms.staff
           echo "MARINA_QA_APP=$app" >> "$GITHUB_ENV"
           echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
-      - name: Preserve original verified unsigned iOS Simulator binary for negative-login QA
+      - name: Keep verified Keychain-enabled iOS Simulator binary unchanged
         run: |
           set -euo pipefail
-          # This test only verifies that an invalid login fails. It must not
-          # modify the SHA-pinned QA binary or claim to verify SecureStore.
-          # A previous post-build ad-hoc signature caused SBMainWorkspace to
-          # deny launch; the unchanged unsigned app has passed native launch.
+          # This job reuses the iOS simulator app proven to launch and accept
+          # OWNER + RECEPTION logins. Never re-sign or modify its bytes.
+          # The negative-auth assertion still must pass independently.
           test -d "$MARINA_QA_APP"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$MARINA_QA_APP/Info.plist")" = kg.go.ms.staff
-          echo 'IOS_NEGATIVE_AUTH_USES_ORIGINAL_VERIFIED_SIMULATOR_APP'
+          echo 'IOS_NEGATIVE_AUTH_USES_LIVE_LOGIN_VERIFIED_SIMULATOR_APP'
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
