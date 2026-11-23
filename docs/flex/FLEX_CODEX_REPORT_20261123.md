@@ -147,3 +147,44 @@ Isolated pre-commit evidence:
 - Runtime permissions still restrict password-only sessions to QA Preview. No authority to mutate invoices, payments, payouts or ENFORCE has been added.
 
 **Historical notes above saying the #588 delta was not imported describe the state before this reconciliation.** The new code is included in this branch after the reconciliation commit, but **complete Gate 0 still requires new SHA GitHub CI evidence**, and Gate 3 requires real isolated staging authentication evidence. Neither should be inferred from local tests.
+
+## Gate evidence update — combined source SHA `5b6f16c7431156c18bbc19b576c1e234616dd0d5`
+
+**Status remains NO-GO** despite clean FLEX CI and deployed isolated previews. All dates below are 2026-11-23; evidence is attributable to this exact code SHA, before this documentation-only update.
+
+### Fixed actionable CI failure — scope guard is NOT weakened
+
+A previous GitHub PR run tested the auto-created `refs/pull/591/merge` instead of our exact branch SHA. The strict scope guard rejected an unrelated new `main` file: `.github/workflows/marina-ios-simulator-keychain-linker-pilot-ci.yml`. Full GitHub job log identified `Forbidden baseline change`. Fix commit `5b6f16c7431156c18bbc19b576c1e234616dd0d5` changed **only** `.github/workflows/marina-flex-integration-ci.yml`, setting both checkouts to `ref: ${{ github.event.pull_request.head.sha || github.sha }}`. The guard implementation and forbidden-path policy remain unchanged. Its own CI job now **PASS**.
+
+### Measured checks
+
+| Evidence | Actual result |
+| --- | --- |
+| [FLEX integrated scope + PG restore](https://github.com/stvelikiy-star/resort-os/actions/runs/45234632975) | **PASS** in both jobs: source branch scope and disposable PostgreSQL 16 0001–0011 install/restore. |
+| [FLEX Console](https://github.com/stvelikiy-star/resort-os/actions/runs/45234633165) | **PASS**; pinned npm ci, Better Auth schema dry run, JS tests and isolated first login. |
+| GitHub specialized FLEX CI on `5b6f16c` | **14/14 PASS**. |
+| Historical `Release RC Truth CI` | **FAIL**, isolated main/November release check; never disabled or edited. |
+| API Preview deployment `dpl_BcntErMh9s1Kd153LVXM5MYbPGKi` | **READY**; `GET /health` 200, `payments_enabled=false`, `payouts_enabled=false`, onboarding and draft writes disabled. |
+| Console Preview deployment `dpl_Ffodn4jNhkMrpyjXax7T8qm37yj1` | **READY**; `GET /api/status` 200, `password_login=true`, `qa_onboarding_enabled=false`, `qa_catalog_admin_enabled=false`, payments/payouts false. |
+| Both isolated previews | Same code SHA `5b6f16c`; stable QA aliases not reassigned. |
+| Anonymous API/Console GET profile/catalog/earnings/hotels | **401**, no data leaked. |
+| Unregistered API POST to catalog SKU, hotel onboarding, and payments | **404**, no action executed. |
+| Payout POST | **NOT VERIFIED** (security gateway disallowed probe; health reports payouts false). |
+| Cloudflare custom DNS/TLS/Access | **NOT VERIFIED**; Vercel HTTPS does not itself prove Cloudflare integration. |
+| Authenticated role-based cloud E2E / MFA staging | **NOT VERIFIED** (password readiness is configuration, not proof of sign-in). |
+
+Preview URLs (not stable QA aliases):
+- Console: `https://marina-smart-flex-fzlqskgct-ai-prof-kg.vercel.app/`
+- API: `https://marina-smart-flex-api-qakvljsfq-ai-prof-kg.vercel.app/health`
+
+### Gate 0–10 disposition after integration
+
+- Gate **0**: **FAIL** as a full acceptance gate despite 14/14 FLEX CI PASS. Separate historical Release RC Truth FAIL; no final approved release candidate.
+- Gate **1**: **PASS**, limited explicitly to disposable isolated PostgreSQL in CI.
+- Gate **2**: **FAIL / PARTIAL** — isolated Vercel previews READY, Cloudflare DNS/TLS/Access backend boundary not proven.
+- Gate **3**: **FAIL / PARTIAL** — password QA flag configured, no verified MFA/cloud live role login.
+- Gates **4–8**: **FAIL / unverified live acceptance**, contract tests and demo screenshots not substitutes for signed cloud E2E.
+- Gate **9**: **FAIL / PARTIAL** — deployment states freeze; several anonymous/forbidden endpoints checked, payout POST and wider negative matrix not fully proven.
+- Gate **10**: **FAIL** — no approved release, Cloudflare, off-site backup and complete rollback/monitoring evidence.
+
+**Frozen without exception:** payment QR, bank integrations, invoices to pay, agent/investor payouts, real hotel ENFORCE. No work performed on PMS, main, Production, production or live QA databases, Docker, or Cloudflare settings.
