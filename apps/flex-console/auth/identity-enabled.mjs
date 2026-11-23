@@ -7,6 +7,7 @@ import pg from 'pg';
 import {verifiedLogin} from './mfa-bridge.mjs';
 import {hashPassword} from 'better-auth/crypto';
 import {redeemFirstInvite} from './first-invite.mjs';
+import {redeemRecovery} from './recovery.mjs';
 import {identityReadiness} from './identity-gate.mjs';
 export const passwordMode=()=>process.env.FLEX_ENVIRONMENT==='qa' && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true';
 export function createFlexAuthConfig({database,baseURL}) {
@@ -74,6 +75,18 @@ export async function handleEnabledIdentity(req,res,issueSessionCookie) {
     return respond(await redeemFirstInvite(database,body?.token,body?.password,hashPassword)?204:403);
   }
   const path=req.url.split('?')[0];
+  if(path==='/api/identity/recover'){
+    const respond=code=>{res.writeHead(code,{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});return res.end();};
+    if(!passwordMode())return respond(404);
+    if(req.method!=='POST')return respond(405);
+    if(req.headers.origin!==new URL(process.env.BETTER_AUTH_URL).origin ||
+       req.headers['content-type']?.split(';')[0]!=='application/json')return respond(403);
+    let size=0;const chunks=[];
+    for await(const chunk of req){size+=Buffer.byteLength(chunk);if(size>2048)return respond(413);chunks.push(Buffer.from(chunk));}
+    let body;
+    try{body=JSON.parse(Buffer.concat(chunks).toString());}catch{return respond(400);}
+    return respond(await redeemRecovery(database,body?.token,body?.password,hashPassword)?204:403);
+  }
   if(issueSessionCookie && (path==='/api/identity/two-factor/verify-totp' || (passwordMode() && path==='/api/identity/sign-in/email'))){
     const origin=new URL(process.env.BETTER_AUTH_URL).origin;
     return toNodeHandler(request=>verifiedLogin(auth,request,origin,issueSessionCookie,passwordMode()))(req,res);
