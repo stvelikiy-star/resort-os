@@ -30,22 +30,39 @@ if [[ "$platform" = android ]];then
     sleep 2
   done
   test "$boot_ready" = true || { echo 'ANDROID_EMULATOR_BOOT_INCOMPLETE'; exit 78; }
-  adb install -r "$apk" >/dev/null
-  adb shell pm path kg.go.ms.staff | grep -q 'package:'
-  # Launch the app via ActivityManager, not Monkey/Pixel Launcher. The
-  # launcher itself had shown "isn't responding" on the failure screenshot.
-  adb shell am force-stop kg.go.ms.staff || true
-  adb shell am start -W -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p kg.go.ms.staff >/dev/null
-  sleep 8
-  echo 'ANDROID_QA_DIRECT_APP_LAUNCH_AFTER_BOOT_PASS'
+  adb install -r "$apk" || { echo ANDROID_QA_APK_INSTALL_FAILED; exit 1; }
+  package_path=$(adb shell pm path kg.go.ms.staff)
+  [[ "$package_path" == *package:* ]] || { echo ANDROID_QA_PACKAGE_MISSING; exit 1; }
+  # The Maestro flow launches the verified APK and checks the login form.
+  echo 'ANDROID_QA_APK_INSTALLED_AFTER_BOOT_PASS'
 fi
 curl -fsSL https://get.maestro.mobile.dev -o /tmp/marina-maestro-qa-negative-install.sh
 bash /tmp/marina-maestro-qa-negative-install.sh >/dev/null
 maestro_bin="$HOME/.maestro/bin/maestro"
 test -x "$maestro_bin"
-# Username guaranteed to be absent from the QA database.
-export MAESTRO_NONEXISTENT_QA_USERNAME="marina_nativeqa_absent_$(openssl rand -hex 12)"
+# Use a real synthetic QA account to test a WRONG PASSWORD, never an unknown user.
+# Only its username is read; the real password is never passed to Maestro here.
+test -n "${MARINA_NATIVE_QA_USERS_JSON:-}" || { echo 'QA_CREDENTIAL_SECRET_MISSING'; exit 78; }
+export MAESTRO_QA_EXISTING_USERNAME="$(python3 - <<'PY'
+import json, os, re
+data=json.loads(os.environ['MARINA_NATIVE_QA_USERS_JSON'])
+assert isinstance(data,dict) and set(data)=={'OWNER','RECEPTION','COOK','WAITER','STORE_STAFF'}
+name=data['OWNER']['username']
+assert re.fullmatch(r'marina_nativeqa_[a-zA-Z0-9_-]{9,70}',name)
+print(name)
+PY
+)"
 export MAESTRO_INVALID_QA_PASSWORD="InvalidOnlyQA$(openssl rand -hex 18)"
+# Independently verify the server rejects the known QA login's invalid password.
+payload="$(python3 - <<'PY'
+import json,os
+print(json.dumps({'username':os.environ['MAESTRO_QA_EXISTING_USERNAME'],'password':os.environ['MAESTRO_INVALID_QA_PASSWORD']}))
+PY
+)"
+status="$(curl -sS --connect-timeout 8 --max-time 17 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' --data-binary "$payload" "$origin/api/v1/auth/login")"
+unset payload
+test "$status" = 401 || { echo "QA_WRONG_PASSWORD_HTTP_UNEXPECTED=$status"; exit 1; }
+echo 'QA_EXISTING_USER_WRONG_PASSWORD_HTTP_401_PASS'
 export MAESTRO_DRIVER_STARTUP_TIMEOUT=360000 MAESTRO_CLI_NO_ANALYTICS=true
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT

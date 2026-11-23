@@ -26,20 +26,22 @@ ALLOWED_GOVERNANCE = frozenset({
 # product source. Git blob digests prevent widening this exception silently.
 # Approved workflow is test-only; pinned to prevent unreviewed CI drift.
 APPROVED_NATIVE_QA_BLOBS = {
+    "scripts/design/fl2-native-qa-session-contract.py": "5129f897f2fbe6f6afd6aacf278a26971d75e406",
+    "scripts/design/fl2-native-qa-logout-restart.yaml": "d107612040190b3e6eefeb3900c68a839bd72e05",
     ".github/workflows/marina-ios-simulator-keychain-linker-pilot-ci.yml": "0df95da7243cd64667eb8d505277b67d5c846ad9",
     ".github/workflows/marina-native-android-ios-maestro-ci.yml": "077328f3a5754daf3162e3a322fc609431c8925c",
     "scripts/design/fl2-android-maestro-demo.sh": "b4372aa0fcb965a3d9337d86c2f4faf96db700c3",
-    "scripts/design/fl2-native-live-role.yaml": "5c7508b1cf6e740e267bcd7d7009cd9eeaf99719",
+    "scripts/design/fl2-native-live-role.yaml": "69e7fa4bd88ffa3c6fe20ba7e552ed0b6a7108d6",
     "scripts/design/fl2-native-live-role.sh": "12df57b660f8bb3bdb0d6bc922bdab2f2d3d8cbd",
     "scripts/design/fl2-native-live-role.README.md": "8e2e78527633902591c6fa56dd53b18afb9ab077",
     ".github/workflows/marina-native-live-qa-build-ci.yml": "756e8cb477eb405ebd70053b90e9186e3812e3dc",
     "scripts/design/fl2-native-qa-connect.yaml": "f92d7e839c81f451bf2896b610f019541f9213c1",
     "scripts/design/fl2-native-qa-connect.sh": "b0df9bd280ac5b3deb5e6a5d5a5e34767cfb4ccb",
-    ".github/workflows/marina-native-qa-negative-auth-ci.yml": "6d40d5205999bcceb05d454580b515b8b618b1f0",
-    "scripts/design/fl2-native-qa-negative-login.yaml": "17ba220277be7f708f225bc08b751e74bc14dd32",
-    "scripts/design/fl2-native-qa-negative-login.sh": "66f7f3a6d59f38430f20cbbee780256ebebfa4e9",
+    ".github/workflows/marina-native-qa-negative-auth-ci.yml": "5b0d064225572b7df6b5ce48d9a1131a124225ac",
+    "scripts/design/fl2-native-qa-negative-login.yaml": "1e1843e93a9c28fba0e45d06bdb01bf2d1b89734",
+    "scripts/design/fl2-native-qa-negative-login.sh": "95207036fe6d063f76d6f80b57f97182b0dfa5d4",
     ".github/workflows/marina-native-live-five-roles-ci.yml": "56b49515dce5a5399e10084e487b65460bf0ee2a",
-    "scripts/design/fl2-native-live-five-roles.sh": "d01d763fc413a2a5222424a473ee551d86aefbdd",
+    "scripts/design/fl2-native-live-five-roles.sh": "bd1088c60ba9f1aa8c5abd21e477f245fcd18e6d",
 }
 
 APPROVED_P0_BLOBS = {

@@ -33,6 +33,18 @@ appId: kg.go.ms.staff
     timeout: 60000
 - tapOn:
     id: "login-submit"
+# iOS shows an OS Password AutoFill offer after an otherwise successful
+# login. Dismiss only this system prompt; never dismiss app auth errors.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - waitForAnimationToEnd
+      - runFlow:
+          when:
+            visible: "Save Password?"
+          commands:
+            - tapOn: "Not Now"
 - extendedWaitUntil:
     visible:
       id: "${MAESTRO_QA_EXPECTED_TAB}"
