@@ -1,24 +1,102 @@
-"""Isolated MARINA FLEX QA connectivity probe for Vercel FastAPI.
+"""Isolated MARINA FLEX management API entrypoint. No PMS runtime import.
 
-Diagnostic only. No PMS imports, no credentials in responses, no writes,
-no authentication fallback, and no commercial or payment endpoints.
-Do NOT mistake this probe for the full FLEX control-plane API.
+Reuses vetted FLEX-only routers from services/api/app; never imports the PMS
+FastAPI application, payment simulator, bank, refund or payout code.
+Writes are disabled unless separately enabled in protected QA with MFA and
+explicit PostgreSQL NOINHERIT writer membership. No new external services.
 """
 from __future__ import annotations
 
 import os
+import sys
+from contextlib import asynccontextmanager
+from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import asyncpg
 from fastapi import FastAPI, HTTPException
+from fastapi.routing import APIRoute
+
+# Shared source is the already reviewed FLEX-only code; its own modules must
+# stay outside operational PMS app and be bundled by Vercel monorepo support.
+_SHARED = Path(__file__).resolve().parents[2] / "services" / "api"
+if not (_SHARED / "app" / "flex_control_plane.py").is_file():
+    raise RuntimeError("FLEX_SOURCE_NOT_INCLUDED_IN_VERCEL_BUILD")
+sys.path.insert(0, str(_SHARED))
+from app import flex_control_plane, flex_partner_portal, flex_onboarding, flex_catalog_admin
+
+
+def _qa_flag(name: str) -> bool:
+    return os.environ.get("FLEX_ENVIRONMENT") == "qa" and os.environ.get(name) == "true"
+
+
+_ENABLE_ONBOARDING = _qa_flag("FLEX_ENABLE_QA_ONBOARDING")
+_ENABLE_CATALOG = _qa_flag("FLEX_ENABLE_QA_CATALOG_DRAFTS")
+
+
+@asynccontextmanager
+async def _flex_lifespan(application: FastAPI):
+    # A database connection is mandatory; never silently run a mocked API.
+    qa_dsn()
+    async with flex_control_plane.lifespan(application):
+        async with application.state.flex_pool.acquire() as conn:
+            for role in flex_partner_portal.READERS:
+                member = await conn.fetchval(
+                    "SELECT pg_has_role(current_user,$1,'MEMBER')", role
+                )
+                inherited = await conn.fetchval(
+                    "SELECT pg_has_role(current_user,$1,'USAGE')", role
+                )
+                if not member or inherited:
+                    raise RuntimeError("FLEX partner reader requires NOINHERIT membership")
+        if _ENABLE_ONBOARDING:
+            await flex_onboarding._onboarding_writer_ready(application.state.flex_pool)
+        if _ENABLE_CATALOG:
+            async with application.state.flex_pool.acquire() as conn:
+                membership = await conn.fetchval(
+                    "SELECT pg_has_role(current_user,'flex_catalog_draft_writer','MEMBER')"
+                )
+                inherited = await conn.fetchval(
+                    "SELECT pg_has_role(current_user,'flex_catalog_draft_writer','USAGE')"
+                )
+                if not membership or inherited:
+                    raise RuntimeError("FLEX catalog writer must be a NOINHERIT member")
+        yield
+
 
 app = FastAPI(
-    title="MARINA FLEX QA Database Readiness",
-    version="0.1.0",
+    title="MARINA FLEX Management QA",
+    version="0.2.0",
+    lifespan=_flex_lifespan,
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
 )
+
+# Existing explicit FLEX routers, not a generic path proxy. Write endpoints
+# remain unregistered while their respective QA flags are disabled.
+_ROUTES = [
+    flex_control_plane.app,
+    flex_partner_portal.app,
+]
+if _ENABLE_ONBOARDING:
+    _ROUTES.append(flex_onboarding.app)
+if _ENABLE_CATALOG:
+    _ROUTES.append(flex_catalog_admin.app)
+_seen = {"/health"}
+for source in _ROUTES:
+    for route in source.routes:
+        if not isinstance(route, APIRoute) or not route.path.startswith("/v1/"):
+            continue
+        if route.path in _seen:
+            raise RuntimeError("FLEX_ROUTE_COLLISION: " + route.path)
+        if not (route.methods <= {"GET", "POST"}):
+            raise RuntimeError("FLEX_UNEXPECTED_MUTATION_ROUTE")
+        if "POST" in route.methods and source not in (flex_onboarding.app, flex_catalog_admin.app):
+            raise RuntimeError("FLEX_UNAUTHORIZED_WRITE_ROUTE")
+        _seen.add(route.path)
+        app.router.routes.append(route)
+
 
 _CHECK_SQL = """
 SELECT current_user AS db_role,
@@ -77,13 +155,15 @@ async def health() -> dict:
             raise HTTPException(503, detail="FLEX_QA_PRIVILEGE_GUARD_FAILED")
         return {
             "status": "ok",
-            "mode": "QA_DIAGNOSTIC_ONLY",
+            "mode": "QA_MANAGEMENT_READ_ONLY" if not (_ENABLE_ONBOARDING or _ENABLE_CATALOG) else "QA_MANAGEMENT_DRAFTS",
             "database": "isolated_neon",
             "least_privilege": True,
             "payments_enabled": False,
             "payouts_enabled": False,
-            "onboarding_enabled": False,
-            "real_user_auth_enabled": False,
+            "onboarding_enabled": _ENABLE_ONBOARDING,
+            "catalog_drafts_enabled": _ENABLE_CATALOG,
+            "real_user_auth_enabled": bool(os.environ.get("FLEX_AUTH_PUBLIC_KEYS_JSON")),
+            "read_routes_registered": True,
         }
     except HTTPException:
         raise
