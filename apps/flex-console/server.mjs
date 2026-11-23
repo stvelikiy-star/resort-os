@@ -29,6 +29,7 @@ const mfaSigner=createMfaSigner(process.env);
 const bridgeConfigured=Boolean(mfaSigner && identityReadiness(process.env).ready &&
   publicOrigin===new URL(process.env.BETTER_AUTH_URL).origin && apiOrigin && secret?.length===32);
 const configured=oidcConfigured || bridgeConfigured;
+const passwordLoginReady=Boolean(bridgeConfigured && qaEnvironment && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true');
 const localOrigin = publicOrigin === 'http://127.0.0.1:' + port || publicOrigin === 'http://localhost:' + port;
 if (configured && (!publicOrigin.startsWith('https://') && !localOrigin)) throw new Error('FLEX_PUBLIC_ORIGIN must use HTTPS outside localhost');
 if (configured && (![...(oidcConfigured?[issuer]:[]), apiOrigin, partnerApiOrigin].every(v => v.startsWith('https://') || (localOrigin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(v))))) {
@@ -391,7 +392,7 @@ export async function handler(req,res) {
       return cookie(cookies.session,seal(session),300);
     }:null);
     if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
-    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
+    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,identity_ready:identityReadiness(process.env).ready,password_login_ready:passwordLoginReady,payments_enabled:false,payouts_enabled:false});
     if(url.pathname==='/api/session') { const s=unseal(cookiesFrom(req)[cookies.session]);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
     if(req.method==='POST'&&(linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))return await trustedLinkAction(req,res,url);
