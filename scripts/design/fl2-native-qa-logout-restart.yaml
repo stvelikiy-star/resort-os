@@ -1,0 +1,27 @@
+# Native logout + cold app restart on the same QA installation.
+# Run AFTER a verified LIVE QA login; never send credentials here.
+appId: kg.go.ms.staff
+---
+- tapOn:
+    id: "tab-profile"
+- scrollUntilVisible:
+    element:
+      id: "sign-out"
+    direction: DOWN
+    timeout: 30000
+- tapOn:
+    id: "sign-out"
+- extendedWaitUntil:
+    visible:
+      id: "login-username"
+    timeout: 90000
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "login-username"
+    timeout: 90000
+- assertNotVisible:
+    id: "tab-store"
+- assertNotVisible:
+    id: "tab-overview"
