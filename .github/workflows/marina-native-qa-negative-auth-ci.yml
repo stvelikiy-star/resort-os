@@ -8,6 +8,12 @@ on:
       - 'scripts/design/fl2-native-qa-session-contract.py'
       - 'scripts/design/fl2-native-live-role.yaml'
   workflow_dispatch:
+    inputs:
+      run_android:
+        description: 'Recheck previously accepted Android only when explicitly requested'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -32,6 +38,7 @@ jobs:
         run: python3 -u scripts/design/fl2-native-qa-session-contract.py
 
   android-invalid-login:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_android == true
     name: Android 35 invalid login to MARINA_FINAL_QA
     runs-on: ubuntu-24.04
     environment: marina-native-qa

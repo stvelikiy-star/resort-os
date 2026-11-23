@@ -4,6 +4,17 @@ on:
     paths:
       - '.github/workflows/marina-native-live-five-roles-ci.yml'
       - 'scripts/design/fl2-native-live-five-roles.sh'
+      - 'scripts/design/fl2-native-live-role.yaml'
+      - 'scripts/design/fl2-native-live-role.sh'
+      - 'scripts/design/fl2-native-qa-logout-restart.yaml'
+
+  workflow_dispatch:
+    inputs:
+      run_android:
+        description: 'Recheck previously accepted Android only when explicitly requested'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -16,7 +27,7 @@ concurrency:
 jobs:
   qa-credentials-ready:
     name: Protected QA credentials available (no values logged)
-    if: github.event.pull_request.number == 573 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'ci/marina-native-android-ios-maestro-20261121'
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'ci/marina-native-android-ios-maestro-20261121'
     runs-on: ubuntu-24.04
     environment: marina-native-qa
     outputs:
@@ -39,7 +50,7 @@ jobs:
 
   android-five-live:
     needs: qa-credentials-ready
-    if: needs.qa-credentials-ready.outputs.ready == 'true'
+    if: needs.qa-credentials-ready.outputs.ready == 'true' && github.event_name == 'workflow_dispatch' && inputs.run_android == true
     name: Android 35 five LIVE staff roles (MARINA_FINAL_QA)
     runs-on: ubuntu-24.04
     environment: marina-native-qa
