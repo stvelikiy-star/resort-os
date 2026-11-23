@@ -386,8 +386,8 @@ async function staticFile(res, pathname) {
 export async function handler(req,res) {
   try {
     const url=new URL(req.url,'http://localhost');
-    if(url.pathname==='/api/identity' || url.pathname.startsWith('/api/identity/')) return await handleFlexIdentity(req,res,bridgeConfigured?subject=>{
-      const session={...mfaSigner(subject),csrf:b64u(randomBytes(32))};
+    if(url.pathname==='/api/identity' || url.pathname.startsWith('/api/identity/')) return await handleFlexIdentity(req,res,bridgeConfigured?(subject,method)=>{
+      const session={...mfaSigner(subject,method),csrf:b64u(randomBytes(32))};
       return cookie(cookies.session,seal(session),300);
     }:null);
     if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
