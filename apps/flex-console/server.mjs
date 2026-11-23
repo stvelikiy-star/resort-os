@@ -375,7 +375,7 @@ async function proxy(req,res,url) {
   res.writeHead(upstream.status,{...noStore,'Content-Type':'application/json; charset=utf-8'}); res.end(body);
 }
 async function staticFile(res, pathname) {
-  const files={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css','/marina-smart-logo.webp':'marina-smart-logo.webp','/enroll':'enroll.html','/enroll.js':'enroll.js'};
+  const files={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css','/marina-smart-logo.webp':'marina-smart-logo.webp','/enroll':'enroll.html','/enroll.js':'enroll.js','/recover':'recover.html','/recover.js':'recover.js'};
   const f=files[pathname]; if(!f) return json(res,404,{error:'NOT_FOUND'});
   const data=await readFile(join(root,'public',f));
   const mime=f.endsWith('.webp')?'image/webp':f.endsWith('.js')?'application/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8';
