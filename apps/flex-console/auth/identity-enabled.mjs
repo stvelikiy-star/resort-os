@@ -56,6 +56,19 @@ async function getHandler() {
   })();
   return handlerPromise;
 }
+// Renew only an existing QA password session whose subject still matches
+// a live, email-verified Better Auth session. Never mint from user input.
+export async function verifiedPasswordSession(req,subject){
+  if(!passwordMode() || typeof subject!=='string' || !subject)return false;
+  const {auth}=await getHandler();
+  const cookie=req.headers.cookie;
+  if(typeof cookie!=='string' || !cookie)return false;
+  const session=await auth.api.getSession({headers:new Headers({cookie})});
+  return session?.user?.id===subject && session.user.emailVerified===true &&
+    Boolean(session.session?.expiresAt) &&
+    new Date(session.session.expiresAt).getTime()>Date.now();
+}
+
 export async function handleEnabledIdentity(req,res,issueSessionCookie) {
   const {database,handler,auth}=await getHandler();
   if(new URL(req.url,'http://localhost').pathname==='/api/identity/first-invite'){
