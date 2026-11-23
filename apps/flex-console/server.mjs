@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, createHash, createCipheriv, createDecipheriv, createPublicKey, verify, timingSafeEqual } from 'node:crypto';
 
@@ -392,7 +392,8 @@ export async function handler(req,res) {
     return await staticFile(res,url.pathname);
   } catch(e) { console.error('FLEX console error:',e.message); return json(res,502,{error:'QA_SERVICE_UNAVAILABLE'}); }
 }
-if(process.env.NODE_ENV!=='test') createServer(handler).listen(port,host,()=>console.log('MARINA FLEX Console READ-ONLY listening on http://'+host+':'+port));
+const launchedDirectly = Boolean(process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url));
+if(process.env.NODE_ENV!=='test' && launchedDirectly) createServer(handler).listen(port,host,()=>console.log('MARINA FLEX Console READ-ONLY listening on http://'+host+':'+port));
 export const testRouteAllowed=routeAllowed;
 export const testValidateHotelRegistration=validateHotelRegistration;
 export const testValidateLinkPayload=validateLinkPayload;
