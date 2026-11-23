@@ -365,8 +365,8 @@ async function proxy(req,res,url) {
   const path=url.pathname.replace(/^\/api\/data/,'');
   const target=routeAllowed(path,url.searchParams);
   if(!target) return json(res,404,{error:'READ_ONLY_ENDPOINT_NOT_AVAILABLE'});
-  if(target==='catalog_admin'&&!qaCatalogAdmin)return json(res,503,{error:'QA_CATALOG_ADMIN_NOT_ENABLED'});
-  const backend=(target==='partner'?partnerApiOrigin:target==='catalog_admin'?catalogAdminApiOrigin:apiOrigin)+path+url.search;
+  // Administrative catalogue GET is available through the read-only core FLEX API.
+  const backend=(target==='partner'?partnerApiOrigin:(target==='catalog_admin'&&qaCatalogAdmin?catalogAdminApiOrigin:apiOrigin))+path+url.search;
   const upstream=await fetch(backend,{method:'GET',headers:{'Authorization':'Bearer '+session.token,'Accept':'application/json'},redirect:'manual',signal:AbortSignal.timeout(10000)});
   if(upstream.status>=300 && upstream.status<400) return json(res,502,{error:'UNEXPECTED_UPSTREAM_REDIRECT'});
   const contentType=upstream.headers.get('content-type')||'';
@@ -392,7 +392,7 @@ export async function handler(req,res) {
       return cookie(cookies.session,seal(session),300);
     }:null);
     if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
-    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,identity_ready:identityReadiness(process.env).ready,password_login_ready:passwordLoginReady,payments_enabled:false,payouts_enabled:false});
+    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,qa_catalog_read_only_enabled:configured&&qaEnvironment,identity_ready:identityReadiness(process.env).ready,password_login_ready:passwordLoginReady,payments_enabled:false,payouts_enabled:false});
     if(url.pathname==='/api/session') {
       const session=unseal(cookiesFrom(req)[cookies.session]);
       if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
