@@ -153,3 +153,13 @@ test('FLEX Console RU/KG/EN includes every UI label without malformed text',()=>
  }
  assert.ok(!src.includes('\uFFFD'),'Misdecoded console source');
 });
+
+
+test('first invitation completes password-only QA login without TOTP enrollment',()=>{
+ const source=readFileSync(new URL('../public/enroll.js',import.meta.url),'utf8');
+ const sessionSuccess=source.indexOf('if(session.platform_session===true)');
+ const mfaEnrollment=source.indexOf("post('two-factor/enable'");
+ assert.ok(sessionSuccess>0,'successful password login must be handled');
+ assert.ok(mfaEnrollment>sessionSuccess,'redirect before TOTP enrollment');
+ assert.match(source.slice(sessionSuccess,mfaEnrollment),/location\.replace\('\/'\);return;/);
+});
