@@ -5,6 +5,7 @@ on:
       - '.github/workflows/marina-native-qa-negative-auth-ci.yml'
       - 'scripts/design/fl2-native-qa-negative-login.yaml'
       - 'scripts/design/fl2-native-qa-negative-login.sh'
+      - 'scripts/design/fl2-native-qa-session-contract.py'
       - 'scripts/design/fl2-native-live-role.yaml'
   workflow_dispatch:
 
@@ -17,6 +18,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  server-session-rbac:
+    name: QA five-role login, logout revocation and forbidden owner routes
+    runs-on: ubuntu-24.04
+    environment: marina-native-qa
+    timeout-minutes: 12
+    env:
+      MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify server auth and revocation for five synthetic roles
+        run: python3 -u scripts/design/fl2-native-qa-session-contract.py
+
   android-invalid-login:
     name: Android 35 invalid login to MARINA_FINAL_QA
     runs-on: ubuntu-24.04
