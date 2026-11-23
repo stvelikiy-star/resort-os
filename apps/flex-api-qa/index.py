@@ -88,8 +88,10 @@ _ROUTES = [
 ]
 if _ENABLE_ONBOARDING:
     _ROUTES.append(flex_onboarding.app)
-if _ENABLE_CATALOG:
-    _ROUTES.append(flex_catalog_admin.app)
+# The existing catalogue GET routes are safe in read-only QA: they switch
+# to flex_platform_admin_reader and never require catalog writer membership.
+# Only the explicitly enabled flag may register POST draft mutations.
+_ROUTES.append(flex_catalog_admin.app)
 _seen = {"/health"}
 for source in _ROUTES:
     for route in source.routes:
@@ -99,8 +101,11 @@ for source in _ROUTES:
             raise RuntimeError("FLEX_ROUTE_COLLISION: " + route.path)
         if not (route.methods <= {"GET", "POST"}):
             raise RuntimeError("FLEX_UNEXPECTED_MUTATION_ROUTE")
-        if "POST" in route.methods and source not in (flex_onboarding.app, flex_catalog_admin.app):
-            raise RuntimeError("FLEX_UNAUTHORIZED_WRITE_ROUTE")
+        if "POST" in route.methods:
+            if source is flex_catalog_admin.app and not _ENABLE_CATALOG:
+                continue
+            if source not in (flex_onboarding.app, flex_catalog_admin.app):
+                raise RuntimeError("FLEX_UNAUTHORIZED_WRITE_ROUTE")
         _seen.add(route.path)
         app.router.routes.append(route)
 
@@ -171,6 +176,7 @@ async def health() -> dict:
             "catalog_drafts_enabled": _ENABLE_CATALOG,
             "real_user_auth_enabled": bool(os.environ.get("FLEX_AUTH_PUBLIC_KEYS_JSON")),
             "read_routes_registered": True,
+            "catalog_read_only_enabled": True,
         }
     except HTTPException:
         raise
