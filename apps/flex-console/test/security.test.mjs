@@ -153,3 +153,29 @@ test('FLEX Console RU/KG/EN includes every UI label without malformed text',()=>
  }
  assert.ok(!src.includes('\uFFFD'),'Misdecoded console source');
 });
+
+
+test('hotel read state distinguishes empty subscription from failed API calls',()=>{
+ const source=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ const match=source.match(/function hotelReadResult\(result,allowNotFound=false\)\{[\s\S]*?\n\}/);
+ assert.ok(match,'hotel read guard must be independently testable');
+ const read=vm.runInNewContext('('+match[0]+')');
+ assert.equal(read({status:'fulfilled',value:[]}).length,0);
+ assert.equal(read({status:'rejected',reason:{status:404}},true),null);
+ for(const status of [401,403,404,429,500,502,503]){
+   assert.throws(()=>read({status:'rejected',reason:{status}}),err=>err.status===status);
+   if(status!==404) assert.throws(()=>read({status:'rejected',reason:{status}},true),err=>err.status===status);
+ }
+ assert.match(source,/const subscription=hotelReadResult\(sub,true\)/);
+ assert.match(source,/const invoices=hotelReadResult\(inv\)/);
+});
+
+
+test('SUPER ADMIN summary reports partial API failures rather than hiding errors',()=>{
+ const source=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ const block=source.slice(source.indexOf('async function overview(){'),source.indexOf('function hotelTable(items)'));
+ assert.match(block,/Promise\.allSettled/);
+ assert.match(block,/const degraded=results\.map/);
+ assert.match(block,/r\.status==='rejected'/);
+ assert.match(block,/degraded\+periodButtons\(\)/);
+});

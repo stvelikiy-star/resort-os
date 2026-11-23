@@ -380,7 +380,10 @@ async function overview(){
  const c=results[1].status==='fulfilled'?results[1].value:null;
  const e=results[2].status==='fulfilled'?results[2].value:null;
  if(!h&&!c&&!e) throw results[0].reason;
- return heading(t('welcome'),t('helpQa'))+periodButtons()+'<div class="grid spacing-top">'+metric(t('activeHotels'),h?.length??'—','cyan-text')+
+ const sectionNames=[t('hotels'),t('features'),t('obligations')];
+ const degraded=results.map((r,i)=>r.status==='rejected'
+   ?info(t('error')+': '+sectionNames[i]+' (HTTP '+safe(r.reason?.status||'—')+')','error'):'').join('');
+ return heading(t('welcome'),t('helpQa'))+degraded+periodButtons()+'<div class="grid spacing-top">'+metric(t('activeHotels'),h?.length??'—','cyan-text')+
  metric(t('activeSku'),c?.length??'—','gold-text')+metric(t('groups'),e?.groups?.length??'—')+metric(t('readOnly'),'QA')+'</div>'+
  '<div class="grid two"><section class="panel"><h2>'+safe(t('hotels'))+'</h2>'+(h?.length?hotelTable(h.slice(0,5)):empty(t('noHotels')))+
  '<button class="subtle" type="button" data-view="hotels">'+safe(t('back'))+' →</button></section><section class="panel"><h2>'+safe(t('obligations'))+'</h2>'+
@@ -400,14 +403,19 @@ async function hotelList(){
  (state.lastCreated?info(t('created')+': '+state.lastCreated,'info'):'')+
  '<section class="panel">'+(filtered.length?hotelTable(filtered):empty(t('noHotels')))+'</section>';
 }
+// Read-only hotel cards must not report outages as missing commercial data.
+// Only an explicit 404 on the subscription GET is a legitimate empty state.
+function hotelReadResult(result,allowNotFound=false){
+ if(result.status==='fulfilled')return result.value;
+ if(allowNotFound&&result.reason?.status===404)return null;
+ throw result.reason||Error('HOTEL_READ_FAILED');
+}
 async function hotelDetail(){
  const id=state.hotelId;
  if(!/^[0-9a-fA-F-]{36}$/.test(id||'')) return heading(t('noSelected'))+empty(t('noSelected'));
  const [sub,inv]=await Promise.allSettled([api('/v1/hotels/'+id+'/subscription'),api('/v1/hotels/'+id+'/invoices')]);
- const subscription=sub.status==='fulfilled'?sub.value:null;
- const invoices=inv.status==='fulfilled'?inv.value:null;
- if(sub.status==='rejected'&&sub.reason.status===403)throw sub.reason;
- if(inv.status==='rejected'&&inv.reason.status===403)throw inv.reason;
+ const subscription=hotelReadResult(sub,true);
+ const invoices=hotelReadResult(inv);
  let draftHistory='';
  if(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled){
   try {
