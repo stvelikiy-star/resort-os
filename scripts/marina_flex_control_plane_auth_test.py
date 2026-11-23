@@ -126,6 +126,25 @@ class SeparateDatabaseAndScopes(unittest.TestCase):
         }):
             self.assertEqual(_flex_dsn(), "postgresql://flex:secret@db.test:5432/flex")
 
+    def test_qa_preview_password_reader_never_works_outside_isolated_preview(self):
+        from app.flex_control_plane import qa_password_read_allowed
+        principal = PlatformPrincipal("test-admin", "SUPER_ADMIN", mfa_verified=False)
+        with patch.dict(os.environ, {
+            "FLEX_ENVIRONMENT": "qa", "VERCEL_ENV": "preview",
+            "FLEX_QA_PASSWORD_LOGIN": "true",
+        }):
+            self.assertTrue(qa_password_read_allowed(principal))
+            self.assertEqual(_reader_for(principal), "flex_platform_admin_reader")
+        for overrides in (
+            {"FLEX_ENVIRONMENT": "production", "VERCEL_ENV": "preview", "FLEX_QA_PASSWORD_LOGIN": "true"},
+            {"FLEX_ENVIRONMENT": "qa", "VERCEL_ENV": "production", "FLEX_QA_PASSWORD_LOGIN": "true"},
+            {"FLEX_ENVIRONMENT": "qa", "VERCEL_ENV": "preview", "FLEX_QA_PASSWORD_LOGIN": "false"},
+        ):
+            with patch.dict(os.environ, overrides):
+                self.assertFalse(qa_password_read_allowed(principal))
+                with self.assertRaises(HTTPException):
+                    _reader_for(principal)
+
     def test_admin_reader_needs_mfa(self):
         with self.assertRaises(HTTPException):
             _reader_for(PlatformPrincipal("root", "SUPER_ADMIN", mfa_verified=False))
