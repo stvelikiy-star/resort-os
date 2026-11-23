@@ -21,6 +21,11 @@ export function identityReadiness(env=process.env) {
     return {ready:false,reason:'INVALID_AUTH_DATABASE'};
   return {ready:true,reason:'STAGING_ONLY'};
 }
+export async function validatePasswordSession(req,subject){
+  if(!identityReadiness(process.env).ready)return false;
+  const {verifiedPasswordSession}=await import('./identity-enabled.mjs');
+  return verifiedPasswordSession(req,subject);
+}
 export async function handleFlexIdentity(req,res,issueSessionCookie) {
   if(!identityReadiness(process.env).ready) {
     res.writeHead(503,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'private, no-store',
