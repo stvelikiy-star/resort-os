@@ -17,12 +17,19 @@ import asyncpg
 from fastapi import FastAPI, HTTPException
 from fastapi.routing import APIRoute
 
-# Shared source is the already reviewed FLEX-only code; its own modules must
-# stay outside operational PMS app and be bundled by Vercel monorepo support.
-_SHARED = Path(__file__).resolve().parents[2] / "services" / "api"
-if not (_SHARED / "app" / "flex_control_plane.py").is_file():
-    raise RuntimeError("FLEX_SOURCE_NOT_INCLUDED_IN_VERCEL_BUILD")
-sys.path.insert(0, str(_SHARED))
+# The deployment carries only a byte-for-byte copy of five FLEX-only modules.
+# CI compares them against services/api/app; no PMS application is imported.
+_BUNDLE_ROOT = Path(__file__).resolve().parent
+_BUNDLED_MODULES = (
+    "flex_control_plane.py",
+    "flex_foundation.py",
+    "flex_partner_portal.py",
+    "flex_onboarding.py",
+    "flex_catalog_admin.py",
+)
+if any(not (_BUNDLE_ROOT / "app" / module).is_file() for module in _BUNDLED_MODULES):
+    raise RuntimeError("FLEX_BUNDLED_MODULES_MISSING")
+sys.path.insert(0, str(_BUNDLE_ROOT))
 from app import flex_control_plane, flex_partner_portal, flex_onboarding, flex_catalog_admin
 
 

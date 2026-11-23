@@ -11,6 +11,26 @@ from index import app, qa_dsn, _CHECK_SQL
 
 
 class NeonProbePolicy(unittest.TestCase):
+    def test_deployed_flex_modules_match_single_source_of_truth(self):
+        """No independent copy of commercial logic is allowed to drift."""
+        root = Path(__file__).resolve().parents[3]
+        names = (
+            "flex_control_plane.py", "flex_foundation.py",
+            "flex_partner_portal.py", "flex_onboarding.py",
+            "flex_catalog_admin.py",
+        )
+        for name in names:
+            with self.subTest(name=name):
+                original = root / "services" / "api" / "app" / name
+                shipped = root / "apps" / "flex-api-qa" / "app" / name
+                self.assertEqual(shipped.read_bytes(), original.read_bytes())
+
+    def test_no_pms_package_import_in_deployed_control_plane(self):
+        shipped = (Path(__file__).resolve().parents[1] / "app" /
+                   "flex_control_plane.py").read_text()
+        self.assertNotIn("from .db import", shipped)
+        self.assertNotIn("from .pms", shipped)
+
     def test_missing_configuration_fails_closed(self):
         with patch.dict(os.environ, {"FLEX_ENVIRONMENT": "qa", "FLEX_DATABASE_URL": ""}):
             response = TestClient(app).get("/health")
