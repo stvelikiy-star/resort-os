@@ -65,6 +65,12 @@ def _flex_dsn() -> str:
     return clean_asyncpg_url(raw)
 
 
+def qa_password_reads() -> bool:
+    return (os.environ.get("FLEX_ENVIRONMENT") == "qa"
+            and os.environ.get("VERCEL_ENV") == "preview"
+            and os.environ.get("FLEX_QA_PASSWORD_LOGIN") == "true")
+
+
 def verify_platform_token(authorization: str | None) -> tuple[str, bool]:
     """Verify issuer-signed EdDSA token. Role and hotel scopes NEVER come from JWT."""
     if not authorization or len(authorization) > MAX_TOKEN_BYTES:
@@ -109,6 +115,8 @@ def verify_platform_token(authorization: str | None) -> tuple[str, bool]:
             raise ValueError("Token lifetime or subject rejected")
         amr = claims.get("amr")
         mfa = isinstance(amr, list) and "mfa" in amr
+        if qa_password_reads() and not mfa and amr != ["pwd"]:
+            raise ValueError("Expected password login")
         return subject, mfa
     except (PyJWTError, ValueError, TypeError, UnicodeError):
         raise HTTPException(401, detail="Invalid bearer token") from None
@@ -205,7 +213,7 @@ def _require_hotel_read(principal: PlatformPrincipal, hotel_id: uuid.UUID):
 
 def _reader_for(principal: PlatformPrincipal) -> str:
     if principal.role == "SUPER_ADMIN":
-        if not principal.mfa_verified:
+        if not (principal.mfa_verified or qa_password_reads()):
             raise HTTPException(403, detail="MFA required")
         return "flex_platform_admin_reader"
     return "flex_hotel_reader"
@@ -230,7 +238,7 @@ async def me(principal: PlatformPrincipal = Depends(resolve_platform_principal))
 async def hotels(
     request: Request, principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    if principal.role != "SUPER_ADMIN" or not principal.mfa_verified:
+    if principal.role != "SUPER_ADMIN" or not (principal.mfa_verified or qa_password_reads()):
         raise HTTPException(403, detail="Admin with MFA required")
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
@@ -314,7 +322,7 @@ async def commercial_catalog(
     """
     if principal.role not in {"HOTEL_OWNER", "SUPER_ADMIN"}:
         raise HTTPException(403, detail="Catalog not available to this role")
-    if principal.role == "SUPER_ADMIN" and not principal.mfa_verified:
+    if principal.role == "SUPER_ADMIN" and not (principal.mfa_verified or qa_password_reads()):
         raise HTTPException(403, detail="MFA required")
     if principal.role == "HOTEL_OWNER" and not principal.hotel_ids:
         raise HTTPException(403, detail="No assigned hotel")

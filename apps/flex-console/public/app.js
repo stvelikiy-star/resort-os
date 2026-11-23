@@ -42,6 +42,7 @@ async function submitIdentityForm(form){
        password:String(form.elements.password.value||'')
      });
      form.elements.password.value='';
+     if(data.platform_session){location.replace('/');return;}
      state.identityStep=data.twoFactorRedirect===true?'totp':'session';
    }else if(form.id==='flex-identity-totp'){
      const code=String(form.elements.code.value||'').trim();
@@ -63,8 +64,8 @@ async function submitIdentityForm(form){
 }
 function identityPanel(){
  const text=identityText;
- const note='<p class="muted">'+safe(text('onlyIdentity'))+'</p>';
- if(state.identitySession?.user)return '<section class="panel gold"><h2>'+safe(text('heading'))+'</h2>'+
+ const note=state.status?.password_login?'':'<p class="muted">'+safe(text('onlyIdentity'))+'</p>';
+ if(state.identitySession?.user && !state.status?.password_login)return '<section class="panel gold"><h2>'+safe(text('heading'))+'</h2>'+
    '<p>'+safe(text('signedIn'))+'</p>'+note+
    '<button type="button" class="outline" data-identity-logout="yes">'+safe(text('signOut'))+'</button></section>';
  if(state.identityStep==='totp')return '<section class="panel gold"><h2>'+safe(text('mfa'))+'</h2>'+
@@ -359,6 +360,7 @@ function showLogin(){
  document.getElementById('session-button').textContent=t('login');
  const configured=state.status?.configured;
  if(state.status?.identity_ready) {
+   if(state.status.password_login){main.innerHTML=identityPanel();return;}
    main.innerHTML=heading(identityText('heading'))+identityPanel()+
      info(safe(configured?t('loginPrompt'):t('configHelp')),'info');
    return;
@@ -509,7 +511,7 @@ document.getElementById('lang').addEventListener('change',e=>{state.lang=e.targe
 document.getElementById('theme').addEventListener('click',()=>{state.theme=state.theme==='dark'?'light':'dark';localStorage.setItem('flex_theme',state.theme);document.body.classList.toggle('light',state.theme==='light')});
 document.getElementById('session-button').addEventListener('click',()=>{
  if(state.status?.identity_ready&&!state.me){
-   if(state.identitySession?.user){
+   if(state.identitySession?.user && !state.status?.password_login){
      document.querySelector('[data-identity-logout]')?.click();
      return;
    }

@@ -45,4 +45,21 @@ assert.equal((await totp(otp())).platform_session,true);
 const [head,payload,sig]=minted.token.split('.');
 assert(verify(null,Buffer.from(head+'.'+payload),publicKey,Buffer.from(sig,'base64url')));
 const claims=JSON.parse(Buffer.from(payload,'base64url'));assert.equal(claims.exp-claims.iat,300);assert(claims.amr.includes('mfa'));assert.equal(claims.sub,(await db.query('select id from "user"')).rows[0].id);
+// Start mode reuses the original password and reports its actual authentication method.
+process.env.FLEX_ENVIRONMENT='qa';
+process.env.VERCEL_ENV='preview';
+process.env.FLEX_QA_PASSWORD_LOGIN='true';
+const simpleAuth=createFlexAuthConfig({database:db,baseURL:origin});
+const tryPassword=async value=>{
+  const request=new Request(origin+'/api/identity/sign-in/email',{method:'POST',headers:{origin,'content-type':'application/json'},
+    body:JSON.stringify({email,password:value})});
+  return verifiedLogin(simpleAuth,request,origin,(sub,method)=>{
+    minted=mint(sub,method);return 'test_session=ok; Secure; HttpOnly';
+  },true);
+};
+minted=undefined;
+assert.equal((await tryPassword('wrong-password-test')).status,401);
+assert.equal(minted,undefined);
+assert.equal((await (await tryPassword(password)).json()).platform_session,true);
+assert.deepEqual(JSON.parse(Buffer.from(minted.token.split('.')[1],'base64url')).amr,['pwd']);
 await db.end(); console.log('PASS invite concurrency, mailbox-bound credentials, TOTP enrollment, login, negative TOTP, Ed25519 JWT');

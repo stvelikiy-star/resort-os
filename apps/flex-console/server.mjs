@@ -366,7 +366,10 @@ async function proxy(req,res,url) {
   if(!target) return json(res,404,{error:'READ_ONLY_ENDPOINT_NOT_AVAILABLE'});
   if(target==='catalog_admin'&&!qaCatalogAdmin)return json(res,503,{error:'QA_CATALOG_ADMIN_NOT_ENABLED'});
   const backend=(target==='partner'?partnerApiOrigin:target==='catalog_admin'?catalogAdminApiOrigin:apiOrigin)+path+url.search;
-  const upstream=await fetch(backend,{method:'GET',headers:{'Authorization':'Bearer '+session.token,'Accept':'application/json'},redirect:'manual',signal:AbortSignal.timeout(10000)});
+  const headers={Authorization:'Bearer '+session.token,Accept:'application/json'};
+  if(qaEnvironment && process.env.VERCEL_ENV==='preview' && new URL(backend).origin===apiOrigin && process.env.FLEX_QA_API_SERVICE_SECRET)
+    headers['x-vercel-protection-bypass']=process.env.FLEX_QA_API_SERVICE_SECRET;
+  const upstream=await fetch(backend,{method:'GET',headers,redirect:'manual',signal:AbortSignal.timeout(10000)});
   if(upstream.status>=300 && upstream.status<400) return json(res,502,{error:'UNEXPECTED_UPSTREAM_REDIRECT'});
   const contentType=upstream.headers.get('content-type')||'';
   if(!contentType.includes('application/json')) return json(res,502,{error:'UPSTREAM_NON_JSON'});
@@ -386,12 +389,12 @@ async function staticFile(res, pathname) {
 export async function handler(req,res) {
   try {
     const url=new URL(req.url,'http://localhost');
-    if(url.pathname==='/api/identity' || url.pathname.startsWith('/api/identity/')) return await handleFlexIdentity(req,res,bridgeConfigured?subject=>{
-      const session={...mfaSigner(subject),csrf:b64u(randomBytes(32))};
+    if(url.pathname==='/api/identity' || url.pathname.startsWith('/api/identity/')) return await handleFlexIdentity(req,res,bridgeConfigured?(subject,method)=>{
+      const session={...mfaSigner(subject,method),csrf:b64u(randomBytes(32))};
       return cookie(cookies.session,seal(session),300);
     }:null);
     if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
-    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
+    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,password_login:bridgeConfigured && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true',identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
     if(url.pathname==='/api/session') { const s=unseal(cookiesFrom(req)[cookies.session]);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
     if(req.method==='POST'&&(linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))return await trustedLinkAction(req,res,url);

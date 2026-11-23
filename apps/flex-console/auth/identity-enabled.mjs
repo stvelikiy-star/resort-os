@@ -8,6 +8,7 @@ import {verifiedLogin} from './mfa-bridge.mjs';
 import {hashPassword} from 'better-auth/crypto';
 import {redeemFirstInvite} from './first-invite.mjs';
 import {identityReadiness} from './identity-gate.mjs';
+export const passwordMode=()=>process.env.FLEX_ENVIRONMENT==='qa' && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true';
 export function createFlexAuthConfig({database,baseURL}) {
   return betterAuth({
     appName:'MARINA SMART FLEX',
@@ -19,7 +20,7 @@ export function createFlexAuthConfig({database,baseURL}) {
     session:{expiresIn:3600,updateAge:900},
     rateLimit:{enabled:true,storage:'database',window:60,max:15},
     advanced:{useSecureCookies:true,cookiePrefix:'msflex_identity'},
-    plugins:[twoFactor({issuer:'MARINA SMART FLEX'})]
+    plugins:passwordMode()?[]:[twoFactor({issuer:'MARINA SMART FLEX'})]
   });
 }
 // Neon pooled connections reject the 'options=-c search_path' startup
@@ -72,9 +73,10 @@ export async function handleEnabledIdentity(req,res,issueSessionCookie) {
     try{body=JSON.parse(Buffer.concat(chunks).toString());}catch{return respond(400);}
     return respond(await redeemFirstInvite(database,body?.token,body?.password,hashPassword)?204:403);
   }
-  if(issueSessionCookie && req.url.split('?')[0]==='/api/identity/two-factor/verify-totp'){
+  const path=req.url.split('?')[0];
+  if(issueSessionCookie && (path==='/api/identity/two-factor/verify-totp' || (passwordMode() && path==='/api/identity/sign-in/email'))){
     const origin=new URL(process.env.BETTER_AUTH_URL).origin;
-    return toNodeHandler(request=>verifiedLogin(auth,request,origin,issueSessionCookie))(req,res);
+    return toNodeHandler(request=>verifiedLogin(auth,request,origin,issueSessionCookie,passwordMode()))(req,res);
   }
   return handler(req,res);
 }
