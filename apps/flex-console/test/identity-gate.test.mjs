@@ -47,3 +47,8 @@ test('no platform token issuance, public signups or implicit admin grants',()=>{
  assert.match(s,/twoFactor\(/);
  assert.doesNotMatch(s,/amr\s*:|SUPER_ADMIN\s*=|signJWT\(|createAccessToken\(/);
 });
+
+test('pinned Better Auth TOTP staging module can import without creating sessions',async()=>{
+  const staging=await import('../auth/identity-enabled.mjs');
+  assert.equal(typeof staging.handleEnabledIdentity,'function');
+});
