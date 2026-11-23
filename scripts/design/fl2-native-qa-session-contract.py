@@ -15,9 +15,11 @@ ORIGIN = "https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core"
 ROLES = ("OWNER", "RECEPTION", "COOK", "WAITER", "STORE_STAFF")
 
 
-def request(opener, path, *, payload=None, method=None):
+def request(opener, path, *, payload=None, method=None, replay_cookie=None):
     data = json.dumps(payload).encode() if payload is not None else None
     headers = {"Content-Type": "application/json"} if data is not None else {}
+    if replay_cookie is not None:
+        headers["Cookie"] = "resort_session=" + replay_cookie
     req = urllib.request.Request(ORIGIN + path, data=data, headers=headers, method=method)
     try:
         with opener.open(req, timeout=25) as res:
@@ -72,6 +74,12 @@ def main():
         ):
             raise RuntimeError(f"{role} verified identity mismatch")
         print(f"QA_{role}_LOGIN_ME_PASS", flush=True)
+        # Retain the pre-logout token in process memory only. A fresh client
+        # must be rejected even if it replays the cookie after server logout.
+        old_tokens = [cookie.value for cookie in jar if cookie.name == "resort_session"]
+        if len(old_tokens) != 1:
+            raise RuntimeError(f"{role} session cookie was not issued")
+        old_token = old_tokens[0]
         if role != "OWNER":
             code, _ = request(session, "/api/v1/admin/dashboard")
             must(code, 403, f"{role} forbidden owner dashboard")
@@ -79,8 +87,12 @@ def main():
         code, _ = request(session, "/api/v1/auth/logout", method="POST")
         must(code, 204, f"{role} logout")
         code, _ = request(session, "/api/v1/auth/me")
-        must(code, 401, f"{role} revoked session")
-        print(f"QA_{role}_LOGOUT_REVOKED_401_PASS", flush=True)
+        must(code, 401, f"{role} locally signed-out session")
+        replay_client = urllib.request.build_opener()
+        code, _ = request(replay_client, "/api/v1/auth/me", replay_cookie=old_token)
+        must(code, 401, f"{role} rejected replay of revoked cookie")
+        del old_token, old_tokens
+        print(f"QA_{role}_LOGOUT_REVOKED_REPLAY_401_PASS", flush=True)
 
     print("MARINA_QA_FIVE_ROLE_SERVER_SESSION_RBAC_PASS", flush=True)
 
