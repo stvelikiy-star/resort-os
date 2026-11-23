@@ -506,5 +506,16 @@ main.addEventListener('submit',e=>{
 
 document.getElementById('lang').addEventListener('change',e=>{state.lang=e.target.value;localStorage.setItem('flex_lang',state.lang);document.documentElement.lang=state.lang==='kg'?'ky':state.lang;render()});
 document.getElementById('theme').addEventListener('click',()=>{state.theme=state.theme==='dark'?'light':'dark';localStorage.setItem('flex_theme',state.theme);document.body.classList.toggle('light',state.theme==='light')});
-document.getElementById('session-button').addEventListener('click',()=>location.assign(state.me?'/api/auth/logout':'/api/auth/login'));
+document.getElementById('session-button').addEventListener('click',()=>{
+ if(state.status?.identity_ready&&!state.me){
+   if(state.identitySession?.user){
+     document.querySelector('[data-identity-logout]')?.click();
+     return;
+   }
+   render();
+   document.querySelector('#flex-identity-signin [name=email], #flex-identity-totp [name=code]')?.focus();
+   return;
+ }
+ location.assign(state.me?'/api/auth/logout':'/api/auth/login');
+});
 start();
