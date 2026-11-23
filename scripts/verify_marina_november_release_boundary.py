@@ -38,7 +38,7 @@ APPROVED_NATIVE_QA_BLOBS = {
     ".github/workflows/marina-native-qa-negative-auth-ci.yml": "aa55b77c85b1c5886b81b4b1da1728fffaf6966a",
     "scripts/design/fl2-native-qa-negative-login.yaml": "1e1843e93a9c28fba0e45d06bdb01bf2d1b89734",
     "scripts/design/fl2-native-qa-negative-login.sh": "95207036fe6d063f76d6f80b57f97182b0dfa5d4",
-    "scripts/design/fl2-native-qa-session-contract.py": "7d47beab4c3fac61cd3defea8f86d8d70c2835c8",
+    "scripts/design/fl2-native-qa-session-contract.py": "5129f897f2fbe6f6afd6aacf278a26971d75e406",
     "scripts/design/fl2-native-qa-logout-restart.yaml": "d107612040190b3e6eefeb3900c68a839bd72e05",
     ".github/workflows/marina-native-live-five-roles-ci.yml": "a0a72a07cd4112ec23cd351cc6f20a066bccb792",
     "scripts/design/fl2-native-live-five-roles.sh": "bd1088c60ba9f1aa8c5abd21e477f245fcd18e6d",
