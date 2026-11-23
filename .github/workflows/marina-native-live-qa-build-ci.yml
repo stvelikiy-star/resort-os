@@ -6,6 +6,12 @@ on:
       - 'scripts/design/fl2-native-qa-connect.yaml'
       - 'scripts/design/fl2-native-qa-connect.sh'
   workflow_dispatch:
+    inputs:
+      run_android:
+        description: 'Recheck previously accepted Android only when explicitly requested'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -16,6 +22,7 @@ concurrency:
 
 jobs:
   android-native:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_android == true
     name: Android 35 QA-origin APK + login screen
     runs-on: ubuntu-24.04
     timeout-minutes: 70
