@@ -8,6 +8,14 @@ on:
       - 'scripts/design/fl2-native-live-role.sh'
       - 'scripts/design/fl2-native-qa-logout-restart.yaml'
 
+  workflow_dispatch:
+    inputs:
+      run_android:
+        description: 'Recheck previously accepted Android only when explicitly requested'
+        type: boolean
+        required: false
+        default: false
+
 permissions:
   contents: read
   actions: read
@@ -42,7 +50,7 @@ jobs:
 
   android-five-live:
     needs: qa-credentials-ready
-    if: needs.qa-credentials-ready.outputs.ready == 'true'
+    if: needs.qa-credentials-ready.outputs.ready == 'true' && github.event_name == 'workflow_dispatch' && inputs.run_android == true
     name: Android 35 five LIVE staff roles (MARINA_FINAL_QA)
     runs-on: ubuntu-24.04
     environment: marina-native-qa
