@@ -42,6 +42,7 @@ async function submitIdentityForm(form){
        password:String(form.elements.password.value||'')
      });
      form.elements.password.value='';
+     if(data.platform_session===true){location.replace('/');return;}
      state.identityStep=data.twoFactorRedirect===true?'totp':'session';
    }else if(form.id==='flex-identity-totp'){
      const code=String(form.elements.code.value||'').trim();
