@@ -16,7 +16,7 @@ import re
 import time
 import uuid
 from contextlib import asynccontextmanager
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import asyncpg
 import jwt
@@ -24,13 +24,26 @@ from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from jwt.exceptions import PyJWTError
 
-from .db import clean_asyncpg_url
 from .flex_foundation import PlatformPrincipal, platform_action_allowed
 
 MAX_TOKEN_BYTES = 8192
 MAX_TOKEN_AGE_SECONDS = 900
 SUBJECT_RE = re.compile(r"^[a-zA-Z0-9_:.@/\-]{2,180}$")
 KID_RE = re.compile(r"^[a-zA-Z0-9_\-]{2,80}$")
+
+
+def clean_asyncpg_url(value: str) -> str:
+    """Discard only Prisma's schema parameter; preserve TLS and other options.
+
+    This FLEX-local helper intentionally does not import the operational PMS
+    database module, start its workers, or access any hotel database.
+    """
+    parts = urlsplit(value)
+    query = [(key, val) for key, val in
+             parse_qsl(parts.query, keep_blank_values=True)
+             if key.lower() != "schema"]
+    return urlunsplit((parts.scheme, parts.netloc, parts.path,
+                       urlencode(query), parts.fragment))
 
 
 def _same_db_target(a: str, b: str) -> bool:
