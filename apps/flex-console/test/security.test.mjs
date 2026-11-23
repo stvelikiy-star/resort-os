@@ -171,7 +171,7 @@ test('read-only FLEX admin catalogue remains visible while write endpoints stay 
  const server=readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
  assert.match(server,/qa_catalog_read_only_enabled:configured&&qaEnvironment/);
  assert.match(server,/target==='catalog_admin'&&qaCatalogAdmin\?catalogAdminApiOrigin:apiOrigin/);
- assert.doesNotMatch(server,/QA_CATALOG_ADMIN_NOT_ENABLED/);
+ assert.match(server,/if\(!configured\|\|!qaCatalogAdmin\)return json\(res,503,\{error:'QA_CATALOG_ADMIN_NOT_ENABLED'\}\)/);
  assert.match(browser,/qa_catalog_read_only_enabled\|\|state\.status\?\.qa_catalog_admin_enabled/);
  assert.match(browser,/state\.status\?\.qa_catalog_admin_enabled\?'<button type="button"/);
 });
