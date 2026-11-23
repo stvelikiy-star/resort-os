@@ -116,3 +116,7 @@ Read-only Git comparison `b0f99f300a93356b379fa0f607157722f95636a5...c849fab1708
 **Gate 0 verification refinement:** #588's own HEAD reports 37/37 GitHub workflow checks SUCCESS; that proves its own commit, **not** the two-branch combined candidate. The #591 HEAD includes a separate red historical `Release RC Truth CI` unrelated to FLEX. Current #591 14/14 FLEX CI tests PASS; Gate 0 remains NO-GO because no single verified combined candidate has passed scope and security acceptance.
 
 **GET contract specification search:** GitHub base SHA, HEAD #588, main, latest checked FLEX UI branch and Project file search contain no `docs/flex/FLEX_RECONCILIATION_CODEX.md`. Its exact six response schemas are not known. No substitute payment-related routes have been invented.
+
+## Supplementary reference discovery — Library API map (not a substitute for D)
+
+A personal Library document named `MARINA_FLEX_UI_Backend_Integration_Map.md` dated 2026-11-22 was located. It lists existing isolated routes (`GET /v1/me`, `/v1/hotels`, `/v1/hotels/{id}/subscription`, `/v1/hotels/{id}/invoices`, `/v1/catalog`, partner earnings, admin summary), but **does not define the six exact new reconciliation contracts**, their response schemas, or verification assertions. The requested `FLEX_RECONCILIATION_CODEX.md` remains missing. This partial discovery does not authorize inventing the six contracts. Gate D = BLOCKED / FAIL.
