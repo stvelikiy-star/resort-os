@@ -5,6 +5,12 @@ on:
       - '.github/workflows/marina-native-android-ios-maestro-ci.yml'
       - 'apps/mobile/**'
   workflow_dispatch:
+    inputs:
+      run_android:
+        description: 'Run Android regression only after an Android-related change'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -15,6 +21,7 @@ concurrency:
 
 jobs:
   android-native:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_android == true
     name: Android 35 APK + Maestro demo roles
     runs-on: ubuntu-24.04
     timeout-minutes: 70
