@@ -5,6 +5,7 @@ import {getMigrations} from 'better-auth/db/migration';
 import {hashPassword} from 'better-auth/crypto';
 import {createFlexAuthConfig} from '../auth/identity-enabled.mjs';
 import {redeemFirstInvite} from '../auth/first-invite.mjs';
+import {redeemRecovery} from '../auth/recovery.mjs';
 import {verifiedLogin,createMfaSigner} from '../auth/mfa-bridge.mjs';
 const db=new pg.Pool({connectionString:'postgresql://ci_no_login:ci_no_secret@127.0.0.1:55449/flex_ci',options:'-c search_path=flex_auth'});
 await db.query('create schema if not exists flex_auth');
@@ -65,4 +66,16 @@ assert.equal((await totp(otp())).platform_session,true);
 const [head,payload,sig]=minted.token.split('.');
 assert(verify(null,Buffer.from(head+'.'+payload),publicKey,Buffer.from(sig,'base64url')));
 const claims=JSON.parse(Buffer.from(payload,'base64url'));assert.equal(claims.exp-claims.iat,300);assert(claims.amr.includes('mfa'));assert.equal(claims.sub,(await db.query('select id from "user"')).rows[0].id);
+// One-time recovery is bound to a pre-verified email and cannot be replayed.
+const recoveryToken=randomBytes(32).toString('base64url');
+const recoveryPassword=randomBytes(26).toString('hex');
+await db.query('INSERT INTO flex_auth.verification(id,identifier,value,"expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval \'15 minutes\',now(),now())',[
+  crypto.randomUUID(),'flex-recovery:'+createHash('sha256').update(recoveryToken).digest('hex'),email
+]);
+assert.equal(await redeemRecovery(db,randomBytes(32).toString('base64url'),recoveryPassword,hashPassword),false);
+assert.equal(await redeemRecovery(db,recoveryToken,'short',hashPassword),false);
+assert.equal(await redeemRecovery(db,recoveryToken,recoveryPassword,hashPassword),true);
+assert.equal(await redeemRecovery(db,recoveryToken,recoveryPassword,hashPassword),false);
+assert.equal((await post('sign-in/email',{email,password})).status,401);
+assert.equal((await post('sign-in/email',{email,password:recoveryPassword})).status,200);
 await db.end(); console.log('PASS invite concurrency, mailbox-bound credentials, TOTP enrollment, login, negative TOTP, Ed25519 JWT');
