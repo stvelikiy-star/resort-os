@@ -43,8 +43,27 @@ export MAESTRO_QA_PASSWORD="$MARINA_QA_PASSWORD"
 export MAESTRO_QA_EXPECTED_TAB="$expected"
 private_dir=$(mktemp -d)
 trap 'rm -rf "$private_dir"' EXIT
-if ! maestro test "$(dirname "$0")/fl2-native-live-role.yaml" >"$private_dir/maestro.log" 2>&1;then
-  printf '%s\n' "LIVE_NATIVE_QA_FAIL role=$MARINA_QA_ROLE (private log not uploaded)"
+# Two separate Maestro phases produce distinguishable results. Never upload
+# raw Maestro logs: the flow contains synthetic passwords in environment vars.
+emit_safe_failure() {
+  local phase="$1" private_log="$2" cause="UNCLASSIFIED_UI_FAILURE"
+  if grep -Fq 'Save Password?' "$private_log"; then
+    cause="IOS_PASSWORD_AUTOFILL_OVERLAY_OBSERVED"
+  elif grep -Fq 'login-username' "$private_log"; then
+    cause="SIGN_IN_TRANSITION_OR_FIELD"
+  elif grep -Fq 'tab-' "$private_log"; then
+    cause="EXPECTED_ROLE_TAB_NOT_VISIBLE"
+  fi
+  printf '%s\n' "LIVE_NATIVE_QA_FAIL role=$MARINA_QA_ROLE phase=$phase reason=$cause (private log not uploaded)"
+}
+if ! maestro test "$(dirname "$0")/fl2-native-live-role.yaml" >"$private_dir/auth.log" 2>&1;then
+  emit_safe_failure AUTH_TRANSITION "$private_dir/auth.log"
   exit 1
 fi
+printf '%s\n' "LIVE_NATIVE_AUTH_TRANSITION_PASS $MARINA_QA_ROLE (synthetic MARINA_FINAL_QA only)"
+if ! maestro test "$(dirname "$0")/fl2-native-live-dashboard.yaml" >"$private_dir/dashboard.log" 2>&1;then
+  emit_safe_failure ROLE_UI "$private_dir/dashboard.log"
+  exit 1
+fi
+printf '%s\n' "LIVE_NATIVE_ROLE_UI_PASS $MARINA_QA_ROLE"
 printf '%s\n' "LIVE_NATIVE_ROLE_LOGIN_PASS $MARINA_QA_ROLE (synthetic MARINA_FINAL_QA only)"

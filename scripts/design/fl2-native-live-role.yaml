@@ -56,21 +56,12 @@ appId: kg.go.ms.staff
     timeout: 60000
 - tapOn:
     id: "login-submit"
-# iOS shows an OS Password AutoFill offer after an otherwise successful
-# login. Dismiss only this system prompt; never dismiss app auth errors.
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - waitForAnimationToEnd
-      - runFlow:
-          when:
-            visible: "Save Password?"
-          commands:
-            - tapOn: "Not Now"
+# Phase 1: authentication/navigation transition. The native iOS Save Password
+# overlay is handled independently in the role-dashboard verification phase.
+# Never claim role UI PASS merely because the sign-in screen disappeared.
 - extendedWaitUntil:
-    visible:
-      id: "${MAESTRO_QA_EXPECTED_TAB}"
+    notVisible:
+      id: "login-username"
     timeout: 60000
 - assertNotVisible:
     id: "login-error"

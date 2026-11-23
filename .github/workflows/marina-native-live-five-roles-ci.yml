@@ -1,13 +1,7 @@
 name: MARINA Native QA Five Role LIVE Login
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/marina-native-live-five-roles-ci.yml'
-      - 'scripts/design/fl2-native-live-five-roles.sh'
-      - 'scripts/design/fl2-native-live-role.yaml'
-      - 'scripts/design/fl2-native-live-role.sh'
-      - 'scripts/design/fl2-native-qa-logout-restart.yaml'
-
+  # Diagnostic only: the pinned iOS LIVE gate belongs to the negative-auth workflow.
+  # No automatic PR trigger and no additional Apple build for test-only changes.
   workflow_dispatch:
     inputs:
       run_android:

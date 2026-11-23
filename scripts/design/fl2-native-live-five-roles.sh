@@ -51,6 +51,7 @@ for role in OWNER RECEPTION COOK WAITER STORE_STAFF;do
     else
       xcrun simctl io "$IOS_SIMULATOR_UDID" screenshot "native-five-roles-evidence/failure-$role.png" || true
     fi
+    printf '%s\n' "LIVE_NATIVE_QA_STOPPED_AFTER_ROLE_FAIL $role (remaining roles NOT EXECUTED)"
     exit 1
   fi
   if [[ "$platform" == android ]];then

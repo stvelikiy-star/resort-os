@@ -7,6 +7,9 @@ on:
       - 'scripts/design/fl2-native-qa-negative-login.sh'
       - 'scripts/design/fl2-native-qa-session-contract.py'
       - 'scripts/design/fl2-native-live-role.yaml'
+      - 'scripts/design/fl2-native-live-role.sh'
+      - 'scripts/design/fl2-native-live-dashboard.yaml'
+      - 'scripts/design/fl2-native-live-five-roles.sh'
   workflow_dispatch:
     inputs:
       run_android:
@@ -121,6 +124,7 @@ jobs:
           test -n "$MARINA_NATIVE_QA_USERS_JSON"
           echo "$IOS_QA_SIM_ZIP_SHA256  ios-bin/ios-live.zip" | shasum -a 256 -c -
           curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/137450788298" | python3 -c "import json,sys; j=json.load(sys.stdin); assert j['conclusion']=='success' and j['run_id']==45063587493"
+          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/45063587493" | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['head_sha']=='9131f3dbd83b3d9617246337b56d166ea22789be'"
           mkdir -p "$RUNNER_TEMP/marina-pinned-ios"
           ditto -x -k ios-bin/ios-live.zip "$RUNNER_TEMP/marina-pinned-ios"
           app=$(find "$RUNNER_TEMP/marina-pinned-ios" -maxdepth 1 -name '*.app' -print -quit)

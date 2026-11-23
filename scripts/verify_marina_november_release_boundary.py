@@ -31,17 +31,18 @@ APPROVED_NATIVE_QA_BLOBS = {
     ".github/workflows/marina-ios-simulator-keychain-linker-pilot-ci.yml": "0e4e2adf456706346760415f98f1e8e9a808bb96",
     ".github/workflows/marina-native-android-ios-maestro-ci.yml": "dc33e47bb732fe40f89f9d6a207d733ec313a0d8",
     "scripts/design/fl2-android-maestro-demo.sh": "b4372aa0fcb965a3d9337d86c2f4faf96db700c3",
-    "scripts/design/fl2-native-live-role.yaml": "2592ff60dd6f9619983c9fc020ce1b387b6b65ff",
-    "scripts/design/fl2-native-live-role.sh": "12df57b660f8bb3bdb0d6bc922bdab2f2d3d8cbd",
+    "scripts/design/fl2-native-live-role.yaml": "c405c4d9aed93362d7f14b07c80b0eb32ad67de5",
+    "scripts/design/fl2-native-live-dashboard.yaml": "51d2207ff63287cbb5f77dd3f02a5a0d2e254fa6",
+    "scripts/design/fl2-native-live-role.sh": "3f182262269a0e50e7f177769eab8e9149ce5cc7",
     "scripts/design/fl2-native-live-role.README.md": "8e2e78527633902591c6fa56dd53b18afb9ab077",
     ".github/workflows/marina-native-live-qa-build-ci.yml": "144abd84c53bbd44375343f6071897a2535ffba2",
     "scripts/design/fl2-native-qa-connect.yaml": "f92d7e839c81f451bf2896b610f019541f9213c1",
     "scripts/design/fl2-native-qa-connect.sh": "b0df9bd280ac5b3deb5e6a5d5a5e34767cfb4ccb",
-    ".github/workflows/marina-native-qa-negative-auth-ci.yml": "3660cb878e9660c6a19238737b217adaa0d5b038",
+    ".github/workflows/marina-native-qa-negative-auth-ci.yml": "f0e1d3e6596ce8d1aaf5418365438a5878cdcd6c",
     "scripts/design/fl2-native-qa-negative-login.yaml": "1e1843e93a9c28fba0e45d06bdb01bf2d1b89734",
     "scripts/design/fl2-native-qa-negative-login.sh": "95207036fe6d063f76d6f80b57f97182b0dfa5d4",
-    ".github/workflows/marina-native-live-five-roles-ci.yml": "216a6c977f2df4234ef5e313d3f713a84f1c6e5b",
-    "scripts/design/fl2-native-live-five-roles.sh": "bd1088c60ba9f1aa8c5abd21e477f245fcd18e6d",
+    ".github/workflows/marina-native-live-five-roles-ci.yml": "78391acf5b4dff5ebbb59f690ff8cde447ce23cf",
+    "scripts/design/fl2-native-live-five-roles.sh": "ed1fd5c69b6aff2ee2f6fbf89cb614142e0686f2",
 }
 
 APPROVED_P0_BLOBS = {
