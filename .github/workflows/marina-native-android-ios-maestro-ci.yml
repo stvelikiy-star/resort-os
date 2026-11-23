@@ -2,7 +2,6 @@ name: MARINA Native Android iOS Maestro QA
 on:
   pull_request:
     paths:
-      - '.github/workflows/marina-native-android-ios-maestro-ci.yml'
       - 'apps/mobile/**'
   workflow_dispatch:
     inputs:

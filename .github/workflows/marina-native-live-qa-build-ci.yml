@@ -2,9 +2,7 @@ name: MARINA Native Pinned LIVE-QA Connection Build
 on:
   pull_request:
     paths:
-      - '.github/workflows/marina-native-live-qa-build-ci.yml'
-      - 'scripts/design/fl2-native-qa-connect.yaml'
-      - 'scripts/design/fl2-native-qa-connect.sh'
+      - 'apps/mobile/**'
   workflow_dispatch:
     inputs:
       run_android:

@@ -1,8 +1,5 @@
 name: MARINA iOS Simulator Keychain Linker Pilot
 on:
-  push:
-    branches:
-      - ci/marina-native-android-ios-maestro-20261121
   workflow_dispatch:
   workflow_call:
     outputs:
