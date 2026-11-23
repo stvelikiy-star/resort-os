@@ -47,9 +47,32 @@ appId: kg.go.ms.staff
       platform: Android
     commands:
       - inputText: ${MAESTRO_QA_USERNAME}
+# iOS may show its first-keyboard typing tutorial after username entry.
+# Dismiss that OS tutorial before interacting with the secure password field.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - runFlow:
+          when:
+            visible: "Speed up your typing"
+          commands:
+            - tapOn: "Continue"
 - tapOn:
     id: "login-password"
 - inputText: ${MAESTRO_QA_PASSWORD}
+# The same system tutorial can appear when the secure field receives input.
+# Never dismiss application login errors; only the known iOS tutorial.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - runFlow:
+          when:
+            visible: "Speed up your typing"
+          commands:
+            - tapOn: "Continue"
+      - hideKeyboard
 - extendedWaitUntil:
     visible:
       id: "login-submit"
