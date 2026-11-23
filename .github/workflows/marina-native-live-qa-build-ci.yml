@@ -171,7 +171,43 @@ jobs:
           test -n "$workspace"
           scheme=$(basename "$workspace" .xcworkspace)
           echo "XCODE_WORKSPACE=$workspace SCHEME=$scheme"
-          xcodebuild -workspace "$workspace" -scheme "$scheme" -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/MarinaDerived" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build > "$RUNNER_TEMP/marina-xcodebuild.log" 2>&1 || { grep -Ein "error:|fatal error|failed" "$RUNNER_TEMP/marina-xcodebuild.log" | tail -45 || true; tail -75 "$RUNNER_TEMP/marina-xcodebuild.log"; exit 1; }
+          # Keep the Xcode output private but expose progress and failure reasons.
+          # A Python watchdog prevents indefinite silent macOS CI compilation.
+          python3 -u - "$workspace" "$scheme" <<'PY'
+          import os, pathlib, subprocess, sys, time
+          workspace, scheme = sys.argv[1:]
+          log = pathlib.Path(os.environ["RUNNER_TEMP"]) / "marina-xcodebuild.log"
+          cmd = ["xcodebuild", "-workspace", workspace, "-scheme", scheme,
+                 "-configuration", "Release", "-sdk", "iphonesimulator",
+                 "-destination", "generic/platform=iOS Simulator",
+                 "-derivedDataPath", str(pathlib.Path(os.environ["RUNNER_TEMP"]) / "MarinaDerived"),
+                 "CODE_SIGNING_ALLOWED=NO", "CODE_SIGNING_REQUIRED=NO", "build"]
+          print("IOS_XCODEBUILD_START", flush=True)
+          with log.open("wb") as out:
+              proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT, start_new_session=True)
+              started = time.monotonic()
+              last_size = -1
+              while proc.poll() is None:
+                  time.sleep(30)
+                  size = log.stat().st_size
+                  print(f"IOS_XCODEBUILD_HEARTBEAT elapsed_s={int(time.monotonic()-started)} log_bytes={size} growing={size != last_size}", flush=True)
+                  last_size = size
+                  if time.monotonic() - started > 3600:
+                      import signal
+                      os.killpg(proc.pid, signal.SIGTERM)
+                      try: proc.wait(timeout=15)
+                      except subprocess.TimeoutExpired: os.killpg(proc.pid, signal.SIGKILL)
+                      print("IOS_XCODEBUILD_TIMEOUT_60_MIN", flush=True)
+                      break
+              result = proc.poll()
+          if result != 0:
+              lines = log.read_text(errors="replace").splitlines()
+              errors = [(i+1, line) for i,line in enumerate(lines) if any(x in line.lower() for x in ("error:", "fatal error", "** build failed **"))]
+              print("IOS_XCODEBUILD_ERRORS", errors[-30:], flush=True)
+              print("IOS_XCODEBUILD_LOG_TAIL", "\\n".join(lines[-50:]), flush=True)
+              sys.exit(1)
+          print("IOS_XCODEBUILD_COMPLETED", flush=True)
+          PY
           app=$(find "$RUNNER_TEMP/MarinaDerived/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)
           test -d "$app"
           test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = "kg.go.ms.staff"
