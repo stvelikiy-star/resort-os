@@ -29,6 +29,26 @@ async function post(path,body){
  const data=await res.json(); if(res.status!==200) console.log(path,res.status,data.code);
  return {status:res.status,...data};
 }
+// Password-only Preview mode must mint a real platform cookie after server-verified credentials.
+// Test before TOTP enrollment, so the identity is in the same state as the first QA administrator.
+const savedEnv={FLEX_ENVIRONMENT:process.env.FLEX_ENVIRONMENT,VERCEL_ENV:process.env.VERCEL_ENV,FLEX_QA_PASSWORD_LOGIN:process.env.FLEX_QA_PASSWORD_LOGIN};
+process.env.FLEX_ENVIRONMENT='qa';
+process.env.VERCEL_ENV='preview';
+process.env.FLEX_QA_PASSWORD_LOGIN='true';
+const passwordAuth=createFlexAuthConfig({database:db,baseURL:origin});
+const passwordRequest=value=>new Request(origin+'/api/identity/sign-in/email',{
+ method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({email,password:value})
+});
+const passwordIssue=(sub,method)=>{minted=mint(sub,method);return 'test_session=ok; Secure; HttpOnly';};
+assert.equal((await verifiedLogin(passwordAuth,passwordRequest('invalid-password'),origin,passwordIssue,true)).status,401);
+assert.equal(minted,undefined);
+const passwordReply=await verifiedLogin(passwordAuth,passwordRequest(password),origin,passwordIssue,true);
+assert.equal(passwordReply.status,200);
+assert.equal((await passwordReply.json()).platform_session,true);
+assert.deepEqual(JSON.parse(Buffer.from(minted.token.split('.')[1],'base64url')).amr,['pwd']);
+assert.equal(JSON.parse(Buffer.from(minted.token.split('.')[1],'base64url')).sub,(await db.query('select id from "user"')).rows[0].id);
+for(const [key,value] of Object.entries(savedEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+minted=undefined;
 const signin=()=>post('sign-in/email',{email,password});
 assert.equal((await signin()).status,200);
 const setup=await post('two-factor/enable',{password});
