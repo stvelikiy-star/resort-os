@@ -40,6 +40,10 @@ jobs:
           python scripts/marina_flex_release_scope_guard.py
       - name: Install isolated commercial API test libraries
         run: python -m pip install --disable-pip-version-check -r services/api/requirements-flex-control.txt
+      - name: Verify bundled FLEX API read routes and deny all writes by default
+        run: |
+          python -m pip install --disable-pip-version-check -r apps/flex-api-qa/requirements.txt httpx==0.28.1
+          python -m unittest discover -s apps/flex-api-qa/test -p 'test_*.py' -v
       - name: Recheck all standalone FLEX calculations
         run: |
           set -euo pipefail
