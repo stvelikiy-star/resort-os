@@ -46,7 +46,8 @@ async function submitIdentityForm(form){
    }else if(form.id==='flex-identity-totp'){
      const code=String(form.elements.code.value||'').trim();
      if(!/^\d{6}$/.test(code))throw Error('INVALID_TOTP_CODE');
-     await identityRequest('two-factor/verify-totp',{code,trustDevice:false});
+     const result=await identityRequest('two-factor/verify-totp',{code,trustDevice:false});
+     if(result.platform_session===true){location.replace('/');return;}
      form.elements.code.value='';
      state.identityStep='session';
    }
@@ -488,7 +489,7 @@ main.addEventListener('click',e=>{
  if(b.dataset.login)location.assign('/api/auth/login');
  if(b.dataset.identityLogout){
    identityRequest('sign-out',{}).then(()=>{
-     state.identitySession=null;state.identityStep='email';state.identityError='';render();
+     location.assign('/api/auth/logout');
    }).catch(()=>{state.identityError=identityText('failed');render()});
  }
 });
@@ -514,6 +515,10 @@ document.getElementById('session-button').addEventListener('click',()=>{
    }
    render();
    document.querySelector('#flex-identity-signin [name=email], #flex-identity-totp [name=code]')?.focus();
+   return;
+ }
+ if(state.me && state.identitySession?.user){
+   identityRequest('sign-out',{}).finally(()=>location.assign('/api/auth/logout'));
    return;
  }
  location.assign(state.me?'/api/auth/logout':'/api/auth/login');

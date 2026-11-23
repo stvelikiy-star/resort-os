@@ -4,6 +4,9 @@ import {betterAuth} from 'better-auth';
 import {twoFactor} from 'better-auth/plugins';
 import {toNodeHandler} from 'better-auth/node';
 import pg from 'pg';
+import {verifiedLogin} from './mfa-bridge.mjs';
+import {hashPassword} from 'better-auth/crypto';
+import {redeemFirstInvite} from './first-invite.mjs';
 import {identityReadiness} from './identity-gate.mjs';
 export function createFlexAuthConfig({database,baseURL}) {
   return betterAuth({
@@ -43,7 +46,7 @@ async function getHandler() {
          row.schema!=='flex_auth' || row.commercial_access!==false)
         throw Error('FLEX_AUTH_DATABASE_SCOPE_INVALID');
       const auth=createFlexAuthConfig({database,baseURL:process.env.BETTER_AUTH_URL});
-      return toNodeHandler(auth);
+      return {database,auth,handler:toNodeHandler(auth)};
     } catch (err) {
       await database.end();
       throw err;
@@ -51,7 +54,27 @@ async function getHandler() {
   })();
   return handlerPromise;
 }
-export async function handleEnabledIdentity(req,res) {
-  const handler=await getHandler();
+export async function handleEnabledIdentity(req,res,issueSessionCookie) {
+  const {database,handler,auth}=await getHandler();
+  if(new URL(req.url,'http://localhost').pathname==='/api/identity/first-invite'){
+    const respond=(code)=>{res.writeHead(code,{'Cache-Control':'no-store'});return res.end();};
+    if(req.method!=='POST') return respond(405);
+    if(req.headers.origin!==new URL(process.env.BETTER_AUTH_URL).origin ||
+       req.headers['content-type']?.split(';')[0]!=='application/json') return respond(403);
+    const chunks=[];
+    let size=0;
+    for await(const chunk of req){
+      size+=Buffer.byteLength(chunk);
+      if(size>2048) return respond(413);
+      chunks.push(Buffer.from(chunk));
+    }
+    let body;
+    try{body=JSON.parse(Buffer.concat(chunks).toString());}catch{return respond(400);}
+    return respond(await redeemFirstInvite(database,body?.token,body?.password,hashPassword)?204:403);
+  }
+  if(issueSessionCookie && req.url.split('?')[0]==='/api/identity/two-factor/verify-totp'){
+    const origin=new URL(process.env.BETTER_AUTH_URL).origin;
+    return toNodeHandler(request=>verifiedLogin(auth,request,origin,issueSessionCookie))(req,res);
+  }
   return handler(req,res);
 }

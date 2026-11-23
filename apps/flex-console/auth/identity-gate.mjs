@@ -21,12 +21,12 @@ export function identityReadiness(env=process.env) {
     return {ready:false,reason:'INVALID_AUTH_DATABASE'};
   return {ready:true,reason:'STAGING_ONLY'};
 }
-export async function handleFlexIdentity(req,res) {
+export async function handleFlexIdentity(req,res,issueSessionCookie) {
   if(!identityReadiness(process.env).ready) {
     res.writeHead(503,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'private, no-store',
       'X-Content-Type-Options':'nosniff','X-Frame-Options':'DENY'});
     return res.end('{"error":"FLEX_IDENTITY_NOT_ENABLED"}');
   }
   const {handleEnabledIdentity}=await import('./identity-enabled.mjs');
-  return handleEnabledIdentity(req,res);
+  return handleEnabledIdentity(req,res,issueSessionCookie);
 }

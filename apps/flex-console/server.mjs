@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { handleFlexIdentity, identityReadiness } from './auth/identity-gate.mjs';
+import {createMfaSigner} from './auth/mfa-bridge.mjs';
 import { readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,10 +24,14 @@ const catalogAdminApiOrigin = (process.env.FLEX_CATALOG_ADMIN_API_ORIGIN || '').
 const qaCatalogAdmin = qaEnvironment && process.env.FLEX_ENABLE_QA_CATALOG_DRAFTS === 'true' && Boolean(catalogAdminApiOrigin);
 
 const secret = rawSecret ? Buffer.from(rawSecret, 'base64') : null;
-const configured = Boolean(publicOrigin && issuer && clientId && apiAudience && apiOrigin && partnerApiOrigin && secret?.length === 32);
+const oidcConfigured = Boolean(publicOrigin && issuer && clientId && apiAudience && apiOrigin && partnerApiOrigin && secret?.length === 32);
+const mfaSigner=createMfaSigner(process.env);
+const bridgeConfigured=Boolean(mfaSigner && identityReadiness(process.env).ready &&
+  publicOrigin===new URL(process.env.BETTER_AUTH_URL).origin && apiOrigin && secret?.length===32);
+const configured=oidcConfigured || bridgeConfigured;
 const localOrigin = publicOrigin === 'http://127.0.0.1:' + port || publicOrigin === 'http://localhost:' + port;
 if (configured && (!publicOrigin.startsWith('https://') && !localOrigin)) throw new Error('FLEX_PUBLIC_ORIGIN must use HTTPS outside localhost');
-if (configured && (![issuer, apiOrigin, partnerApiOrigin].every(v => v.startsWith('https://') || (localOrigin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(v))))) {
+if (configured && (![...(oidcConfigured?[issuer]:[]), apiOrigin, partnerApiOrigin].every(v => v.startsWith('https://') || (localOrigin && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(v))))) {
   throw new Error('OIDC and FLEX backend endpoints require HTTPS outside localhost');
 }
 if (qaOnboarding && !(onboardingApiOrigin.startsWith('https://') || (localOrigin && /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/.test(onboardingApiOrigin)))) {
@@ -94,13 +99,14 @@ async function verifyJwt(token, doc, audience, nonce) {
   return claims;
 }
 async function authLogin(res) {
-  if(!configured) return json(res,503,{error:'QA_IDENTITY_NOT_CONFIGURED'});
+  if(!oidcConfigured) return json(res,503,{error:'QA_IDENTITY_NOT_CONFIGURED'});
   const doc=await discover();
   const state=b64u(randomBytes(32)),nonce=b64u(randomBytes(32)),verifier=b64u(randomBytes(32));
   const query=new URLSearchParams({ response_type:'code',client_id:clientId, redirect_uri:publicOrigin+'/api/auth/callback',scope:'openid profile',state,nonce,code_challenge:sha256(verifier),code_challenge_method:'S256' });
   redirect(res,doc.authorization_endpoint+'?'+query,{ 'Set-Cookie':cookie(cookies.login,seal({state,nonce,verifier,exp:Date.now()+600000}),600,'/api/auth') });
 }
 async function authCallback(req,res,url) {
+  if(!oidcConfigured)return json(res,503,{error:'QA_IDENTITY_NOT_CONFIGURED'});
   const payload=unseal(cookiesFrom(req)[cookies.login]);
   if(!payload || !fixedEqual(payload.state,url.searchParams.get('state') || '')) return json(res,401,{error:'OIDC_STATE_INVALID'});
   if(!url.searchParams.get('code')||url.searchParams.get('error')) return json(res,401,{error:'OIDC_AUTH_DENIED'});
@@ -369,7 +375,7 @@ async function proxy(req,res,url) {
   res.writeHead(upstream.status,{...noStore,'Content-Type':'application/json; charset=utf-8'}); res.end(body);
 }
 async function staticFile(res, pathname) {
-  const files={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css'};
+  const files={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css','/enroll':'enroll.html','/enroll.js':'enroll.js'};
   const f=files[pathname]; if(!f) return json(res,404,{error:'NOT_FOUND'});
   const data=await readFile(join(root,'public',f));
   const mime=f.endsWith('.js')?'application/javascript; charset=utf-8':f.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8';
@@ -380,7 +386,10 @@ async function staticFile(res, pathname) {
 export async function handler(req,res) {
   try {
     const url=new URL(req.url,'http://localhost');
-    if(url.pathname==='/api/identity' || url.pathname.startsWith('/api/identity/')) return await handleFlexIdentity(req,res);
+    if(url.pathname==='/api/identity' || url.pathname.startsWith('/api/identity/')) return await handleFlexIdentity(req,res,bridgeConfigured?subject=>{
+      const session={...mfaSigner(subject),csrf:b64u(randomBytes(32))};
+      return cookie(cookies.session,seal(session),300);
+    }:null);
     if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
     if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
     if(url.pathname==='/api/session') { const s=unseal(cookiesFrom(req)[cookies.session]);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
