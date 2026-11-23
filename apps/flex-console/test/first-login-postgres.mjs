@@ -43,6 +43,9 @@ const passwordRequest=value=>new Request(origin+'/api/identity/sign-in/email',{
 const passwordIssue=(sub,method)=>{minted=mint(sub,method);return 'test_session=ok; Secure; HttpOnly';};
 assert.equal((await verifiedLogin(passwordAuth,passwordRequest('invalid-password'),origin,passwordIssue,true)).status,401);
 assert.equal(minted,undefined);
+// Disposable CI database only: isolate invalid-password rate-limit from positive-login assertion.
+// The real runtime remains rate-limited.
+await db.query('DELETE FROM "rateLimit"');
 const passwordReply=await verifiedLogin(passwordAuth,passwordRequest(password),origin,passwordIssue,true);
 assert.equal(passwordReply.status,200);
 assert.equal((await passwordReply.json()).platform_session,true);
@@ -50,6 +53,8 @@ assert.deepEqual(JSON.parse(Buffer.from(minted.token.split('.')[1],'base64url'))
 assert.equal(JSON.parse(Buffer.from(minted.token.split('.')[1],'base64url')).sub,(await db.query('select id from "user"')).rows[0].id);
 for(const [key,value] of Object.entries(savedEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
 minted=undefined;
+// Separate the legacy TOTP contract from the preceding password-only CI phase.
+await db.query('DELETE FROM "rateLimit"');
 const signin=()=>post('sign-in/email',{email,password});
 assert.equal((await signin()).status,200);
 const setup=await post('two-factor/enable',{password});
@@ -77,5 +82,7 @@ assert.equal(await redeemRecovery(db,recoveryToken,'short',hashPassword),false);
 assert.equal(await redeemRecovery(db,recoveryToken,recoveryPassword,hashPassword),true);
 assert.equal(await redeemRecovery(db,recoveryToken,recoveryPassword,hashPassword),false);
 assert.equal((await post('sign-in/email',{email,password})).status,401);
+// Wrong-password throttling must not mask proof of recovered credentials in the disposable CI fixture.
+await db.query('DELETE FROM "rateLimit"');
 assert.equal((await post('sign-in/email',{email,password:recoveryPassword})).status,200);
 await db.end(); console.log('PASS invite concurrency, mailbox-bound credentials, TOTP enrollment, login, negative TOTP, Ed25519 JWT');
