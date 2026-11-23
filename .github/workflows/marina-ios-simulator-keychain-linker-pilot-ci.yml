@@ -1,0 +1,142 @@
+name: MARINA iOS Simulator Keychain Linker Pilot
+on:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      app_sha256:
+        description: SHA-256 of the simulator app archive from this run
+        value: ${{ jobs.ios-simulator-keychain.outputs.app_sha256 }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-ios-keychain-linker-pilot-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  ios-simulator-keychain:
+    name: iOS-only linker entitlement and clean Simulator launch
+    runs-on: macos-26-intel
+    outputs:
+      app_sha256: ${{ steps.archive.outputs.sha256 }}
+    timeout-minutes: 140
+    env:
+      CI: 'true'
+      EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - name: Verify isolated QA origin and iOS runner
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          test "$(xcodebuild -version | awk '/^Xcode / {split($2,a,".");print a[1]}')" -ge 26
+          curl -fsS --connect-timeout 8 --max-time 20 -o /dev/null "$EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS/health/ready"
+          curl -fsS --connect-timeout 8 --max-time 20 "$EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS/api/v1/auth/mode" |
+            python3 -c 'import json,sys; assert json.load(sys.stdin).get("mode")=="single_property"'
+      - name: Prebuild iOS-only QA app; no repository source changes
+        working-directory: apps/mobile
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npx expo install --check
+          node - <<'NODE'
+          const fs = require('fs');
+          const f = 'app.json';
+          const cfg = JSON.parse(fs.readFileSync(f, 'utf8'));
+          cfg.expo.ios = cfg.expo.ios || {};
+          cfg.expo.ios.bundleIdentifier = 'kg.go.ms.staff';
+          fs.writeFileSync(f, JSON.stringify(cfg, null, 2) + '\n');
+          NODE
+          npx expo prebuild --platform ios --no-install --non-interactive
+      - name: CocoaPods dependencies
+        working-directory: apps/mobile/ios
+        env:
+          LANG: en_US.UTF-8
+          LC_ALL: en_US.UTF-8
+        run: pod install
+      - name: Embed Keychain entitlement into Simulator Mach-O linker section
+        working-directory: apps/mobile
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/marina-qa-sim-linked.entitlements" <<'ENTITLEMENTS'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>application-identifier</key><string>kg.go.ms.staff</string>
+            <key>keychain-access-groups</key><array><string>kg.go.ms.staff</string></array>
+          </dict></plist>
+          ENTITLEMENTS
+          export MARINA_QA_SIM_ENTITLEMENTS="$RUNNER_TEMP/marina-qa-sim-linked.entitlements"
+          ruby - <<'RUBY'
+          require 'xcodeproj'
+          project_path = Dir.glob('ios/*.xcodeproj').fetch(0)
+          project = Xcodeproj::Project.open(project_path)
+          app_targets = project.targets.select { |t| t.respond_to?(:product_type) && t.product_type == 'com.apple.product-type.application' }
+          raise "Expected exactly one main iOS app target" unless app_targets.size == 1
+          target = app_targets.first
+          target.build_configurations.each do |cfg|
+            original = cfg.build_settings['OTHER_LDFLAGS']
+            flags = original.is_a?(Array) ? original.join(' ') : (original || '$(inherited)').to_s
+            args = %W[-Xlinker -sectcreate -Xlinker __TEXT -Xlinker __entitlements -Xlinker #{ENV.fetch('MARINA_QA_SIM_ENTITLEMENTS')}]
+            cfg.build_settings['OTHER_LDFLAGS'] = flags + ' ' + args.join(' ')
+          end
+          project.save
+          puts 'IOS_SIMULATOR_LINKER_ENTITLEMENTS_CONFIGURED'
+          RUBY
+      - name: Build unsigned Simulator app with linked Keychain entitlement
+        working-directory: apps/mobile
+        run: |
+          set -euo pipefail
+          workspace=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          test -n "$workspace"
+          scheme=$(basename "$workspace" .xcworkspace)
+          xcodebuild -workspace "$workspace" -scheme "$scheme" -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/MarinaKeychainDerived" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build > "$RUNNER_TEMP/marina-keychain-build.log" 2>&1 || { grep -Ein 'error:|fatal error|failed' "$RUNNER_TEMP/marina-keychain-build.log" | tail -35 || true; exit 1; }
+          app=$(find "$RUNNER_TEMP/MarinaKeychainDerived/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)
+          test -d "$app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = kg.go.ms.staff
+          exe=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$app/Info.plist")
+          xcrun otool -l "$app/$exe" | grep -F -A 4 'sectname __entitlements' | grep -F 'segname __TEXT'
+          echo "IOS_QA_SIM_APP=$app" >> "$GITHUB_ENV"
+          echo 'IOS_SIMULATOR_LINKED_KEYCHAIN_SECTION_PASS'
+      - name: Boot clean iPhone Simulator and launch app
+        run: |
+          set -euo pipefail
+          udid=$(xcrun simctl list devices available -j | python3 -c 'import json,sys;d=json.load(sys.stdin);xs=[x for v in d["devices"].values() for x in v if x.get("isAvailable") and "iPhone" in x.get("name","")];print(xs[0]["udid"] if xs else "")')
+          test -n "$udid"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" "$IOS_QA_SIM_APP"
+          xcrun simctl launch "$udid" kg.go.ms.staff
+          sleep 7
+          mkdir -p ios-keychain-pilot-evidence
+          xcrun simctl io "$udid" screenshot ios-keychain-pilot-evidence/ios-launch.png
+          test -s ios-keychain-pilot-evidence/ios-launch.png
+          echo 'IOS_SIMULATOR_KEYCHAIN_LINKER_LAUNCH_PASS'
+      - name: Archive the exact simulator app that passed launch
+        if: github.event_name == 'pull_request'
+        id: archive
+        run: |
+          set -euo pipefail
+          ditto -c -k --keepParent "$IOS_QA_SIM_APP" "$RUNNER_TEMP/ios-live.zip"
+          echo "sha256=$(shasum -a 256 "$RUNNER_TEMP/ios-live.zip" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'pull_request'
+        with:
+          name: marina-linked-ios-live-app
+          path: ${{ runner.temp }}/ios-live.zip
+          retention-days: 2
+          if-no-files-found: error
+      - name: Upload QA-only Simulator launch evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-ios-keychain-linker-pilot
+          path: ios-keychain-pilot-evidence/
+          retention-days: 7
+          if-no-files-found: warn

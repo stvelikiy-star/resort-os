@@ -1,0 +1,90 @@
+# This is an opt-in LIVE QA test, NOT production acceptance.
+# Compile a separate native build with EXACT EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS.
+# Use synthetic MARINA_FINAL_QA staff only. No real accounts.
+appId: kg.go.ms.staff
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true
+# A slow GitHub Android emulator can show an OS-level Pixel Launcher ANR
+# over a healthy app. Dismiss ONLY this system dialog; never suppress app errors.
+- runFlow:
+    when:
+      platform: Android
+      visible: "Pixel Launcher isn't responding"
+    commands:
+      - tapOn:
+          text: "Wait"
+- assertNotVisible:
+    text: "Pixel Launcher isn't responding"
+- extendedWaitUntil:
+    visible:
+      id: "login-username"
+    timeout: 90000
+- tapOn:
+    id: "login-username"
+# Use supported Maestro setClipboard and pasteText. Retry only the
+# username field, then require exact full value before password.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - retry:
+          maxRetries: 2
+          commands:
+            - tapOn:
+                id: "login-username"
+            - eraseText
+            - setClipboard: ${MAESTRO_QA_USERNAME}
+            - pasteText
+            - copyTextFrom:
+                id: "login-username"
+            - assertTrue:
+                condition: ${maestro.copiedText === MAESTRO_QA_USERNAME}
+                label: "Full synthetic QA username must be present before password"
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - inputText: ${MAESTRO_QA_USERNAME}
+# iOS may show its first-keyboard typing tutorial after username entry.
+# Dismiss that OS tutorial before interacting with the secure password field.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - runFlow:
+          when:
+            visible: "Speed up your typing"
+          commands:
+            - tapOn: "Continue"
+- tapOn:
+    id: "login-password"
+- inputText: ${MAESTRO_QA_PASSWORD}
+# The same system tutorial can appear when the secure field receives input.
+# Never dismiss application login errors; only the known iOS tutorial.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - runFlow:
+          when:
+            visible: "Speed up your typing"
+          commands:
+            - tapOn: "Continue"
+      - hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: "login-submit"
+    timeout: 60000
+- tapOn:
+    id: "login-submit"
+# Phase 1: authentication/navigation transition. The native iOS Save Password
+# overlay is handled independently in the role-dashboard verification phase.
+# Never claim role UI PASS merely because the sign-in screen disappeared.
+- extendedWaitUntil:
+    notVisible:
+      id: "login-username"
+    timeout: 60000
+- assertNotVisible:
+    id: "login-error"

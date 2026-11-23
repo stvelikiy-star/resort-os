@@ -1,0 +1,24 @@
+# Phase 2: verify role-specific native UI after the authentication transition.
+# iOS Password AutoFill can appear late, including after the dashboard renders.
+# Retrying only the read/dismiss/assert block avoids repeating the login.
+appId: kg.go.ms.staff
+---
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            platform: iOS
+          commands:
+            - runFlow:
+                when:
+                  visible: "Save Password?"
+                commands:
+                  - tapOn:
+                      text: "Not Now"
+      - extendedWaitUntil:
+          visible:
+            id: "${MAESTRO_QA_EXPECTED_TAB}"
+          timeout: 15000
+- assertNotVisible:
+    id: "login-error"

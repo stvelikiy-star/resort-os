@@ -1,0 +1,236 @@
+name: MARINA Native Android iOS Maestro QA
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/**'
+  workflow_dispatch:
+    inputs:
+      run_android:
+        description: 'Run Android regression only after an Android-related change'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marina-native-dual-platform-qa
+  cancel-in-progress: true
+
+jobs:
+  android-native:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_android == true
+    name: Android 35 APK + Maestro demo roles
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    env:
+      CI: 'true'
+      EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Build offline standalone Android APK (no hotel credentials)
+        working-directory: apps/mobile
+        run: |
+          npm ci --no-audit --no-fund
+          npx expo install --check
+          npx expo prebuild --platform android --no-install --non-interactive
+          cd android
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace
+      - name: Validate Android package and bundled JavaScript
+        run: |
+          set -euo pipefail
+          apk=apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          test -s "$apk"
+          unzip -Z1 "$apk" | grep -Fx 'assets/index.android.bundle'
+          aapt=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          "$aapt" dump badging "$apk" | grep -F "package: name='kg.go.ms.staff'"
+          if "$aapt" dump permissions "$apk" | grep -F 'android.permission.SYSTEM_ALERT_WINDOW'; then
+            echo 'FAIL: forbidden overlay permission'; exit 1
+          fi
+      - name: Upload installable Android APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-android-installable-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-marina-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Android 35 real UI + Maestro demo roles
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          ram-size: 3072M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-boot-timeout: 900
+          script: bash scripts/design/fl2-android-maestro-demo.sh
+      - name: Upload Android native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-android-native-maestro-proof
+          path: android-emulator-evidence/
+          retention-days: 7
+          if-no-files-found: warn
+
+  ios-simulator:
+    name: iOS simulator offline build + Maestro demo roles
+    runs-on: macos-26-intel
+    timeout-minutes: 140
+    env:
+      CI: 'true'
+      EXPO_PUBLIC_MARINA_TRUSTED_API_ORIGINS: ''
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: '360000'
+      MAESTRO_CLI_NO_ANALYTICS: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Preflight Xcode iOS Simulator
+        run: |
+          xcodebuild -version
+          xcode_major=$(xcodebuild -version | awk '/^Xcode / {split($2,parts,"."); print parts[1]}')
+          test "${xcode_major:-0}" -ge 26 || { echo "FAIL: Expo 58 needs Xcode 26.4+"; exit 1; }
+          xcrun simctl list devices available
+          mkdir -p ios-simulator-evidence
+      - name: Prepare simulator-only iOS bundle identifier (no App Store signing)
+        working-directory: apps/mobile
+        run: |
+          npm ci --no-audit --no-fund
+          npx expo install --check
+          node - <<'NODE'
+          const fs=require('fs');
+          const f='app.json';
+          const cfg=JSON.parse(fs.readFileSync(f,'utf8'));
+          cfg.expo.ios=cfg.expo.ios||{};
+          cfg.expo.ios.bundleIdentifier='kg.go.ms.staff';
+          fs.writeFileSync(f, JSON.stringify(cfg,null,2)+'\n');
+          console.log('SIMULATOR_ONLY_BUNDLE_ID=kg.go.ms.staff; source repo unchanged');
+          NODE
+          npx expo prebuild --platform ios --no-install --non-interactive
+      - name: CocoaPods dependencies
+        working-directory: apps/mobile/ios
+        env:
+          LANG: en_US.UTF-8
+          LC_ALL: en_US.UTF-8
+        run: pod install
+      - name: Build offline release for iOS Simulator without Apple credentials
+        working-directory: apps/mobile
+        run: |
+          set -euo pipefail
+          workspace=$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)
+          test -n "$workspace"
+          scheme=$(basename "$workspace" .xcworkspace)
+          echo "XCODE_WORKSPACE=$workspace SCHEME=$scheme"
+          xcodebuild -workspace "$workspace" -scheme "$scheme" -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/MarinaDerived" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build > "$RUNNER_TEMP/marina-xcodebuild.log" 2>&1 || { grep -Ein "error:|fatal error|failed" "$RUNNER_TEMP/marina-xcodebuild.log" | tail -45 || true; tail -75 "$RUNNER_TEMP/marina-xcodebuild.log"; exit 1; }
+          app=$(find "$RUNNER_TEMP/MarinaDerived/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)
+          test -d "$app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = "kg.go.ms.staff"
+          echo "IOS_APP_PATH=$app" >> "$GITHUB_ENV"
+          echo 'IOS_UNSIGNED_SIMULATOR_BUILD_PASS'
+      - name: Package unsigned iOS Simulator app for review
+        run: |
+          set -euo pipefail
+          test -d "$IOS_APP_PATH"
+          mkdir -p ios-simulator-evidence
+          cd "$(dirname "$IOS_APP_PATH")"
+          zip -qry "$GITHUB_WORKSPACE/ios-simulator-evidence/MARINA_SMART_iOS_Simulator.zip" "$(basename "$IOS_APP_PATH")"
+          test -s "$GITHUB_WORKSPACE/ios-simulator-evidence/MARINA_SMART_iOS_Simulator.zip"
+      - name: Upload unsigned iOS Simulator application
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-ios-simulator-app
+          path: ios-simulator-evidence/MARINA_SMART_iOS_Simulator.zip
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Boot iPhone Simulator, install app, capture native proof
+        run: |
+          set -euo pipefail
+          udid=$(xcrun simctl list devices available -j | python3 -c 'import sys,json; j=json.load(sys.stdin); d=[x for a in j["devices"].values() for x in a if x.get("isAvailable") and "iPhone" in x.get("name","")]; print(d[0]["udid"] if d else "")')
+          test -n "$udid"
+          echo "IOS_SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" "$IOS_APP_PATH"
+          xcrun simctl launch "$udid" kg.go.ms.staff
+          sleep 16
+          xcrun simctl io "$udid" screenshot ios-simulator-evidence/ios-first-launch.png
+          test -s ios-simulator-evidence/ios-first-launch.png
+          echo 'IOS_NATIVE_INSTALL_LAUNCH_SCREENSHOT_PASS'
+      - name: Maestro iOS demo owner/reception/cook/waiter
+        run: |
+          set -euo pipefail
+          curl -fsSL https://get.maestro.mobile.dev | bash
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro --version
+          for role in owner reception cook waiter; do
+            # The actual iOS QA screenshot showed Cook/Waiter visibly rendered,
+            # yet Maestro failed to expose their testID accessibility nodes.
+            # Only the lower-row roles use the visible text selector; this is
+            # a test-only adjustment, not a change to the application itself.
+            case "$role" in
+              cook) selector='text: "Cook"' ;;
+              waiter) selector='text: "Waiter"' ;;
+              owner|reception) selector="id: \"connect-demo-$role\"" ;;
+              *) echo 'UNEXPECTED_DEMO_ROLE'; exit 1 ;;
+            esac
+            cat > /tmp/marina-native-demo.yaml <<EOF
+          appId: kg.go.ms.staff
+          ---
+          - launchApp:
+              clearState: true
+              clearKeychain: true
+          - scrollUntilVisible:
+              element:
+                $selector
+              direction: DOWN
+              timeout: 60000
+              visibilityPercentage: 30
+          - tapOn:
+              $selector
+          - extendedWaitUntil:
+              visible: ".*DEMO.*"
+              timeout: 30000
+          EOF
+            if ! maestro test /tmp/marina-native-demo.yaml; then
+              xcrun simctl io "$IOS_SIMULATOR_UDID" screenshot "ios-simulator-evidence/failure-$role.png" || true
+              exit 1
+            fi
+            xcrun simctl io "$IOS_SIMULATOR_UDID" screenshot "ios-simulator-evidence/maestro-$role.png"
+          done
+          echo 'IOS_NATIVE_DEMO_4_ROLES_PASS (not live hotel E2E)'
+      - name: Upload iOS native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-ios-native-maestro-proof
+          path: ios-simulator-evidence/
+          retention-days: 7
+          if-no-files-found: warn

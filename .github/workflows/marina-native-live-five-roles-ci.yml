@@ -1,0 +1,199 @@
+name: MARINA Native QA Five Role LIVE Login
+on:
+  # Diagnostic only: the pinned iOS LIVE gate belongs to the negative-auth workflow.
+  # No automatic PR trigger and no additional Apple build for test-only changes.
+  workflow_dispatch:
+    inputs:
+      run_android:
+        description: 'Recheck previously accepted Android only when explicitly requested'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: marina-native-qa-five-role-login
+  cancel-in-progress: true
+
+jobs:
+  qa-credentials-ready:
+    name: Protected QA credentials available (no values logged)
+    if: github.event_name == 'workflow_dispatch' && github.ref_name == 'ci/marina-native-android-ios-maestro-20261121'
+    runs-on: ubuntu-24.04
+    environment: marina-native-qa
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    env:
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
+    steps:
+      - name: Check protected secret presence without printing it
+        id: check
+        run: |
+          set -euo pipefail
+          if [[ -n "$MARINA_NATIVE_QA_USERS_JSON" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "Protected synthetic QA credentials present"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::error title=Missing protected QA credentials::LIVE acceptance is BLOCKED; provide synthetic MARINA_FINAL_QA credentials in environment marina-native-qa"
+            exit 78
+          fi
+
+  android-five-live:
+    needs: qa-credentials-ready
+    if: needs.qa-credentials-ready.outputs.ready == 'true' && github.event_name == 'workflow_dispatch' && inputs.run_android == true
+    name: Android 35 five LIVE staff roles (MARINA_FINAL_QA)
+    runs-on: ubuntu-24.04
+    environment: marina-native-qa
+    timeout-minutes: 75
+    env:
+      CI: 'true'
+      MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_BUILD_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify temporary synthetic QA secret provisioned
+        run: |
+          set -euo pipefail
+          test -n "$MARINA_NATIVE_QA_USERS_JSON" || { echo 'Missing QA environment secret'; exit 78; }
+      - uses: actions/download-artifact@v4
+        with:
+          name: marina-qa-android-origin-pinned-apk
+          run-id: 44909147697
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: android-bin
+      - name: Pin checked Android QA binary
+        run: |
+          set -euo pipefail
+          echo 'f22aedddc4232b6ea85ed7e6de0cbc0f84cadf720900e1cc5332f971da9bb1f4  android-bin/app-release.apk' | sha256sum -c -
+          echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-marina-kvm.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Real Android five-role QA login Maestro
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 2
+          ram-size: 3072M
+          disk-size: 6000M
+          disable-animations: true
+          emulator-boot-timeout: 900
+          script: bash scripts/design/fl2-native-live-five-roles.sh android
+      - name: Upload synthetic Android screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-native-android-five-live-role-evidence
+          path: native-five-roles-evidence/
+          retention-days: 5
+          if-no-files-found: warn
+
+  build-ios-live:
+    needs: qa-credentials-ready
+    if: needs.qa-credentials-ready.outputs.ready == 'true'
+    uses: ./.github/workflows/marina-ios-simulator-keychain-linker-pilot-ci.yml
+
+  ios-five-live:
+    needs: [qa-credentials-ready, build-ios-live]
+    if: needs.qa-credentials-ready.outputs.ready == 'true'
+    name: iPhone Simulator five LIVE staff roles (MARINA_FINAL_QA)
+    runs-on: macos-26-intel
+    environment: marina-native-qa
+    timeout-minutes: 90
+    env:
+      CI: 'true'
+      MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_BUILD_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
+      MAESTRO_DRIVER_STARTUP_TIMEOUT: '360000'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify temporary synthetic QA secret provisioned
+        run: |
+          set -euo pipefail
+          test -n "$MARINA_NATIVE_QA_USERS_JSON" || { echo 'Missing QA environment secret'; exit 78; }
+      - uses: actions/download-artifact@v4
+        with:
+          name: marina-linked-ios-live-app
+          path: ios-bin
+      - name: Verify and extract the same-run launch-tested iOS QA app
+        env:
+          EXPECTED_SHA256: ${{ needs.build-ios-live.outputs.app_sha256 }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          echo "$EXPECTED_SHA256  ios-bin/ios-live.zip" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/marina-five-live"
+          ditto -x -k ios-bin/ios-live.zip "$RUNNER_TEMP/marina-five-live"
+          app=$(find "$RUNNER_TEMP/marina-five-live" -maxdepth 1 -name '*.app' -print -quit)
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = kg.go.ms.staff
+          echo "MARINA_NATIVE_QA_IOS_APP=$app" >> "$GITHUB_ENV"
+          echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify QA logout endpoint from macOS runner without a user session
+        run: |
+          set -euo pipefail
+          status=$(curl --silent --show-error --request POST --output /dev/null --write-out '%{http_code}' --connect-timeout 8 --max-time 20 "$MARINA_QA_ORIGIN/api/v1/auth/logout")
+          test "$status" = 204 || { echo "QA_ANONYMOUS_LOGOUT_HTTP_UNEXPECTED=$status"; exit 1; }
+          echo 'QA_ANONYMOUS_LOGOUT_FROM_MACOS_HTTP_204_PASS'
+      - name: Boot simulator and install QA app
+        run: |
+          set -euo pipefail
+          udid=$(xcrun simctl list devices available -j | python3 -c 'import json,sys;d=json.load(sys.stdin);xs=[x for vs in d["devices"].values() for x in vs if x.get("isAvailable") and "iPhone" in x.get("name","")];print(xs[0]["udid"] if xs else "")')
+          test -n "$udid"
+          echo "IOS_SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" "$MARINA_NATIVE_QA_IOS_APP"
+          xcrun simctl launch "$udid" kg.go.ms.staff
+      - name: Real iPhone five-role QA login Maestro
+        run: bash scripts/design/fl2-native-live-five-roles.sh ios
+      - name: Report redacted iPhone Keychain and SecureStore indicators on failure
+        if: failure()
+        run: |
+          set -euo pipefail
+          mkdir -p native-five-roles-evidence
+          {
+            if [[ -n "${MARINA_NATIVE_QA_IOS_APP:-}" && -d "$MARINA_NATIVE_QA_IOS_APP" ]]; then
+              if codesign -v "$MARINA_NATIVE_QA_IOS_APP" >/dev/null 2>&1; then
+                echo 'IOS_QA_CODE_SIGNATURE_PRESENT=true'
+              else
+                echo 'IOS_QA_CODE_SIGNATURE_PRESENT=false'
+              fi
+              if codesign -d --entitlements - "$MARINA_NATIVE_QA_IOS_APP" 2>/dev/null | grep -q 'keychain-access-groups'; then
+                echo 'IOS_QA_KEYCHAIN_ACCESS_ENTITLEMENT_PRESENT=true'
+              else
+                echo 'IOS_QA_KEYCHAIN_ACCESS_ENTITLEMENT_PRESENT=false'
+              fi
+            fi
+            if [[ -n "${IOS_SIMULATOR_UDID:-}" ]]; then
+              xcrun simctl spawn "$IOS_SIMULATOR_UDID" log show --last 12m --style compact --predicate 'process == "MARINASMART" OR process == "securityd"' 2>/dev/null |
+                python3 -c 'import sys,re; d={"keychain":0,"securestore":0,"osstatus_34018":0,"missing_entitlement":0}; terms={"keychain":r"keychain","securestore":r"securestore","osstatus_34018":r"-34018","missing_entitlement":r"missing.entitlement"}; lines=0; exec("for line in sys.stdin:\n lines+=1\n for k,p in terms.items():\n  d[k]+=bool(re.search(p,line,re.I))"); print("IOS_NATIVE_OSLOG_LINES_SCANNED",lines); print("IOS_NATIVE_KEYCHAIN_SIGNAL_COUNTS",d)'
+            fi
+          } > native-five-roles-evidence/ios-security-diagnostics.txt || true
+          echo 'iOS diagnostic report contains only boolean flags and counts'
+      - name: Upload synthetic iPhone screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-native-ios-five-live-role-evidence
+          path: native-five-roles-evidence/
+          retention-days: 5
+          if-no-files-found: warn
