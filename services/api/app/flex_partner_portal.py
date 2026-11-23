@@ -13,7 +13,8 @@ from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 
-from .flex_control_plane import qa_password_read_allowed, (
+from .flex_control_plane import (
+    qa_password_read_allowed,
     lifespan as core_lifespan,
     resolve_platform_principal,
 )
