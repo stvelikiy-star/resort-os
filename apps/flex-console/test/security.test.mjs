@@ -179,3 +179,31 @@ test('SUPER ADMIN summary reports partial API failures rather than hiding errors
  assert.match(block,/r\.status==='rejected'/);
  assert.match(block,/degraded\+periodButtons\(\)/);
 });
+
+
+test('SUPER ADMIN draft dates mirror the API bounds without sending malformed periods',()=>{
+ const source=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ const fragment=source.slice(source.indexOf('function validDraftPeriod('),source.indexOf('async function subscriptionDraftForm()'));
+ assert.ok(fragment.startsWith('function validDraftPeriod('));
+ const valid=vm.runInNewContext('('+fragment.trim()+')');
+ const today='2026-11-24';
+ for(const dates of [
+   ['2026-11-23','2026-11-23'],
+   ['2026-11-24','2026-11-24'],
+   ['2026-12-01','2027-12-02'],
+   ['2027-11-25','2027-11-25']
+ ])assert.equal(valid(...dates,today),true,JSON.stringify(dates));
+ for(const dates of [
+   ['2026-11-22','2026-11-24'],
+   ['2026-11-25','2026-11-24'],
+   ['2026-12-01','2027-12-03'],
+   ['2027-11-26','2027-11-26'],
+   ['2026-02-30','2026-03-01'],
+   ['garbage','2027-01-01']
+ ])assert.equal(valid(...dates,today),false,JSON.stringify(dates));
+ assert.match(source,/if\(!validDraftPeriod\(form.elements.period_start.value,form.elements.period_end.value\)\)/);
+ const match=source.match(/const translations = (\{[\s\S]*?\n\});\nconst main=/);
+ assert.ok(match);
+ const translations=vm.runInNewContext('('+match[1]+')');
+ for(const lang of ['ru','kg','en'])assert.ok(translations[lang].draftDatesError.length>30);
+});
