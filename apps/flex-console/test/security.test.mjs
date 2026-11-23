@@ -183,7 +183,7 @@ test('SUPER ADMIN summary reports partial API failures rather than hiding errors
 
 test('SUPER ADMIN draft dates mirror the API bounds without sending malformed periods',()=>{
  const source=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
- const fragment=source.slice(source.indexOf('function validDraftPeriod('),source.indexOf('async function subscriptionDraftForm()'));
+ const fragment=source.slice(source.indexOf('function validDraftPeriod('),source.indexOf('// Browser price estimate only;'));
  assert.ok(fragment.startsWith('function validDraftPeriod('));
  const valid=vm.runInNewContext('('+fragment.trim()+')');
  const today='2026-11-24';
@@ -234,4 +234,27 @@ test('commercial hotel card presents honest role-bound tabs without inventing us
  assert.match(detail,/const subscription=hotelReadResult\(sub,true\)/);
  assert.match(detail,/const invoices=hotelReadResult\(inv\)/);
  assert.doesNotMatch(detail,/Math\.random/);
+});
+
+
+test('commercial proposal estimate uses only effective published noncore KGS prices',()=>{
+ const source=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ const begin=source.indexOf('function draftEstimate(');
+ const end=source.indexOf('function refreshDraftEstimate(',begin);
+ const estimate=vm.runInNewContext('('+source.slice(begin,end).trim()+')');
+ const row=(sku,price,from='2026-11-20T00:00:00+06:00',to=null,extra={})=>({
+  sku,status:'AVAILABLE',is_core:false,
+  latest_price:{monthly_price:price,currency:'KGS',valid_from:from,valid_to:to},...extra
+ });
+ const rows=[row('A','1500.70'),row('B','125.25')];
+ assert.equal(estimate(rows,['A','B'],'2026-11-25'),'1625.95');
+ assert.equal(estimate(rows,[],'2026-11-25'),null);
+ assert.equal(estimate(rows,['MISSING'],'2026-11-25'),null);
+ assert.equal(estimate([row('A','100','2026-12-01T00:00:00+06:00')],['A'],'2026-11-25'),null);
+ assert.equal(estimate([row('A','100','2026-11-20T00:00:00+06:00','2026-11-25T00:00:00+06:00')],['A'],'2026-11-25'),null);
+ assert.equal(estimate([row('A','100',undefined,null,{is_core:true})],['A'],'2026-11-25'),null);
+ assert.equal(estimate([row('A','100',undefined,null,{status:'PLANNED'})],['A'],'2026-11-25'),null);
+ assert.equal(estimate([row('A','100',undefined,null,{latest_price:{monthly_price:'100',currency:'USD',valid_from:'2026-11-20T00:00:00+06:00'}})],['A'],'2026-11-25'),null);
+ assert.match(source,/draftEstimate\(state\.draftPriceRows,checked,form\.elements\.period_start\.value\)===null/);
+ assert.match(source,/draftEstimateDisclaimer/);
 });
