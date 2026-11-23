@@ -195,17 +195,27 @@ async def resolve_platform_principal(
             )
 
 
+def qa_password_read_allowed(principal: PlatformPrincipal) -> bool:
+    """Read-only preview exception; never grants MFA or write permissions."""
+    return bool(
+        principal.subject_id
+        and os.environ.get("FLEX_ENVIRONMENT") == "qa"
+        and os.environ.get("VERCEL_ENV") == "preview"
+        and os.environ.get("FLEX_QA_PASSWORD_LOGIN") == "true"
+    )
+
+
 def _require_hotel_read(principal: PlatformPrincipal, hotel_id: uuid.UUID):
-    if not platform_action_allowed(
+    if not (platform_action_allowed(
         principal, action="VIEW_HOTEL_BILLING", hotel_id=str(hotel_id)
-    ):
+    ) or (principal.role == "SUPER_ADMIN" and qa_password_read_allowed(principal))):
         # 404 limits revelation of hotel existence to unauthorized callers.
         raise HTTPException(404, detail="Hotel not found")
 
 
 def _reader_for(principal: PlatformPrincipal) -> str:
     if principal.role == "SUPER_ADMIN":
-        if not principal.mfa_verified:
+        if not (principal.mfa_verified or qa_password_read_allowed(principal)):
             raise HTTPException(403, detail="MFA required")
         return "flex_platform_admin_reader"
     return "flex_hotel_reader"
@@ -230,7 +240,7 @@ async def me(principal: PlatformPrincipal = Depends(resolve_platform_principal))
 async def hotels(
     request: Request, principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    if principal.role != "SUPER_ADMIN" or not principal.mfa_verified:
+    if principal.role != "SUPER_ADMIN" or not (principal.mfa_verified or qa_password_read_allowed(principal)):
         raise HTTPException(403, detail="Admin with MFA required")
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
@@ -314,7 +324,7 @@ async def commercial_catalog(
     """
     if principal.role not in {"HOTEL_OWNER", "SUPER_ADMIN"}:
         raise HTTPException(403, detail="Catalog not available to this role")
-    if principal.role == "SUPER_ADMIN" and not principal.mfa_verified:
+    if principal.role == "SUPER_ADMIN" and not (principal.mfa_verified or qa_password_read_allowed(principal)):
         raise HTTPException(403, detail="MFA required")
     if principal.role == "HOTEL_OWNER" and not principal.hotel_ids:
         raise HTTPException(403, detail="No assigned hotel")
