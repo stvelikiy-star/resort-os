@@ -155,6 +155,16 @@ test('FLEX Console RU/KG/EN includes every UI label without malformed text',()=>
 });
 
 
+test('dashboard login finishes on signed password platform session before TOTP',()=>{
+ const source=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ assert.match(source,/if\(data\.platform_session===true\)\{location\.replace\('\/'\);return;\}/);
+ const api=readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
+ assert.match(api,/password_login_ready:passwordLoginReady/);
+ const recovery=readFileSync(new URL('../auth/recovery.mjs',import.meta.url),'utf8');
+ assert.match(recovery,/DELETE FROM flex_auth\.verification/);
+ assert.match(recovery,/DELETE FROM flex_auth\.session/);
+});
+
 test('first invitation completes password-only QA login without TOTP enrollment',()=>{
  const source=readFileSync(new URL('../public/enroll.js',import.meta.url),'utf8');
  const sessionSuccess=source.indexOf('if(session.platform_session===true)');
