@@ -15,7 +15,7 @@ permissions:
 
 concurrency:
   group: marina-native-qa-negative-auth
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   server-session-rbac:
@@ -87,6 +87,59 @@ jobs:
           name: marina-android-native-negative-login-qa
           path: native-qa-evidence/
           retention-days: 7
+          if-no-files-found: warn
+
+  ios-live-pinned-five:
+    name: iOS pinned LIVE five roles + logout/restart (MARINA_FINAL_QA)
+    runs-on: macos-26-intel
+    environment: marina-native-qa
+    timeout-minutes: 85
+    env:
+      CI: 'true'
+      MARINA_QA_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_BUILD_ORIGIN: 'https://agent-vivobook-asuslaptop-x412ua.tail2066a4.ts.net/core'
+      MARINA_NATIVE_QA_USERS_JSON: ${{ secrets.MARINA_NATIVE_QA_USERS_JSON }}
+      IOS_QA_SIM_ZIP_SHA256: '4b880f67282b17fcd08a809072a00a199ddbe83859ea15552360f39342601b62'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: marina-linked-ios-live-app
+          run-id: 45063587493
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ios-bin
+      - name: Verify proven iOS QA app and prepare simulator
+        run: |
+          set -euo pipefail
+          test -n "$MARINA_NATIVE_QA_USERS_JSON"
+          echo "$IOS_QA_SIM_ZIP_SHA256  ios-bin/ios-live.zip" | shasum -a 256 -c -
+          curl -fsS -H "Authorization: Bearer ${{ github.token }}" -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/137450788298" | python3 -c "import json,sys; j=json.load(sys.stdin); assert j['conclusion']=='success' and j['run_id']==45063587493"
+          mkdir -p "$RUNNER_TEMP/marina-pinned-ios"
+          ditto -x -k ios-bin/ios-live.zip "$RUNNER_TEMP/marina-pinned-ios"
+          app=$(find "$RUNNER_TEMP/marina-pinned-ios" -maxdepth 1 -name '*.app' -print -quit)
+          test -d "$app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Info.plist")" = kg.go.ms.staff
+          udid=$(xcrun simctl list devices available -j | python3 -c 'import json,sys; j=json.load(sys.stdin); a=[x for v in j["devices"].values() for x in v if x.get("isAvailable") and "iPhone" in x.get("name","")]; print(a[0]["udid"] if a else "")')
+          test -n "$udid"
+          echo "IOS_SIMULATOR_UDID=$udid" >> "$GITHUB_ENV"
+          echo 'MARINA_QA_ARTIFACT_VERIFIED=yes' >> "$GITHUB_ENV"
+          xcrun simctl boot "$udid"
+          xcrun simctl bootstatus "$udid" -b
+          xcrun simctl install "$udid" "$app"
+          xcrun simctl launch "$udid" kg.go.ms.staff
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Five role LIVE login and native sign-out/restart
+        run: bash scripts/design/fl2-native-live-five-roles.sh ios
+      - name: Upload evidence for synthetic five roles and logout
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marina-ios-pinned-five-live-and-logout-qa
+          path: native-five-roles-evidence/
+          retention-days: 5
           if-no-files-found: warn
 
   ios-invalid-login:
