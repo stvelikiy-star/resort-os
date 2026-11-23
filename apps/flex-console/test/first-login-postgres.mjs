@@ -3,7 +3,7 @@ import {randomBytes,createHash,createHmac,generateKeyPairSync,verify} from 'node
 import pg from 'pg';
 import {getMigrations} from 'better-auth/db/migration';
 import {hashPassword} from 'better-auth/crypto';
-import {createFlexAuthConfig} from '../auth/identity-enabled.mjs';
+import {createFlexAuthConfig,isVerifiedIdentitySession} from '../auth/identity-enabled.mjs';
 import {redeemFirstInvite} from '../auth/first-invite.mjs';
 import {redeemRecovery} from '../auth/recovery.mjs';
 import {verifiedLogin,createMfaSigner} from '../auth/mfa-bridge.mjs';
@@ -49,6 +49,14 @@ await db.query('DELETE FROM "rateLimit"');
 const passwordReply=await verifiedLogin(passwordAuth,passwordRequest(password),origin,passwordIssue,true);
 assert.equal(passwordReply.status,200);
 assert.equal((await passwordReply.json()).platform_session,true);
+// Check an actual Better Auth session cookie against the database identity.
+// No fabricated subject or revoked/absent cookie may renew a platform token.
+const passwordCookie=passwordReply.headers.getSetCookie().map(line=>line.split(';')[0]).join('; ');
+const actualSubject=(await db.query('select id from "user"')).rows[0].id;
+assert.equal(await isVerifiedIdentitySession(passwordAuth,passwordCookie,actualSubject),true);
+assert.equal(await isVerifiedIdentitySession(passwordAuth,passwordCookie,'not-the-account'),false);
+assert.equal(await isVerifiedIdentitySession(passwordAuth,'',actualSubject),false);
+
 assert.deepEqual(JSON.parse(Buffer.from(minted.token.split('.')[1],'base64url')).amr,['pwd']);
 assert.equal(JSON.parse(Buffer.from(minted.token.split('.')[1],'base64url')).sub,(await db.query('select id from "user"')).rows[0].id);
 for(const [key,value] of Object.entries(savedEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
