@@ -48,9 +48,14 @@ test('no platform token issuance, public signups or implicit admin grants',()=>{
  assert.doesNotMatch(s,/amr\s*:|SUPER_ADMIN\s*=|signJWT\(|createAccessToken\(/);
 });
 
-test('pinned Better Auth TOTP staging module can import without creating sessions',async()=>{
+test('pinned Better Auth TOTP staging module can import without creating sessions',async(t)=>{
+  const {default:pg}=await import('pg');
+  const pool=t.mock.method(pg,'Pool',function(){
+    throw Error('Import must not open a session database pool');
+  });
   const staging=await import('../auth/identity-enabled.mjs');
   assert.equal(typeof staging.handleEnabledIdentity,'function');
+  assert.equal(pool.mock.callCount(),0);
 });
 
 test('Neon pooled runtime never sends unsupported startup options, validates auth scope',()=>{

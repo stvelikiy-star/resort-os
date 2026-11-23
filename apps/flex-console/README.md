@@ -1,6 +1,6 @@
 # MARINA SMART FLEX — isolated commercial console (read-only QA)
 
-This app implements the **existing Future Luxury 2.0** visual language (navy/cyan/champagne) with role-bound views. The exact six-screen approved interactive reference remains at `docs/flex/ui/MARINA_FLEX_Interactive_Prototype.html` and is NOT served on the authenticated origin.
+This app implements the **existing Future Luxury 2.0** visual language (navy/teal/champagne) with role-bound views. The exact six-screen approved interactive reference remains at `docs/flex/ui/MARINA_FLEX_Interactive_Prototype.html` and is NOT served on the authenticated origin.
 
 ## What's implemented
 
@@ -15,7 +15,8 @@ This app implements the **existing Future Luxury 2.0** visual language (navy/cya
 
 ```sh
 cd apps/flex-console
-node --version  # v22+
+node --version  # v22.x
+npm install --ignore-scripts --no-fund --no-audit
 npm test
 npm start
 # http://127.0.0.1:3407

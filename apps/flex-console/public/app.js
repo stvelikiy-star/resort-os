@@ -342,8 +342,12 @@ async function submitAdminForm(form,kind){
  } catch(e){result.textContent=t('adminError')+': '+e.message;button.disabled=false}
 }
 
+function frozenBadge(){
+ const labels={ru:'Заморожено',kg:'Тоңдурулган',en:'Frozen'};
+ return '<span class="frozen">'+labels[state.lang]+'</span>';
+}
 function billingHold(){
- return heading('BILLING',t('billingHold'))+info(t('billingHold'),'info');
+ return heading('BILLING',t('billingHold'))+frozenBadge()+info(t('billingHold'),'info');
 }
 function renderNav(){
  const r=state.me?.role;
@@ -419,7 +423,7 @@ async function hotelDetail(){
  return heading(t('selected'),id)+toolbar()+ (state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?'<button type="button" class="outline" data-view="subscription-draft">'+safe(t('configure'))+'</button>':'')+ (state.me?.role==='SUPER_ADMIN'?'<button type="button" class="outline" data-link="'+safe(id)+'">'+safe(t('linkHotel'))+'</button>':'')+'<button type="button" class="subtle" data-view="'+(state.me?.role==='SUPER_ADMIN'?'hotels':'subscription')+'">← '+safe(t('openBack'))+'</button>'+
  '<div class="grid three spacing-top">'+metric(t('planStatus'),subscription?.status??'—')+metric(t('enforcement'),subscription?.enforcement??'—')+metric(t('expires'),date(subscription?.period_end))+'</div>'+
  '<section class="panel"><h2>'+safe(t('subscription'))+'</h2>'+(subscription?'<div class="grid three">'+kv(t('periodStart'),date(subscription.period_start))+kv(t('periodEnd'),date(subscription.period_end))+kv(t('grace'),date(subscription.grace_until))+'</div>':empty(t('noSubscription')))+'</section>'+
- '<section class="panel"><h2>'+safe(t('invoices'))+'</h2>'+(invoices?.length?table([t('invoice'),t('status'),t('total'),t('due')],invoices.map(i=>'<tr><td>'+safe(i.number||i.id)+'</td><td><span class="chip">'+safe(i.status)+'</span></td><td>'+money(i.total,i.currency)+'</td><td>'+safe(date(i.due_at))+'</td></tr>')):empty(t('noInvoices')))+'</section>'+draftHistory+info(t('warning'),'info');
+ '<section class="panel"><h2>'+safe(t('invoices'))+'</h2>'+frozenBadge()+(invoices?.length?table([t('invoice'),t('status'),t('total'),t('due')],invoices.map(i=>'<tr><td>'+safe(i.number||i.id)+'</td><td><span class="chip">'+safe(i.status)+'</span></td><td>'+money(i.total,i.currency)+'</td><td>'+safe(date(i.due_at))+'</td></tr>')):empty(t('noInvoices')))+'</section>'+draftHistory+info(t('warning'),'info');
 }
 async function catalog(){
  if(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled){
@@ -441,10 +445,10 @@ async function catalog(){
  '<section class="panel">'+(items.length?table([t('sku'),t('features'),t('price'),t('status')],items.map(i=>'<tr><td>'+safe(i.sku)+'</td><td>'+safe(i.name)+'</td><td>'+money(i.monthly_list_price,i.currency)+'</td><td><span class="chip">v'+safe(i.price_version)+'</span></td></tr>')):empty(t('noCatalog')))+'</section>';
 }
 function earningsSummary(o){return (o.groups?.length?table([t('groups'),t('gross'),t('refunds'),t('net')],o.groups.map(g=>'<tr><td>'+safe(g.role)+'</td><td>'+money(g.accrued_gross_kg)+'</td><td>'+money(g.reversed_kg)+'</td><td>'+money(g.net_accrued_kg)+'</td></tr>')):empty(t('noPartners')))+info('QA_ONLY_NOT_BANK_RECONCILED','info')}
-async function obligations(){const r=await api('/v1/platform/partner-earnings-summary?period='+state.period);return heading(t('obligations'),t('helpQa'))+toolbar()+periodButtons()+'<section class="panel spacing-top">'+earningsSummary(r)+'</section>'+info(t('notImplemented'))}
+async function obligations(){const r=await api('/v1/platform/partner-earnings-summary?period='+state.period);return heading(t('obligations'),t('helpQa'))+frozenBadge()+toolbar()+periodButtons()+'<section class="panel spacing-top">'+earningsSummary(r)+'</section>'+info(t('notImplemented'))}
 async function earnings(){
  const r=await api('/v1/partner/me/earnings?period='+state.period);
- return heading(state.me.role==='INVESTOR'?t('investor'):t('agent'),t('helpQa'))+toolbar()+periodButtons()+'<div class="grid spacing-top">'+
+ return heading(state.me.role==='INVESTOR'?t('investor'):t('agent'),t('helpQa'))+frozenBadge()+toolbar()+periodButtons()+'<div class="grid spacing-top">'+
  metric(t('gross'),money(r.accrued_gross_kg),'cyan-text')+metric(t('refunds'),money(r.reversed_kg))+
  metric(t('net'),money(r.net_accrued_kg),'gold-text')+metric(t('paid'),money(r.actual_paid_kg))+'</div>'+
  '<section class="panel"><h2>'+safe(t('earnings'))+'</h2><div class="grid two">'+kv(t('events'),r.events)+kv(t('role'),r.role)+'</div></section>'+info(t('notImplemented'))+info(safe(r.data_provenance||'QA_ONLY'),'info');
