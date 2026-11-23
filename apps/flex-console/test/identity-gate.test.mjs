@@ -53,6 +53,15 @@ test('pinned Better Auth TOTP staging module can import without creating session
   assert.equal(typeof staging.handleEnabledIdentity,'function');
 });
 
+test('Neon pooled runtime never sends unsupported startup options, validates auth scope',()=>{
+ const s=readFileSync(new URL('../auth/identity-enabled.mjs',import.meta.url),'utf8');
+ assert.doesNotMatch(s,/options\s*:\s*['"`]-c\s+search_path/);
+ assert.match(s,/current_schema\(\) AS schema/);
+ assert.match(s,/row\.schema!=='flex_auth'/);
+ assert.match(s,/row\.role!=='flex_auth_runtime'/);
+ assert.match(s,/row\.commercial_access!==false/);
+});
+
 test('schema generator imports the canonical Better Auth config, no drift',()=>{
  const s=readFileSync(new URL('../auth/schema-config.mjs',import.meta.url),'utf8');
  assert.match(s,/createFlexAuthConfig/);
