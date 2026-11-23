@@ -32,7 +32,7 @@ APPROVED_NATIVE_QA_BLOBS = {
     "scripts/design/fl2-native-live-role.yaml": "5c7508b1cf6e740e267bcd7d7009cd9eeaf99719",
     "scripts/design/fl2-native-live-role.sh": "12df57b660f8bb3bdb0d6bc922bdab2f2d3d8cbd",
     "scripts/design/fl2-native-live-role.README.md": "8e2e78527633902591c6fa56dd53b18afb9ab077",
-    ".github/workflows/marina-native-live-qa-build-ci.yml": "4dee5d9718fdfb13a1d672da87174924bb02f6ce",
+    ".github/workflows/marina-native-live-qa-build-ci.yml": "0cf2ebfbcd14b295e1c8a374a02a175e0c0e19f3",
     "scripts/design/fl2-native-qa-connect.yaml": "23cdffda866cffa5557c41084ffcfefe1cfea666",
     "scripts/design/fl2-native-qa-connect.sh": "b0df9bd280ac5b3deb5e6a5d5a5e34767cfb4ccb",
     ".github/workflows/marina-native-qa-negative-auth-ci.yml": "6d40d5205999bcceb05d454580b515b8b618b1f0",
