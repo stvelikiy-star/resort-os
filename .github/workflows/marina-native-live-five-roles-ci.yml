@@ -6,6 +6,7 @@ on:
       - 'scripts/design/fl2-native-live-five-roles.sh'
       - 'scripts/design/fl2-native-live-role.yaml'
       - 'scripts/design/fl2-native-live-role.sh'
+      - 'scripts/design/fl2-native-qa-logout-restart.yaml'
 
 permissions:
   contents: read
