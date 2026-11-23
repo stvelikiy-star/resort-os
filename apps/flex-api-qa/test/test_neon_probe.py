@@ -75,6 +75,9 @@ class NeonProbePolicy(unittest.TestCase):
             "/v1/hotels/{hotel_id}/invoices",
             "/v1/partner/me/earnings",
             "/v1/platform/partner-earnings-summary",
+            "/v1/platform/catalog",
+            "/v1/platform/catalog/skus/{sku}/versions",
+            "/v1/platform/subscription-drafts",
         ):
             self.assertIn(("GET", path), methods)
         for method, path in methods:
@@ -83,6 +86,16 @@ class NeonProbePolicy(unittest.TestCase):
             self.assertNotIn("payment", path)
             self.assertNotIn("payout", path)
             self.assertNotIn("settlement", path)
+
+    def test_admin_catalog_is_readable_but_never_writable_in_default_qa(self):
+        client = TestClient(app)
+        for path in ("/v1/platform/catalog", "/v1/platform/subscription-drafts"):
+            with self.subTest(path=path):
+                self.assertEqual(client.get(path).status_code, 401)
+                self.assertEqual(client.post(path, json={}).status_code, 404)
+        for route in app.routes:
+            if getattr(route, "path", "").startswith("/v1/platform/"):
+                self.assertNotIn("POST", getattr(route, "methods", set()))
 
     def test_core_identity_without_token_fails_closed(self):
         r = TestClient(app).get("/v1/me")
