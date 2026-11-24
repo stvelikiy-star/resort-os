@@ -196,9 +196,11 @@ class SharedAuthTests(unittest.TestCase):
         batch = '/api/v1/kitchen/orders/' + valid + '/batch-allocations'
         plan = '/api/v1/kitchen/production-targets'
         # Middleware admission is independent of COOK role checks.
-        self.assertEqual(self.client.get(plan).status_code, 401)
-        self.assertEqual(self.client.get(batch).status_code, 401)
-        self.assertEqual(self.client.post(batch).status_code, 401)
+        # Test app deliberately omits the real batch routers: admitted routes
+        # are 404 even anonymously; rejected methods/paths must be 503.
+        self.assertEqual(self.client.get(plan).status_code, 404)
+        self.assertEqual(self.client.get(batch).status_code, 404)
+        self.assertEqual(self.client.post(batch).status_code, 404)
         self.assertEqual(self.login('HOTEL_A').status_code, 200)
         self.assertEqual(self.client.get(plan).status_code, 404)
         self.assertEqual(self.client.get(batch).status_code, 404)
