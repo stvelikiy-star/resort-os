@@ -4,6 +4,7 @@ Only staging and independently reviewed complete sources. This is not a
 period-close process: P&L stays NULL until complete-period reconciliation.
 """
 import os
+import json
 import uuid
 from datetime import date
 from decimal import Decimal
@@ -55,7 +56,10 @@ async def qualified_posting_source(conn,pid,proposal):
         raise HTTPException(409,detail={"code":"ACCOUNTING_SOURCE_UNVERIFIED_OR_REVERSED"})
     # Immutable qualification snapshot is written only by the original
     # verified source API, never by this posting request.
-    proof=row["sourceSnapshot"]
+    proof=(json.loads(row["sourceSnapshot"])
+           if isinstance(row["sourceSnapshot"],str) else row["sourceSnapshot"])
+    if not isinstance(proof,dict):
+        raise HTTPException(409,detail={"code":"ACCOUNTING_SOURCE_SNAPSHOT_INVALID"})
     key=("rate_and_tax_accounting_approved" if row["sourceType"]=="ROOM_NIGHT"
          else "tax_discount_refund_accounting_approved")
     if proof.get(key) is not True:
@@ -138,6 +142,13 @@ async def post_approved_proposal(proposal_id:uuid.UUID,body:PostingAction,
                        ("postingId","propertyId","lineNo","accountCode",side,"amountKgs")
                        VALUES($1,$2,$3,$4,$5,$6)""",
                     body.id,pid,r["lineNo"],r["accountCode"],r["side"],r["amountKgs"])
+            await conn.execute(
+                """INSERT INTO audit_logs
+                   (id,"propertyId","actorType","actorId",action,resource,"resourceId",
+                    source,result,"createdAt")
+                   VALUES($1,$2,'STAFF',$3,'ACCOUNTING_LEDGER_POST',
+                          'OwnerAccountingPosting',$4,'WEB_ADMIN','SUCCESS',now())""",
+                uuid.uuid4(),pid,str(actor),str(body.id))
             return posting_view(row)
 
 
@@ -187,6 +198,13 @@ async def reverse_posting(posting_id:uuid.UUID,body:PostingAction,request:Reques
                        "postingId","propertyId","lineNo","accountCode",side,"amountKgs")
                        VALUES($1,$2,$3,$4,$5,$6)""",
                     body.id,pid,line["lineNo"],line["accountCode"],opposite,line["amountKgs"])
+            await conn.execute(
+                """INSERT INTO audit_logs
+                   (id,"propertyId","actorType","actorId",action,resource,"resourceId",
+                    source,result,"createdAt")
+                   VALUES($1,$2,'STAFF',$3,'ACCOUNTING_LEDGER_REVERSE',
+                          'OwnerAccountingPosting',$4,'WEB_ADMIN','SUCCESS',now())""",
+                uuid.uuid4(),pid,str(actor),str(body.id))
             return posting_view(row)
 
 
