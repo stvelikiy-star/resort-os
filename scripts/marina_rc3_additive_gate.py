@@ -65,9 +65,10 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/kitchen_batch_allocation.py": "21f71b7bd7d7a6c4aa2b044b4617a4547a16be47",
     "services/api/app/owner_served_kitchen_cost_trace.py": "d051cd2f1962fb4540434b026dec75e8c2afc6a7",
     "scripts/marina_shared_batch_allocation_ci.py": "ba9ce140bb72bfdb7954cb7081ea4f312bb4a168",
+    "scripts/marina_owner_accounting_decision_ci.py": "4b84740d89e497f976accaa6da3da082129e349e",
     "services/api/app/owner_accounting_journal.py": "fcb45a4a75f7935e12d6793dcdd95062a5d7c8d6",
     "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "24e9586d68e90e4292bb5f53f44d7fddeead7849",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "93f23cc1698d41169920ca05fe96bbc2d95ad883",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
