@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "c849159b6f6adce63d40e21b3f451188f66c105d",
+    "scripts/marina_rc3_additive_gate.py": "429f6d59004c86a82b54fe747bdedf4fec9f228f",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "cb4acbe3083a5981f550f6f614d67bc4f2acb436",
@@ -65,7 +65,8 @@ APPROVED_P0_BLOBS = {
     "services/api/app/reservation_payments.py": "fe9e0afb085f8343e073a4ba55c3d2b64efc070e",
     "scripts/marina_shared_manual_refund_evidence_ci.py": "6af069651da5bf9e0623cc886ff3c54deec3faff",
     "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "7edafcdff327fc84e56b47725449385204f5b5cc",
+    "scripts/marina_shared_kitchen_cost_truth_ci.py": "e955a3cbd8a12ce76f8dd421bf1c277fe1cbde21",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "3ebf8db3c10dadab720626dd5e42e72a64488a8e",
     "apps/staff/components/WaiterEntry.module.css": "7218c412d73930418c4d703267bf83e5f8153c0e",
     "scripts/test_marina_staff_legacy_dining_preservation.py": "15fb8274b823c5dcb0842aa6be4ca585b85d05a5",
 }
