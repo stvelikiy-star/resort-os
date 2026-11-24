@@ -89,6 +89,15 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         self.assertEqual(self.get("/v1/platform/catalog",who="owner-a").status_code,403)
         self.assertEqual(self.get("/v1/platform/subscription-drafts",mfa=False).status_code,403)
 
+    def test_01a_commercial_policy_is_admin_scoped_and_persisted(self):
+        path = "/v1/platform/commercial-policy"
+        self.assertEqual(self.get(path, who="owner-a").status_code, 403)
+        response = self.get(path)
+        self.assertEqual(response.status_code, 200, response.text)
+        approved = json.loads((Path(__file__).resolve().parents[1] / "docs/flex/commercial-policy-20261124.json").read_text())
+        self.assertEqual(response.json()["version"], 1)
+        self.assertEqual(response.json()["policy"], approved)
+
     def test_02_planned_sku_append_and_price_version(self):
         sku={"sku":"EXTRA_QA_CI","title":"QA add-on 1","capability_key":"qa.extra.feature"}
         made=self.post("/v1/platform/catalog/skus",sku)
