@@ -191,6 +191,37 @@ class SharedAuthTests(unittest.TestCase):
                      '/api/v1/kitchen/stock/items'):
             self.assertEqual(self.client.post(path).status_code, 503, path)
 
+    def test_owner_finance_routes_admitted_exactly_and_other_finance_closed(self):
+        # Middleware admission is separate from actual OWNER-only checks.
+        reads = (
+            '/api/v1/admin/finance/owner/expenses',
+            '/api/v1/admin/finance/owner/accrual-readiness',
+            '/api/v1/admin/finance/owner/recorded-cash-movements',
+        )
+        for code in ('HOTEL_A', 'HOTEL_B'):
+            self.assertEqual(self.login(code).status_code, 200)
+            # No test-only real finance router is present, so 404 proves
+            # admission while 503 would indicate a blocking shared gate.
+            for path in reads:
+                self.assertEqual(self.client.get(path).status_code, 404, path)
+            self.assertEqual(self.client.post('/api/v1/admin/finance/owner/expenses',
+                json={}).status_code, 404)
+            good = '11111111-1111-4111-8111-111111111111'
+            for suffix in ('settlements', 'void'):
+                self.assertEqual(self.client.post(
+                    '/api/v1/admin/finance/owner/expenses/'+good+'/'+suffix,
+                    json={}).status_code, 404)
+            for bad_method, bad_route in (
+                ('DELETE', '/api/v1/admin/finance/owner/expenses'),
+                ('POST', '/api/v1/admin/finance/owner/accrual-readiness'),
+                ('GET', '/api/v1/admin/finance/owner/expenses/'+good+'/settlements'),
+                ('POST', '/api/v1/admin/finance/owner/expenses/not-a-uuid/void'),
+                ('POST', '/api/v1/admin/finance/owner/accounting-journal/proposals'),
+            ):
+                self.assertEqual(self.client.request(
+                    bad_method, bad_route).status_code, 503, bad_route)
+            self.assertEqual(self.client.post('/api/v1/auth/logout').status_code, 204)
+
     def test_shared_dashboard_never_falls_back_to_previous_hotel(self):
         route = '/api/v1/admin/dashboard'
         self.assertEqual(self.login('HOTEL_A').status_code, 200)

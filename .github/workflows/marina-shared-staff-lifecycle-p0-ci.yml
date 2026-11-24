@@ -7,6 +7,7 @@ on:
       - 'services/api/app/staff_control.py'
       - 'services/api/app/auth.py'
       - 'services/api/app/shared_auth_preview.py'
+      - 'scripts/marina_shared_owner_finance_p0_ci.py'
       - 'services/api/app/section_permissions.py'
       - '.github/workflows/marina-shared-staff-lifecycle-p0-ci.yml'
   workflow_dispatch:
@@ -77,3 +78,7 @@ jobs:
         run: python scripts/marina_shared_live_browser_db.py seed
       - name: Verify full real two-hotel staff creation and revocation contract
         run: python scripts/marina_shared_staff_lifecycle_ci.py
+      - name: Verify two-hotel OWNER expenses, settlements and financial truth
+        env:
+          MARINA_SHARED_FINANCE_P0_CI_CONFIRM: ISOLATED_OWNER_FINANCE_CI_ONLY
+        run: python scripts/marina_shared_owner_finance_p0_ci.py

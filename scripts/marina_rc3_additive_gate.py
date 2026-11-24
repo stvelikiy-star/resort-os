@@ -34,10 +34,12 @@ WORKFLOW_PATH = ".github/workflows/marina-shared-rc3-source-ci.yml"
 # Approved current-release P0 (PR #592) is additive to immutable RC3.
 # No historical manifest, RC3 gate, or original SQL hash is rewritten.
 REVIEWED_SHARED_STAFF_P0_BLOBS = {
-    "services/api/app/shared_auth_preview.py": "38c7a4992a7a4a7a822ca58159e49ccb16037953",
-    "scripts/test_marina_shared_auth.py": "6786e5b4681248bbf7432167bbb5a255395d3201",
+    "services/api/app/shared_auth_preview.py": "def6ae43b34ab7946ab903f71ac207adf375fce8",
+    "scripts/test_marina_shared_auth.py": "866325b1ef4f0d14f98798fec9d3364ebe7b00a7",
     "apps/staff/components/StaffRoleGateway.tsx": "957821d21a17350529f9fcef442527772a42e0c9",
     "apps/staff/components/StoreStaffStock.tsx": "82b87098c1ab1355562551ec76cd8b4eb7b5478c",
+    "scripts/marina_shared_owner_finance_p0_ci.py": "71cabedce521c0019a3fd900d075830d51891a13",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "9cfef5e35c189f792cedf768aaab595b18b23fdb",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
