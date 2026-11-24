@@ -19,6 +19,11 @@ on:
       - 'scripts/marina_owner_accounting_decision_ci.py'
       - 'scripts/test_owner_accounting_decision_evidence.py'
       - 'services/api/app/owner_accounting_journal.py'
+      - 'services/api/app/owner_accounting_postings.py'
+      - 'services/api/app/owner_ledger_policy.py'
+      - 'scripts/test_owner_ledger_policy.py'
+      - 'scripts/marina_owner_posting_api_ci.py'
+      - 'packages/database/prisma/migrations/zz129_marina_owner_accounting_postings_20261125/migration.sql'
       - 'packages/database/prisma/migrations/zz128_marina_owner_accounting_decision_evidence_20261124/migration.sql'
       - 'services/api/app/kitchen_batch_allocation.py'
       - 'services/api/app/owner_served_kitchen_cost_trace.py'
@@ -125,3 +130,12 @@ jobs:
           PROPERTY_CODE: HOTEL_A
           MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED: 'true'
         run: python scripts/marina_owner_accounting_decision_ci.py
+      - name: Verify fail-closed posted journal policy and reversal math
+        run: python -m unittest scripts.test_owner_ledger_policy -v
+      - name: Verify exact OWNER posting and reversal against both hotels
+        env:
+          MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'false'
+          PROPERTY_CODE: HOTEL_A
+          MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED: 'true'
+          MARINA_ACCOUNTING_POSTING_ENABLED: 'true'
+        run: python scripts/marina_owner_posting_api_ci.py
