@@ -120,6 +120,13 @@ BEGIN
        RAISE EXCEPTION 'ACCOUNTING_POSTING_EXPENSE_UNVERIFIED_OR_DUPLICATE'
          USING ERRCODE='23514';
      END IF;
+   ELSIF original_proposal."sourceType"='STOCK_CONSUMPTION' THEN
+     IF owner_accounting_served_cogs_proof(
+          NEW."propertyId",original_proposal."sourceId",
+          NEW."accountingDate") IS NULL THEN
+       RAISE EXCEPTION 'ACCOUNTING_POSTING_SERVED_COGS_SOURCE_UNVERIFIED'
+         USING ERRCODE='23514';
+     END IF;
    ELSE
      RAISE EXCEPTION 'ACCOUNTING_POSTING_SOURCE_POLICY_UNSUPPORTED'
        USING ERRCODE='23514';
@@ -182,6 +189,27 @@ BEGIN
                  AND l.side='CREDIT' AND l."amountKgs"=debit_total)
      THEN
          RAISE EXCEPTION 'ACCOUNTING_POSTING_EXPENSE_ACCOUNT_POLICY_INVALID'
+           USING ERRCODE='23514';
+     END IF;
+   ELSIF EXISTS(SELECT 1 FROM owner_accounting_journal_proposals pr
+      WHERE pr.id=p."proposalId" AND pr."propertyId"=p."propertyId"
+        AND pr."sourceType"='STOCK_CONSUMPTION') THEN
+     SELECT owner_accounting_served_cogs_proof(
+              pr."propertyId",pr."sourceId",pr."accountingDate")
+       INTO debit_total
+       FROM owner_accounting_journal_proposals pr
+       WHERE pr.id=p."proposalId" AND pr."propertyId"=p."propertyId";
+     IF debit_total IS NULL
+         OR (SELECT COUNT(*) FROM owner_accounting_posting_lines l
+              WHERE l."postingId"=p.id)<>2
+         OR NOT EXISTS(SELECT 1 FROM owner_accounting_posting_lines l
+               WHERE l."postingId"=p.id AND l."accountCode"='5100'
+                 AND l.side='DEBIT' AND l."amountKgs"=debit_total)
+         OR NOT EXISTS(SELECT 1 FROM owner_accounting_posting_lines l
+               WHERE l."postingId"=p.id AND l."accountCode"='1300'
+                 AND l.side='CREDIT' AND l."amountKgs"=debit_total)
+     THEN
+         RAISE EXCEPTION 'ACCOUNTING_POSTING_SERVED_COGS_ACCOUNT_POLICY_INVALID'
            USING ERRCODE='23514';
      END IF;
    ELSE
@@ -347,6 +375,12 @@ BEGIN
               AND d."supplierName"=e."supplierName"
               AND d."documentReference"=e."documentReference")
       ) INTO source_valid;
+    ELSIF proposal_source_type='STOCK_CONSUMPTION' THEN
+      SELECT owner_accounting_served_cogs_proof(
+        NEW."propertyId",proposal_source_id,pr."accountingDate") IS NOT NULL
+        INTO source_valid
+        FROM owner_accounting_journal_proposals pr
+        WHERE pr.id=NEW."proposalId" AND pr."propertyId"=NEW."propertyId";
     ELSE
       source_valid:=false;
     END IF;
@@ -368,3 +402,39 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- A kitchen cost becomes a *candidate* for double-entry only when every served
+-- order item is explicitly tied to production batches and a valid folio charge.
+-- This does not independently verify recipe inputs or constitute period close.
+CREATE FUNCTION owner_accounting_served_cogs_proof(
+ property_id uuid, order_id uuid, service_day date)
+RETURNS numeric(20,4) LANGUAGE SQL STABLE AS $$
+ SELECT SUM(items.allocated_cost)::numeric(20,4)
+ FROM kitchen_orders o
+ JOIN properties hotel ON hotel.id=o."propertyId"
+ JOIN guest_folio_charges folio ON folio.id=o."folioChargeId"
+   AND folio."propertyId"=o."propertyId"
+   AND folio."sourceType"='KITCHEN_ORDER'
+   AND folio."sourceId"=o.id AND folio."amountKgs"=o."totalKgs"
+   AND folio.status IN ('OPEN','PAID') AND folio."serviceDate"=service_day
+ JOIN LATERAL (
+   SELECT item.id,item.quantity AS served_portions,
+          COALESCE(SUM(a.portions),0)::integer AS allocated_portions,
+          COALESCE(SUM(a."totalCostKgs"),0)::numeric(20,4) AS allocated_cost
+   FROM kitchen_order_items item
+   LEFT JOIN kitchen_served_batch_allocations a
+     ON a."propertyId"=o."propertyId" AND a."orderId"=o.id
+     AND a."orderItemId"=item.id
+   WHERE item."orderId"=o.id AND item.status='SERVED'
+   GROUP BY item.id,item.quantity
+ ) items ON TRUE
+ WHERE o.id=order_id AND o."propertyId"=property_id
+   AND o.status='SERVED' AND o."completedAt" IS NOT NULL
+   AND (o."completedAt" AT TIME ZONE hotel.timezone)::date=service_day
+   AND NOT EXISTS (SELECT 1 FROM kitchen_order_items i
+       WHERE i."orderId"=o.id AND i.status<>'SERVED')
+ GROUP BY o.id
+ HAVING COUNT(*)>0
+    AND BOOL_AND(items.served_portions=items.allocated_portions)
+    AND SUM(items.allocated_cost)>0;
+$$;
