@@ -16,7 +16,7 @@ FROZEN_MAIN = "2642eedc27431fdb9eaa9f7bf306904d487f4b9c"
 SAFE_PATHS = (
     re.compile(r"^docs/flex/[A-Za-z0-9_./-]+$"),
     # New isolated commercial UI; explicit file set, no changes to existing admin/PMS.
-    re.compile(r"^apps/flex-console/(?:README\.md|package\.json|server\.(?:mjs|js)|vercel\.json|auth/(?:identity-gate|identity-enabled|schema-config)\.mjs|public/(?:index\.html|app\.js|styles\.css)|test/(?:security|onboarding-e2e|vercel-qa|identity-gate)\.test\.mjs)$"),
+    re.compile(r"^apps/flex-console/(?:README\.md|package\.json|server\.(?:mjs|js)|vercel\.json|auth/(?:identity-gate|identity-enabled|schema-config)\.mjs|public/(?:index\.html|app\.js|styles\.css)|test/(?:security|onboarding-e2e|vercel-qa|identity-gate|usage-projection)\.test\.mjs)$"),
     re.compile(r"^apps/flex-console/(?:auth/(?:first-invite|mfa-bridge)\.mjs|public/enroll\.(?:js|html)|test/first-login-postgres\.mjs)$"),
     re.compile(r"^apps/flex-console/(?:package\-lock\.json|public/marina-smart-logo\.webp)$"),
     re.compile(r"^apps/flex-api-qa/(?:index\.py|requirements\.txt|vercel\.json|app/(?:__init__|flex_(?:control_plane|foundation|partner_portal|onboarding|catalog_admin))\.py|test/test_neon_probe\.py)$"),
@@ -44,6 +44,8 @@ def run() -> int:
         assert safe_file("docs/flex/sql/0010_flex_partner_earnings_preview.sql", "A")
         assert safe_file("apps/flex-console/server.mjs", "A")
         assert safe_file("apps/flex-console/public/index.html", "A")
+        assert safe_file("apps/flex-console/test/usage-projection.test.mjs", "A")
+        assert not safe_file("apps/flex-console/public/usage-projection.test.mjs", "A")
         assert safe_file("apps/flex-console/test/onboarding-e2e.test.mjs", "A")
         assert safe_file("apps/flex-console/test/vercel-qa.test.mjs", "A")
         assert safe_file("apps/flex-console/server.js", "A")
