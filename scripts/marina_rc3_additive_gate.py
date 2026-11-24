@@ -63,7 +63,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
     "services/api/app/kitchen_batch_allocation.py": "21f71b7bd7d7a6c4aa2b044b4617a4547a16be47",
     "services/api/app/owner_served_kitchen_cost_trace.py": "d051cd2f1962fb4540434b026dec75e8c2afc6a7",
-    "scripts/marina_shared_batch_allocation_ci.py": "8dd036381b538afa375c73dc2033ecda9175360f",
+    "scripts/marina_shared_batch_allocation_ci.py": "ba9ce140bb72bfdb7954cb7081ea4f312bb4a168",
     ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "24e9586d68e90e4292bb5f53f44d7fddeead7849",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
