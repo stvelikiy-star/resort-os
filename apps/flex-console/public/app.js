@@ -583,16 +583,6 @@ function hotelReadResult(result,allowNotFound=false){
  if(allowNotFound&&result.reason?.status===404)return null;
  throw result.reason||Error('HOTEL_READ_FAILED');
 }
-function hotelCardTabs(){
- const admin=state.me?.role==='SUPER_ADMIN';
- const sections=[['overview','hotelTabOverview'],['subscription','subscription'],['finance','hotelTabFinance'],['usage','hotelTabUsage']];
- if(admin)sections.push(['relations','hotelTabRelations'],['history','hotelTabHistory']);
- const valid=sections.some(x=>x[0]===state.hotelTab);
- if(!valid)state.hotelTab='overview';
- return '<nav class="toolbar" aria-label="'+safe(t('selected'))+'">'+sections.map(([key,label])=>
-   '<button type="button" data-hotel-tab="'+key+'" class="'+(state.hotelTab===key?'primary':'outline')+'" aria-current="'+(state.hotelTab===key?'page':'false')+'">'+safe(t(label))+'</button>').join('')+'</nav>';
-}
-
 function hotelEditText(key){
  const labels={ru:{edit:'Редактировать гостиницу',save:'Сохранить',saved:'Название сохранено'},kg:{edit:'Мейманкананы түзөтүү',save:'Сактоо',saved:'Аталышы сакталды'},en:{edit:'Edit hotel',save:'Save',saved:'Hotel name saved'}};
  return (labels[state.lang]||labels.ru)[key];
@@ -616,6 +606,16 @@ async function submitHotelName(form){
   output.textContent=hotelEditText('saved');
  }catch(e){output.textContent=t('error')+': '+e.message;}
  finally{button.disabled=false;}
+}
+
+function hotelCardTabs(){
+ const admin=state.me?.role==='SUPER_ADMIN';
+ const sections=[['overview','hotelTabOverview'],['subscription','subscription'],['finance','hotelTabFinance'],['usage','hotelTabUsage']];
+ if(admin)sections.push(['relations','hotelTabRelations'],['history','hotelTabHistory']);
+ const valid=sections.some(x=>x[0]===state.hotelTab);
+ if(!valid)state.hotelTab='overview';
+ return '<nav class="toolbar" aria-label="'+safe(t('selected'))+'">'+sections.map(([key,label])=>
+   '<button type="button" data-hotel-tab="'+key+'" class="'+(state.hotelTab===key?'primary':'outline')+'" aria-current="'+(state.hotelTab===key?'page':'false')+'">'+safe(t(label))+'</button>').join('')+'</nav>';
 }
 
 async function hotelDetail(){
