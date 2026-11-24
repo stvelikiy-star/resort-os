@@ -193,6 +193,31 @@ async function registration(req,res) {
 const flexUuidRe=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const linkHotelRoute=/^\/api\/actions\/hotels\/([0-9a-fA-F-]{36})\/challenge$/;
 const linkConfirmRoute=/^\/api\/actions\/challenges\/([0-9a-fA-F-]{36})\/confirm$/;
+
+const hotelNameRoute=/^\/api\/actions\/hotels\/([0-9a-fA-F-]{36})\/name$/;
+async function hotelNameAction(req,res,url) {
+  if(!configured||!qaOnboarding)return json(res,503,{error:'QA_ONBOARDING_NOT_ENABLED'});
+  if(!isSameOrigin(req))return json(res,403,{error:'ORIGIN_NOT_ALLOWED'});
+  if(!/^application\/json(?:\s*;|$)/i.test(String(req.headers['content-type']||'')))return json(res,415,{error:'JSON_REQUIRED'});
+  const session=await commercialSession(req);
+  if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
+  if(!session.csrf||!fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
+  const id=url.pathname.match(hotelNameRoute)?.[1];
+  if(!id||!flexUuidRe.test(id))return json(res,404,{error:'ACTION_NOT_ALLOWED'});
+  let raw='';for await(const part of req){raw+=part.toString();if(Buffer.byteLength(raw,'utf8')>4096)return json(res,413,{error:'BODY_TOO_LARGE'});}
+  let body;try{body=JSON.parse(raw)}catch{return json(res,400,{error:'INVALID_JSON'});}
+  if(!body||Object.keys(body).length!==2||typeof body.display_name!=='string'||typeof body.expected_name!=='string'||
+     body.display_name.trim().length<2||body.display_name.length>180||body.expected_name.length<1||body.expected_name.length>180||
+     /[\u0000-\u001f\u007f]/.test(body.display_name))return json(res,422,{error:'INVALID_HOTEL_NAME'});
+  const upstream=await fetch(onboardingApiOrigin+'/v1/onboarding/hotels/'+id+'/name',{
+    method:'POST',headers:{Authorization:'Bearer '+session.token,'Content-Type':'application/json','Accept':'application/json'},
+    body:JSON.stringify({display_name:body.display_name.trim(),expected_name:body.expected_name}),redirect:'manual',signal:AbortSignal.timeout(10000)});
+  if(!upstream.ok)return json(res,upstream.status>=300&&upstream.status<400?502:upstream.status,{error:upstream.status===409?'HOTEL_NAME_CHANGED':'HOTEL_UPDATE_FAILED'});
+  const result=await upstream.json();
+  if(result.hotel_id!==id.toLowerCase()||typeof result.name!=='string'||!['PENDING','ACTIVE'].includes(result.status))return json(res,502,{error:'UNEXPECTED_HOTEL_RESULT'});
+  return json(res,200,{hotel_id:result.hotel_id,name:result.name,status:result.status});
+}
+
 function validateLinkPayload(kind,payload) {
   if(!payload||typeof payload!=='object'||Array.isArray(payload))return null;
   if(kind==='challenge') {
@@ -441,10 +466,11 @@ export async function handler(req,res) {
         exp:Date.now() + lifetimeSeconds * 1000};
       return cookie(cookies.session,seal(session),lifetimeSeconds);
     }:null);
-    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
+    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||hotelNameRoute.test(url.pathname)||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
     if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,password_login:bridgeConfigured && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true',identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
     if(url.pathname==='/api/session') { const s=await commercialSession(req);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
+    if(req.method==='POST'&&hotelNameRoute.test(url.pathname))return await hotelNameAction(req,res,url);
     if(req.method==='POST'&&(linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))return await trustedLinkAction(req,res,url);
     if(req.method==='POST'&&(catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath))return await catalogAdminPost(req,res,url);
     if(url.pathname==='/api/auth/login') return await authLogin(res);
