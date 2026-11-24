@@ -1,11 +1,13 @@
 """Financial source truth tests: never treat money movement as recognized P&L."""
 import sys
+import asyncio
+import uuid
 import unittest
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1] / "services/api"))
 from app.owner_recognition_policy import (
-    source_candidate, classify_owner_expense, money,
+    source_candidate, classify_owner_expense, money, reconciliation_snapshot,
 )
 
 
@@ -65,6 +67,36 @@ class FinanceRecognitionSourceTests(unittest.TestCase):
         result=classify_owner_expense("UTILITIES","250")
         self.assertEqual(result["non_stock_expense_candidate_kgs"],"250.0000")
         self.assertIsNone(result["recognized_expense_kgs"])
+
+    def test_property_scoped_snapshot_and_cash_separation(self):
+        approved=uuid.uuid4()
+        class FakeConn:
+            calls=[]
+            async def fetch(self,sql,pid,start,end):
+                self.calls.append((sql,pid))
+                assert '"propertyId"=$1' in sql
+                if "FROM owner_revenue_source_events e" in sql and "SELECT e.id" in sql:
+                    return [{"id":approved,"face":"1000.0000"}]
+                if "FROM owner_revenue_correction_events c" in sql:
+                    return [
+                        {"id":uuid.uuid4(),"approvalId":approved,"kind":"DISCOUNT","amount":"100.0000"},
+                        {"id":uuid.uuid4(),"approvalId":approved,"kind":"REFUND","amount":"100.0000"},
+                    ]
+                if "FROM owner_expenses e" in sql:
+                    return [{"id":uuid.uuid4(),"category":"SUPPLIES",
+                             "amountKgs":"1200.0000","supplier_document_matched":False}]
+                raise AssertionError("Unexpected finance SQL")
+        prop=uuid.uuid4()
+        conn=FakeConn()
+        result=asyncio.run(reconciliation_snapshot(conn,prop,"2026-11-01","2026-11-30"))
+        self.assertEqual(result["gross_approved_source_face_candidate_kgs"],"1000.0000")
+        self.assertEqual(result["net_before_tax_source_candidate_kgs"],"900.0000")
+        self.assertEqual(result["cash_refund_evidence_kgs"],"100.0000")
+        self.assertEqual(result["unclassified_or_supplier_overlap_expense_kgs"],"1200.0000")
+        self.assertIsNone(result["recognized_profit_kgs"])
+        self.assertFalse(result["accounting_posted"])
+        self.assertEqual(len(conn.calls),3)
+        self.assertTrue(all(pid==prop for _,pid in conn.calls))
 
 
 if __name__=="__main__":
