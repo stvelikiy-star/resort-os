@@ -259,6 +259,7 @@ async function trustedLinkAction(req,res,url) {
 const catalogSkuAction=/^\/api\/actions\/catalog\/skus$/;
 const catalogPriceAction=/^\/api\/actions\/catalog\/skus\/([A-Z][A-Z0-9_]{1,79})\/prices$/;
 const configurationDraftAction=/^\/api\/actions\/subscription-drafts$/;
+const tariffPackageAction=/^\/api\/actions\/tariff-packages$/;
 const catalogVersionsRead=/^\/v1\/platform\/catalog\/skus\/([A-Z][A-Z0-9_]{1,79})\/versions$/;
 const catalogReadOnly=new Set(['/v1/platform/catalog','/v1/platform/subscription-drafts']);
 const amountPattern=/^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/;
@@ -280,6 +281,27 @@ function validateCatalogAdminAction(kind,body) {
     const when=Date.parse(body.valid_from),now=Date.now();
     if(!Number.isFinite(when)||when<=now+86400000||when>now+366*86400000)return null;
     return {monthly_price:body.monthly_price,currency:'KGS',valid_from:new Date(when).toISOString()};
+  }
+  if(kind==='package') {
+    if(!exact(['hotel_id','package_kind','title','period_start','skus','discount_pct','trial_days','custom_monthly_price']))return null;
+    if(typeof body.hotel_id!=='string'||!flexUuidRe.test(body.hotel_id))return null;
+    if(!['BASE','BUSINESS','PREMIUM','CUSTOM'].includes(body.package_kind))return null;
+    if(typeof body.title!=='string'||body.title.trim().length<2||body.title.trim().length>120)return null;
+    if(typeof body.period_start!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(body.period_start)||
+       !Number.isFinite(Date.parse(body.period_start))||
+       new Date(body.period_start).toISOString().slice(0,10)!==body.period_start)return null;
+    if(!Array.isArray(body.skus)||body.skus.length<1||body.skus.length>50||
+       new Set(body.skus).size!==body.skus.length||
+       !body.skus.every(x=>typeof x==='string'&&/^[A-Z][A-Z0-9_]{1,79}$/.test(x)))return null;
+    if(typeof body.discount_pct!=='string'||!amountPattern.test(body.discount_pct)||
+       Number(body.discount_pct)>100)return null;
+    if(!Number.isInteger(body.trial_days)||body.trial_days<0||body.trial_days>90)return null;
+    if(body.custom_monthly_price!==null&&(typeof body.custom_monthly_price!=='string'||
+       !amountPattern.test(body.custom_monthly_price)))return null;
+    if(body.custom_monthly_price!==null&&(body.package_kind!=='CUSTOM'||Number(body.discount_pct)!==0))return null;
+    return {hotel_id:body.hotel_id,package_kind:body.package_kind,title:body.title.trim(),
+      period_start:body.period_start,skus:body.skus,discount_pct:body.discount_pct,
+      trial_days:body.trial_days,custom_monthly_price:body.custom_monthly_price};
   }
   if(kind==='draft') {
     if(!exact(['hotel_id','title','period_start','period_end','skus']))return null;
@@ -306,7 +328,7 @@ async function catalogAdminPost(req,res,url) {
   if(!session.csrf||!fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
   const priceMatch=url.pathname.match(catalogPriceAction);
   const kind=catalogSkuAction.test(url.pathname)?'sku':priceMatch?'price':
-    configurationDraftAction.test(url.pathname)?'draft':null;
+    configurationDraftAction.test(url.pathname)?'draft':tariffPackageAction.test(url.pathname)?'package':null;
   if(!kind)return json(res,404,{error:'ACTION_NOT_ALLOWED'});
   let raw='';
   for await(const part of req) {
@@ -319,7 +341,7 @@ async function catalogAdminPost(req,res,url) {
   if(!payload)return json(res,422,{error:'INVALID_QA_CONFIGURATION'});
   const path=kind==='sku'?'/v1/platform/catalog/skus':
     kind==='price'?'/v1/platform/catalog/skus/'+priceMatch[1]+'/prices':
-    '/v1/platform/subscription-drafts';
+    kind==='package'?'/v1/platform/tariff-packages':'/v1/platform/subscription-drafts';
   const upstream=await fetch(catalogAdminApiOrigin+path,{
     method:'POST',
     headers:{Authorization:'Bearer '+session.token,'Content-Type':'application/json','Accept':'application/json'},
@@ -337,6 +359,9 @@ async function catalogAdminPost(req,res,url) {
     return json(res,502,{error:'UNEXPECTED_SKU_STATE'});
   if(kind==='price' && !(result.entitlement_changed===false&&result.payment_collected===false))
     return json(res,502,{error:'UNEXPECTED_PRICE_STATE'});
+  if(kind==='package' && !(result.state==='DRAFT'&&result.enforcement==='OFF'&&
+     result.subscription_activated===false&&result.payments_enabled===false))
+    return json(res,502,{error:'UNEXPECTED_PACKAGE_STATE'});
   if(kind==='draft' && !(result.state==='DRAFT'&&result.enforcement==='OFF'&&
      result.subscription_activated===false&&result.payments_enabled===false))
     return json(res,502,{error:'UNEXPECTED_DRAFT_STATE'});
@@ -345,10 +370,12 @@ async function catalogAdminPost(req,res,url) {
 
 function routeAllowed(path, search) {
   if(search && [...search.keys()].some(k=>!['period','hotel_id'].includes(k)))return null;
-  if(search.has('hotel_id')&&path!=='/v1/platform/subscription-drafts')return null;
+  if(search.has('hotel_id')&&!['/v1/platform/subscription-drafts','/v1/platform/tariff-packages'].includes(path))return null;
   if(search.has('period')&&!['/v1/partner/me/earnings','/v1/platform/partner-earnings-summary'].includes(path))return null;
   if(['/v1/me','/v1/hotels','/v1/catalog'].includes(path) && !search.size) return 'core';
   if((path==='/v1/platform/catalog'||catalogVersionsRead.test(path))&&!search.size)return 'catalog_admin';
+  if(path==='/v1/platform/tariff-packages'&&search.size===1&&
+     flexUuidRe.test(search.get('hotel_id')||''))return 'catalog_admin';
   if(path==='/v1/platform/subscription-drafts'&&
      (!search.size||(search.size===1&&flexUuidRe.test(search.get('hotel_id')||''))))
     return 'catalog_admin';
@@ -393,12 +420,12 @@ export async function handler(req,res) {
       const session={...mfaSigner(subject,method),csrf:b64u(randomBytes(32))};
       return cookie(cookies.session,seal(session),300);
     }:null);
-    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
+    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
     if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,password_login:bridgeConfigured && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true',identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
     if(url.pathname==='/api/session') { const s=unseal(cookiesFrom(req)[cookies.session]);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
     if(req.method==='POST'&&(linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))return await trustedLinkAction(req,res,url);
-    if(req.method==='POST'&&(catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)))return await catalogAdminPost(req,res,url);
+    if(req.method==='POST'&&(catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)))return await catalogAdminPost(req,res,url);
     if(url.pathname==='/api/auth/login') return await authLogin(res);
     if(url.pathname==='/api/auth/callback') return await authCallback(req,res,url);
     if(url.pathname==='/api/auth/logout') return redirect(res,'/',{'Set-Cookie':cookie(cookies.session,'',0)});

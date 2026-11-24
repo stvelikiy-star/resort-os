@@ -13,8 +13,11 @@ New versions are inserted only; no edit/delete, no live subscription, no invoice
 Returns `state:DRAFT`, `enforcement:OFF`, `subscription_activated:false`, `payments_enabled:false`. Status 201, no current subscription changes. Refuses PLANNED/core/unpriced SKU, wrong hotel, bad date, wrong role, no MFA.
 - Published prices, custom prices and discounts are never treated as received cash. The package is an *unapproved offer*, not a contract and not a capability grant.
 
+### Console integration (code only, QA flag remains OFF)
+The existing SUPER ADMIN constructor now has a separate **Save tariff version** button, discount/trial/custom-price inputs and a version history table in the hotel subscription tab. The previous **Save draft** action remains separate and unchanged: it still stores the original DRAFT/OFF subscription configuration. The new button uses an exact allowlisted `/api/actions/tariff-packages` proxy, same-origin/CSRF/role checks and the new server endpoint, only when `FLEX_ENABLE_QA_CATALOG_DRAFTS=true` in an independently accepted QA. No deployed preview currently enables it. This is **per-hotel proposed version history**, not yet a reusable global tariff-template catalog.
+
 ### Boundaries
-This is a **per-hotel proposal version history**, not a finished global reusable tariff-template catalog. Existing Console dropdown BASE/BUSINESS/PREMIUM/CUSTOM currently writes only the old subscription DRAFT title; it must not be described as using the new server package endpoint. Integrating the UI requires strict CSRF/same-origin proxy allowlisting, hidden by the existing QA flag, and tests.
+This is **not** a finished global reusable tariff-template catalog. The package is still a DRAFT/OFF and cannot be applied to PMS. No bank or live subscription operations are present.
 No code is merged into main, no QA Neon or operational database migration, no new Cloudflare, domain or Vercel project. Live payment/payout flags remain false. Separate partner and usage scopes untouched.
 
 ### Test evidence required

@@ -274,11 +274,43 @@ test('tariff proposal labels are safe without assigning fabricated modules or ac
  assert.equal(format('BASE','x'.repeat(121)),null);
  assert.match(source,/name="package_kind"/);
  assert.match(source,/packageNote/);
- const draft=source.slice(source.indexOf("}else if(kind==='draft'){"),source.indexOf("if(data.state!=='DRAFT'"));
+ const draft=source.slice(source.indexOf("}else if(kind==='draft'||kind==='package'){"),source.indexOf("if(data.state!=='DRAFT'"));
  assert.match(draft,/packageProposalTitle/);
  assert.doesNotMatch(draft,/enforcement:'ENFORCE'|subscription_activated:true|payment_collected:true/);
  const head=source.slice(source.indexOf('const translations = ')+21,source.indexOf('\nconst main='));
  const dict=vm.runInNewContext('('+head.slice(0,head.lastIndexOf(';'))+')');
  for(const lang of ['ru','kg','en'])for(const key of ['packageType','packageCustom','packageNote','packageTitleRequired'])
   assert.ok(dict[lang][key]?.length,lang+':'+key);
+});
+
+
+test('tariff package version proxy is exact, QA-scoped and does not accept payment fields',()=>{
+ const id='123e4567-e89b-12d3-a456-426614174000';
+ const valid={
+  hotel_id:id,package_kind:'BUSINESS',title:'QA business',
+  period_start:'2027-01-01',skus:['AI_ASSISTANT'],
+  discount_pct:'10.00',trial_days:14,custom_monthly_price:null
+ };
+ assert.deepEqual(testValidateCatalogAdminAction('package',valid),valid);
+ for(const invalid of [
+  {...valid,paid:true},
+  {...valid,subscription_activated:true},
+  {...valid,enforcement:'ENFORCE'},
+  {...valid,package_kind:'ROOT'},
+  {...valid,discount_pct:'101'},
+  {...valid,trial_days:91},
+  {...valid,custom_monthly_price:'999.00'},
+  {...valid,skus:['AI_ASSISTANT','AI_ASSISTANT']},
+  {...valid,period_start:'2027-02-30'},
+ ])assert.equal(testValidateCatalogAdminAction('package',invalid),null);
+ const custom={...valid,package_kind:'CUSTOM',discount_pct:'0',custom_monthly_price:'999.00'};
+ assert.deepEqual(testValidateCatalogAdminAction('package',custom),custom);
+ assert.equal(testRouteAllowed('/v1/platform/tariff-packages',new URLSearchParams('hotel_id='+id)),'catalog_admin');
+ assert.equal(testRouteAllowed('/v1/platform/tariff-packages',new URLSearchParams()),null);
+ assert.equal(testRouteAllowed('/v1/platform/tariff-packages',new URLSearchParams('hotel_id='+id+'&role=SUPER_ADMIN')),null);
+ const src=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ assert.match(src,/saveQaCatalogAction\('tariff-packages'/);
+ assert.match(src,/packageHistory/);
+ assert.match(src,/data-package-save/);
+ assert.match(src,/if\(data.state!=='DRAFT'\|\|data.enforcement!=='OFF'/);
 });
