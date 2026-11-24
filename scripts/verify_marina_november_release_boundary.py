@@ -51,18 +51,18 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "8af9bb2d28ff4d6d550e473e517deb236acb3922",
+    "scripts/marina_rc3_additive_gate.py": "612cb739c06eca5a47c2a17f302432a29c5231be",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "cb4acbe3083a5981f550f6f614d67bc4f2acb436",
-    "scripts/test_marina_shared_auth.py": "61e7e68db81c4414436abb7f36f7d344e4ea3134",
+    "scripts/test_marina_shared_auth.py": "9c90ca127cba6c0eee2d22f0c6512bf586319509",
     "apps/staff/components/StoreStaffStock.tsx": "82b87098c1ab1355562551ec76cd8b4eb7b5478c",
     "apps/staff/components/StaffRoleGateway.tsx": "957821d21a17350529f9fcef442527772a42e0c9",
     # Reviewed P0 two-hotel OWNER financial facts, exact method-scoped routes,
     # and test-only workflow. No production shared-auth promotion.
     "scripts/marina_shared_owner_finance_p0_ci.py": "71cabedce521c0019a3fd900d075830d51891a13",
     # Full refund can only be recorded after external evidence; nothing is sent.
-    "services/api/app/reservation_payments.py": "fe9e0afb085f8343e073a4ba55c3d2b64efc070e",
+    "services/api/app/reservation_payments.py": "f7e533861624cd8a62fd29e81c7b0d73337717f3",
     "services/api/app/pms_reservation_create.py": "f068836d615409443f1742fc492f27886f9d6aee",
     "scripts/marina_shared_manual_refund_evidence_ci.py": "f52d7947e64e935497617834e17535def9a59042",
     "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
