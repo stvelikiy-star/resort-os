@@ -60,6 +60,7 @@ DECLARE
   source_ok boolean;
   source_amount numeric(20,4);
   source_kind text;
+  source_date date;
   valid_revenue_line_count integer;
   corrections_exist boolean;
   debit_total numeric(20,4);
@@ -139,9 +140,57 @@ BEGIN
           RAISE EXCEPTION 'ACCOUNTING_REVENUE_ACCOUNT_OR_AMOUNT_INVALID'
             USING ERRCODE='23514';
         END IF;
+      ELSIF proposal."sourceType"='OPERATING_EXPENSE' THEN
+        SELECT e."amountKgs"::numeric,e."expenseDate"
+          INTO source_amount,source_date
+          FROM owner_expenses e WHERE e.id=proposal."sourceId"
+            AND e."propertyId"=NEW."propertyId" AND e.status='POSTED'
+            AND e.category IN ('UTILITIES','PAYROLL','MAINTENANCE','RENT','MARKETING')
+            AND NOT EXISTS(SELECT 1 FROM kitchen_supplier_documents d
+              WHERE d."propertyId"=e."propertyId"
+                AND d."supplierName"=e."supplierName"
+                AND d."documentReference"=e."documentReference");
+        IF source_amount IS NULL OR source_amount<=0
+           OR source_date IS DISTINCT FROM NEW."accountingDate" THEN
+          RAISE EXCEPTION 'ACCOUNTING_EXPENSE_UNVERIFIED_OR_PERIOD_MISMATCH'
+            USING ERRCODE='23514';
+        END IF;
+        SELECT COUNT(*) INTO valid_revenue_line_count
+          FROM owner_accounting_journal_proposal_lines l
+          WHERE l."proposalId"=proposal.id AND l."amountKgs"=source_amount
+            AND ((l."accountCode"='6000' AND l.side='DEBIT')
+              OR (l."accountCode"='2100' AND l.side='CREDIT'));
+        IF valid_revenue_line_count<>2 OR
+          (SELECT COUNT(*) FROM owner_accounting_journal_proposal_lines
+           WHERE "proposalId"=proposal.id)<>2 THEN
+          RAISE EXCEPTION 'ACCOUNTING_EXPENSE_ACCOUNTS_INVALID' USING ERRCODE='23514';
+        END IF;
+      ELSIF proposal."sourceType"='STOCK_CONSUMPTION' THEN
+        SELECT a."totalCostKgs",(o."completedAt" AT TIME ZONE p.timezone)::date
+          INTO source_amount,source_date
+          FROM kitchen_served_batch_allocations a
+          JOIN kitchen_orders o ON o.id=a."orderId"
+            AND o."propertyId"=a."propertyId" AND o.status='SERVED'
+          JOIN kitchen_order_items i ON i.id=a."orderItemId"
+            AND i."orderId"=o.id AND i.status='SERVED'
+          JOIN properties p ON p.id=a."propertyId"
+          WHERE a.id=proposal."sourceId" AND a."propertyId"=NEW."propertyId";
+        IF source_amount IS NULL OR source_amount<=0
+           OR source_date IS DISTINCT FROM NEW."accountingDate" THEN
+          RAISE EXCEPTION 'ACCOUNTING_COGS_BATCH_OR_PERIOD_INVALID'
+            USING ERRCODE='23514';
+        END IF;
+        SELECT COUNT(*) INTO valid_revenue_line_count
+          FROM owner_accounting_journal_proposal_lines l
+          WHERE l."proposalId"=proposal.id AND l."amountKgs"=source_amount
+            AND ((l."accountCode"='5000' AND l.side='DEBIT')
+              OR (l."accountCode"='1200' AND l.side='CREDIT'));
+        IF valid_revenue_line_count<>2 OR
+          (SELECT COUNT(*) FROM owner_accounting_journal_proposal_lines
+           WHERE "proposalId"=proposal.id)<>2 THEN
+          RAISE EXCEPTION 'ACCOUNTING_COGS_ACCOUNTS_INVALID' USING ERRCODE='23514';
+        END IF;
       ELSE
-        -- Until explicit mapping exists for correction/COGS/tax expenses,
-        -- these proposal types stay read-only and cannot be posted.
         RAISE EXCEPTION 'ACCOUNTING_POSTING_POLICY_NOT_RELEASED'
           USING ERRCODE='23514';
       END IF;
@@ -220,3 +269,89 @@ CREATE CONSTRAINT TRIGGER marina_posting_deferred_check
 
 -- 54th migration is intentionally a *staged* journal primitive, not proof of
 -- complete P&L; no revenue, cash, tax, cost or inventory is auto-reclassified.
+
+-- Guard revision for the newly eligible, strictly verified expense/COGS sources.
+CREATE OR REPLACE FUNCTION guard_owner_accounting_decision_insert() RETURNS trigger AS $$
+DECLARE
+  proposal_creator uuid;
+  proposal_source_type text;
+  proposal_source_id uuid;
+  source_valid boolean;
+  actor_property uuid;
+  actor_role text;
+  actor_active boolean;
+  parent_row record;
+BEGIN
+  SELECT "createdById","sourceType","sourceId"
+    INTO proposal_creator,proposal_source_type,proposal_source_id
+    FROM owner_accounting_journal_proposals
+    WHERE id=NEW."proposalId" AND "propertyId"=NEW."propertyId";
+  SELECT "propertyId",role::text,"isActive"
+    INTO actor_property,actor_role,actor_active
+    FROM staff_users WHERE id=NEW."actorId";
+  IF proposal_creator IS NULL OR actor_property IS DISTINCT FROM NEW."propertyId"
+     OR actor_role IS DISTINCT FROM 'OWNER' OR actor_active IS DISTINCT FROM true
+     OR proposal_creator=NEW."actorId" THEN
+    RAISE EXCEPTION 'ACCOUNTING_DECISION_APPROVER_NOT_INDEPENDENT'
+      USING ERRCODE='23514';
+  END IF;
+  -- Keep the database as strict as the API. A direct SQL actor may not
+  -- approve a missing, foreign, or already reversed source.
+  IF NEW.action='APPROVE' THEN
+    IF proposal_source_type='REVENUE_SOURCE' THEN
+      SELECT EXISTS(
+        SELECT 1 FROM owner_revenue_source_events e
+        WHERE e.id=proposal_source_id AND e."propertyId"=NEW."propertyId"
+          AND e.action='APPROVE_SOURCE'
+          AND NOT EXISTS (
+            SELECT 1 FROM owner_revenue_source_events rev
+            WHERE rev."propertyId"=NEW."propertyId" AND rev."reversesId"=e.id)
+      ) INTO source_valid;
+    ELSIF proposal_source_type='REVENUE_CORRECTION' THEN
+      SELECT EXISTS(
+        SELECT 1 FROM owner_revenue_correction_events e
+        JOIN owner_revenue_evidence_documents d
+          ON d.id=e."evidenceDocumentId" AND d."propertyId"=e."propertyId"
+        WHERE e.id=proposal_source_id AND e."propertyId"=NEW."propertyId"
+          AND e.action='RECORD'
+          AND NOT EXISTS (
+            SELECT 1 FROM owner_revenue_correction_events rev
+            WHERE rev."propertyId"=NEW."propertyId" AND rev."reversesId"=e.id)
+      ) INTO source_valid;
+    ELSIF proposal_source_type='OPERATING_EXPENSE' THEN
+      SELECT EXISTS(SELECT 1 FROM owner_expenses e
+        WHERE e.id=proposal_source_id AND e."propertyId"=NEW."propertyId"
+          AND e.status='POSTED'
+          AND e.category IN ('UTILITIES','PAYROLL','MAINTENANCE','RENT','MARKETING')
+          AND NOT EXISTS(SELECT 1 FROM kitchen_supplier_documents d
+            WHERE d."propertyId"=e."propertyId" AND d."supplierName"=e."supplierName"
+              AND d."documentReference"=e."documentReference")) INTO source_valid;
+    ELSIF proposal_source_type='STOCK_CONSUMPTION' THEN
+      SELECT EXISTS(SELECT 1 FROM kitchen_served_batch_allocations a
+        JOIN kitchen_orders o ON o.id=a."orderId"
+          AND o."propertyId"=a."propertyId" AND o.status='SERVED'
+        JOIN kitchen_order_items i ON i.id=a."orderItemId"
+          AND i."orderId"=o.id AND i.status='SERVED'
+        WHERE a.id=proposal_source_id AND a."propertyId"=NEW."propertyId"
+          AND a."totalCostKgs">0) INTO source_valid;
+    ELSE
+      source_valid:=false;
+    END IF;
+    IF source_valid IS DISTINCT FROM true THEN
+      RAISE EXCEPTION 'ACCOUNTING_DECISION_SOURCE_UNVERIFIED'
+        USING ERRCODE='23514';
+    END IF;
+  END IF;
+  IF NEW.action='REVERSE' THEN
+    SELECT "propertyId","proposalId",action INTO parent_row
+      FROM owner_accounting_journal_decisions WHERE id=NEW."approvalId";
+    IF NOT FOUND OR parent_row."propertyId" IS DISTINCT FROM NEW."propertyId"
+       OR parent_row."proposalId" IS DISTINCT FROM NEW."proposalId"
+       OR parent_row.action IS DISTINCT FROM 'APPROVE' THEN
+      RAISE EXCEPTION 'ACCOUNTING_DECISION_REVERSE_TARGET_INVALID'
+        USING ERRCODE='23514';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
