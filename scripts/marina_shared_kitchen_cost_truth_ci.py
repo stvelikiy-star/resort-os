@@ -1,7 +1,8 @@
 """Two-hotel warehouse valuation test: actual PostgreSQL, no profit fabrication."""
 import asyncio
 import os
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -83,7 +84,7 @@ with TestClient(app, base_url="https://synthetic-staging.invalid") as client:
             "tenant_code": "tenant_" + letter.lower(),
             "property_code": "HOTEL_" + letter})
         assert owner.status_code == 200
-        today = date.today().isoformat()
+        today = datetime.now(ZoneInfo('Asia/Bishkek')).date().isoformat()
         report = client.get("/api/v1/admin/finance/owner/accrual-readiness", params={
             "from_date": today, "to_date": today})
         assert report.status_code == 200, report.text
