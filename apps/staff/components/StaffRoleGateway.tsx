@@ -56,6 +56,13 @@ function isSharedDiningUser(value: unknown): value is User & { role: "COOK" | "W
     Array.isArray(value.module_permissions) && value.module_permissions.includes("DINING");
 }
 
+function isSharedStoreUser(value: unknown): value is User & { role: "STORE_STAFF"; property_id: string; tenant_id: string } {
+  if (!isOperationalUser(value)) return false;
+  return value.role === "STORE_STAFF" &&
+    typeof value.property_id === "string" && typeof value.tenant_id === "string" &&
+    Array.isArray(value.module_permissions) && value.module_permissions.includes("DINING");
+}
+
 export default function StaffRoleGateway() {
   const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
@@ -89,7 +96,7 @@ export default function StaffRoleGateway() {
         if (detected === "shared_auth_preview") {
           const me = await fetch("/core/api/v1/auth/me", { cache: "no-store" });
           const identity = me.ok ? await me.json() : null;
-          if (!cancelled && (isSharedShiftUser(identity) || isSharedDiningUser(identity))) setUser(identity);
+          if (!cancelled && (isSharedShiftUser(identity) || isSharedDiningUser(identity) || isSharedStoreUser(identity))) setUser(identity);
           if (!cancelled) setChecking(false);
           return;
         }
@@ -169,8 +176,8 @@ export default function StaffRoleGateway() {
         try {
           const me = await fetch("/core/api/v1/auth/me", { cache: "no-store" });
           const identity = me.ok ? await me.json() : null;
-          if (!(isSharedShiftUser(body) || isSharedDiningUser(body)) ||
-              !(isSharedShiftUser(identity) || isSharedDiningUser(identity)) ||
+          if (!(isSharedShiftUser(body) || isSharedDiningUser(body) || isSharedStoreUser(body)) ||
+              !(isSharedShiftUser(identity) || isSharedDiningUser(identity) || isSharedStoreUser(identity)) ||
               !identity.tenant_id || !identity.property_id ||
               identity.tenant_id !== body.tenant_id || identity.property_id !== body.property_id ||
               identity.property_code !== selectors.property_code ||
@@ -236,6 +243,17 @@ export default function StaffRoleGateway() {
   }
   if (mode === "shared_auth_preview" && isSharedShiftUser(user)) {
     return <StaffShiftV2 key={user.id} sharedSession={{ user, onEnd: expireSharedSession }} />;
+  }
+
+  if (mode === "shared_auth_preview" && isSharedStoreUser(user)) {
+    return <main className="shift-shell" data-testid="shared-store-staff">
+      <header className="shift-head">
+        <div><StaffProductLogo size={44}/><p className="shift-eyebrow">MARINA SMART · Моя смена</p>
+          <h1>{user.display_name}</h1><span>Склад · {user.property_code}</span></div>
+        <button className="shift-ghost" onClick={() => void logout()}>Выйти</button>
+      </header>
+      <StoreStaffStock allowProcurement={false}/>
+    </main>;
   }
 
   if (LEGACY_SHIFT_ROLES.has(user.role)) {
