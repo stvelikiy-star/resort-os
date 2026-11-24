@@ -57,7 +57,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     # MARINA-specific 52nd migration, exact batch-to-served item ledger.
     "scripts/release_contract.py": "19a3a63c01c7e2a7616bcd3f18a3e650b3bfd2d2",
     "scripts/release_contract_test.py": "443e97cebd5dcb841a7aedc932343cf636760cc5",
-    ".github/workflows/marina-zz113-rollback-ci.yml": "a2d23ca8be3734cd2e7bb8d160f8d582dd61acea",
+    ".github/workflows/marina-zz113-rollback-ci.yml": "d205d4615d996343319f1d35cbf2a41b1a163765",
     "scripts/marina_disposable_upgrade_acceptance_ci.py": "8fe78f31a4d3ca74baafc6129c6c368dd73d871f",
     ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "fadfe76cd59a2db944b82f72f5c8abf0dda89b5c",
     "services/api/app/app_entry.py": "088b69374b5b0e5ee3b86eab6cd59a8cf8f6642f",
