@@ -112,9 +112,9 @@ def run():
         challenge.locator('[name="code"]').fill(totp(secret))
         with page.expect_response(ORIGIN + "/api/identity/two-factor/verify-totp") as verified:
             challenge.locator('button[type="submit"]').click()
-        verification = verified.value.json()
-        assert verified.value.status == 200 and verification.get("platform_session") is True, (
-            "login challenge", verified.value.status, verification.get("code"), sorted(verification.keys()))
+        # Successful login immediately navigates away. Check the cookie and server-side
+        # role in the new document instead of reading the discarded response body.
+        assert verified.value.status == 200, ("login challenge", verified.value.status)
         assert any(c["name"] == "flex_session" for c in context.cookies()), "Missing platform session cookie"
         for path in ["/api/data/v1/me", "/api/data/v1/hotels"]:
             status = page.request.get(ORIGIN + path, ignore_https_errors=True)
