@@ -79,11 +79,7 @@ BEGIN
              AND rev."proposalId"=NEW."proposalId" AND rev.action='REVERSE') THEN
       RAISE EXCEPTION 'ACCOUNTING_POSTING_APPROVAL_INVALID' USING ERRCODE='23514';
    END IF;
-   -- These checks also apply to direct SQL writers, not just the API.
-   -- Current policy only allows verified, uncorrected delivered source revenue.
-   IF original_proposal."sourceType" <> 'REVENUE_SOURCE' THEN
-      RAISE EXCEPTION 'ACCOUNTING_POSTING_SOURCE_POLICY_UNSUPPORTED' USING ERRCODE='23514';
-   END IF;
+   IF original_proposal."sourceType"='REVENUE_SOURCE' THEN
    SELECT e."faceValueKgs",e."sourceType",e."sourceSnapshot" INTO source_proof
      FROM owner_revenue_source_events e
     WHERE e."propertyId"=NEW."propertyId" AND e.id=original_proposal."sourceId"
@@ -104,6 +100,29 @@ BEGIN
                WHERE r."propertyId"=c."propertyId" AND r."reversesId"=c.id)) THEN
       RAISE EXCEPTION 'ACCOUNTING_POSTING_SOURCE_COMPLETENESS_NOT_VERIFIED'
         USING ERRCODE='23514';
+   END IF;
+   ELSIF original_proposal."sourceType"='OPERATING_EXPENSE' THEN
+     IF NOT EXISTS (
+       SELECT 1 FROM owner_expenses e
+       WHERE e.id=original_proposal."sourceId"
+         AND e."propertyId"=NEW."propertyId"
+         AND e.status='POSTED'
+         AND e."expenseDate"=NEW."accountingDate"
+         AND e.category IN ('UTILITIES','PAYROLL','MAINTENANCE','RENT','MARKETING')
+         AND e."supplierName" IS NOT NULL
+         AND e."documentReference" IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM kitchen_supplier_documents d
+           WHERE d."propertyId"=e."propertyId"
+             AND d."supplierName"=e."supplierName"
+             AND d."documentReference"=e."documentReference")
+     ) THEN
+       RAISE EXCEPTION 'ACCOUNTING_POSTING_EXPENSE_UNVERIFIED_OR_DUPLICATE'
+         USING ERRCODE='23514';
+     END IF;
+   ELSE
+     RAISE EXCEPTION 'ACCOUNTING_POSTING_SOURCE_POLICY_UNSUPPORTED'
+       USING ERRCODE='23514';
    END IF;
  ELSE
    SELECT * INTO reversed_post FROM owner_accounting_postings
@@ -146,6 +165,26 @@ BEGIN
    RAISE EXCEPTION 'ACCOUNTING_POSTING_UNBALANCED' USING ERRCODE='23514';
  END IF;
  IF p.action='POST' THEN
+   IF EXISTS(SELECT 1 FROM owner_accounting_journal_proposals pr
+      WHERE pr.id=p."proposalId" AND pr."propertyId"=p."propertyId"
+        AND pr."sourceType"='OPERATING_EXPENSE') THEN
+     SELECT e."amountKgs" INTO debit_total
+       FROM owner_accounting_journal_proposals pr
+       JOIN owner_expenses e ON e.id=pr."sourceId" AND e."propertyId"=pr."propertyId"
+       WHERE pr.id=p."proposalId" AND pr."propertyId"=p."propertyId";
+     IF (SELECT COUNT(*) FROM owner_accounting_posting_lines l
+          WHERE l."postingId"=p.id)<>2
+         OR NOT EXISTS(SELECT 1 FROM owner_accounting_posting_lines l
+               WHERE l."postingId"=p.id AND l."accountCode"='5200'
+                 AND l.side='DEBIT' AND l."amountKgs"=debit_total)
+         OR NOT EXISTS(SELECT 1 FROM owner_accounting_posting_lines l
+               WHERE l."postingId"=p.id AND l."accountCode"='2200'
+                 AND l.side='CREDIT' AND l."amountKgs"=debit_total)
+     THEN
+         RAISE EXCEPTION 'ACCOUNTING_POSTING_EXPENSE_ACCOUNT_POLICY_INVALID'
+           USING ERRCODE='23514';
+     END IF;
+   ELSE
    -- Revenue posting: debit receivable for the source's exact face value;
    -- credit an approved revenue account and optional tax payable only.
    SELECT e."faceValueKgs",e."sourceType" INTO debit_total,source_service_type
@@ -175,6 +214,8 @@ BEGIN
    THEN
        RAISE EXCEPTION 'ACCOUNTING_POSTING_REVENUE_ACCOUNT_POLICY_INVALID'
          USING ERRCODE='23514';
+   END IF;
+
    END IF;
    SELECT count(*)::integer INTO mismatch_count FROM (
      (SELECT "lineNo","accountCode",side,"amountKgs"
