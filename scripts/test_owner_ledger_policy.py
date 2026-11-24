@@ -1,9 +1,13 @@
 """Invariant acceptance for strict MARINA OWNER ledger policy."""
 import sys
 import unittest
+import os
+from unittest.mock import patch
+from fastapi import HTTPException
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"services/api"))
 from app.owner_ledger_policy import validate_posting,posted_totals
+from app.owner_accounting_postings import posting_guard
 
 
 class OwnerLedgerPolicyTests(unittest.TestCase):
@@ -63,6 +67,29 @@ class OwnerLedgerPolicyTests(unittest.TestCase):
             with self.subTest(v=v),self.assertRaises(ValueError):
                 validate_posting([{**self.revenue[0],"amount_kgs":v},*self.revenue[1:]],
                     source_type="REVENUE_SOURCE",evidence_complete=True,source_amount="700")
+
+    def test_posting_feature_off_by_default(self):
+        with patch.dict(os.environ,{"APP_ENV":"staging",
+              "MARINA_ACCOUNTING_POSTING_ENABLED":"false",
+              "MARINA_SHARED_AUTH_PREVIEW_ENABLED":"false"}):
+            with self.assertRaises(HTTPException) as ctx:
+                posting_guard()
+            self.assertEqual(ctx.exception.status_code,503)
+
+    def test_posting_never_enabled_in_production_or_shared_preview(self):
+        for env,shared in (("production","false"),("staging","true")):
+            with patch.dict(os.environ,{"APP_ENV":env,
+                  "MARINA_ACCOUNTING_POSTING_ENABLED":"true",
+                  "MARINA_SHARED_AUTH_PREVIEW_ENABLED":shared}):
+                with self.assertRaises(HTTPException) as ctx:
+                    posting_guard()
+                self.assertEqual(ctx.exception.status_code,503)
+
+    def test_staging_requires_explicit_opt_in(self):
+        with patch.dict(os.environ,{"APP_ENV":"staging",
+              "MARINA_ACCOUNTING_POSTING_ENABLED":"true",
+              "MARINA_SHARED_AUTH_PREVIEW_ENABLED":"false"}):
+            self.assertIsNone(posting_guard())
 
 
 if __name__=="__main__":
