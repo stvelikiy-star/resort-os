@@ -124,8 +124,9 @@ with TestClient(app,base_url="https://batch-isolated.invalid") as client:
         assert repeated.status_code==201 and repeated.json()["already_processed"] is True
         checks+=1
         too_much=client.post(path,json={**good,"id":str(uuid4()),"portions":1})
-        assert too_much.status_code==409
-        checks+=1
+        assert too_much.status_code==409,too_much.text
+        assert too_much.json()["detail"]["code"]=="BATCH_ITEM_PAIR_ALREADY_ALLOCATED"
+        checks+=2
         reused=client.post(path,json={**good,"portions":3})
         assert reused.status_code==409
         checks+=1
