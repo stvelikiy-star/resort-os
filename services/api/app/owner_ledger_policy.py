@@ -33,7 +33,8 @@ def exact_amount(value):
     return x.quantize(MONEY)
 
 
-def validate_posting(proposal_lines, *, source_type, evidence_complete, source_amount,\n                     revenue_service_type=None):
+def validate_posting(proposal_lines, *, source_type, evidence_complete, source_amount,
+                     revenue_service_type=None):
     """Return balanced amount; NO automatic approval of missing evidence.
 
     Inputs must come from database-owned proposal and independently verified
