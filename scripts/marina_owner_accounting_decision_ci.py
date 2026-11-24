@@ -16,6 +16,7 @@ assert parsed.hostname in ("127.0.0.1", "localhost")
 assert parsed.path == "/marina_shared_browser_ci"
 assert os.getenv("MARINA_SHARED_BROWSER_CI_CONFIRM") == "DISPOSABLE_TWO_HOTEL_BROWSER_CI"
 assert os.getenv("MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED") == "true"
+assert os.getenv("MARINA_ACCOUNTING_POSTING_ENABLED") == "true"
 assert os.getenv("APP_ENV") == "staging"
 assert os.getenv("MARINA_SHARED_AUTH_PREVIEW_ENABLED") == "false"
 assert os.getenv("PROPERTY_CODE") == "HOTEL_A"
@@ -97,8 +98,8 @@ with TestClient(app, base_url="https://accounting-disposable.invalid") as client
         "policy_version": "CI-EVIDENCE-01",
         "reason": "Reviewed synthetic source evidence only",
         "lines": [
-            {"account_code":"1000","side":"DEBIT","amount_kgs":"25.0000"},
-            {"account_code":"4000","side":"CREDIT","amount_kgs":"25.0000"},
+            {"account_code":"1100","side":"DEBIT","amount_kgs":"25.0000"},
+            {"account_code":"4100","side":"CREDIT","amount_kgs":"25.0000"},
         ],
     }
     r = client.post("/api/v1/admin/finance/owner/accounting-journal/proposals",
@@ -129,6 +130,37 @@ with TestClient(app, base_url="https://accounting-disposable.invalid") as client
     r = client.get(url)
     check(r.status_code, 200, "approved readback")
     check(r.json()["evidence_status"], "EVIDENCE_APPROVED", "approved state")
+    posting_url = "/api/v1/admin/finance/owner/accounting-journal/proposals/" + proposal_id + "/postings"
+    foreign_post = "/api/v1/admin/finance/owner/accounting-journal/proposals/" + str(foreign_proposal) + "/postings"
+    check(client.get(foreign_post).status_code,404,"foreign hotel posting denied")
+    check(client.post(foreign_post,json={"id":str(uuid4()),"action":"POST",
+        "reason":"Foreign hotel attempt blocked"}).status_code,404,"foreign posting write denied")
+    posting={"id":str(uuid4()),"action":"POST","reason":"Independent posted service evidence"}
+    r=client.post(posting_url,json=posting)
+    check(r.status_code,201,"POST approved exact revenue proposal")
+    check(r.json()["accounting_posted"],True,"real posting written")
+    check(r.json()["recognized_profit_kgs"],None,"no premature profit after POST")
+    r=client.post(posting_url,json=posting)
+    check(r.status_code,201,"posted replay status")
+    check(r.json()["already_processed"],True,"posted event is idempotent")
+    check(client.post(posting_url,json={**posting,"id":str(uuid4())}).status_code,
+          409,"second POST blocked")
+    subtotal_url="/api/v1/admin/finance/owner/accounting-journal/posted-subtotals"
+    period={"from_date":__import__("datetime").date.today().isoformat(),
+            "to_date":__import__("datetime").date.today().isoformat()}
+    r=client.get(subtotal_url,params=period)
+    check(r.status_code,200,"posting subtotal read")
+    check(r.json()["posted_revenue_subtotal_kgs"],"25.0000","gross posted source value")
+    check(r.json()["recognized_profit_kgs"],None,"subtotal is not full profit")
+    reversing={"id":str(uuid4()),"action":"REVERSE",
+               "reason":"Independent exact GL posting reversal"}
+    r=client.post(posting_url,json=reversing)
+    check(r.status_code,201,"GL reversal posted")
+    check(r.json()["accounting_posted"],True,"reversal is recorded")
+    r=client.get(subtotal_url,params=period)
+    check(r.status_code,200,"reversed subtotal read")
+    check(r.json()["posted_revenue_subtotal_kgs"],"0.0000","balanced GL reversal restores zero")
+    check(client.get(posting_url).json()["items"].__len__(),2,"both posting events preserved")
     reversal = {"id":str(uuid4()),"action":"REVERSE",
                 "reason":"Independent review correction required"}
     r = client.post(url, json=reversal)
@@ -137,11 +169,13 @@ with TestClient(app, base_url="https://accounting-disposable.invalid") as client
     check(r.status_code, 200, "reversed readback")
     check(r.json()["evidence_status"], "EVIDENCE_REVERSED", "reversed state")
     check(r.json()["recognized_profit_kgs"], None, "no invented profit")
-    check(r.json()["accounting_posted"], False, "no ledger posted")
+    check(r.json()["accounting_posted"], False, "decision endpoint is evidence only")
 
 async def verify():
     conn=await asyncpg.connect(dsn)
     try:
+        check(await conn.fetchval("SELECT count(*) FROM owner_accounting_postings WHERE \"propertyId\"=$1",a),2,"two immutable GL events")
+        check(await conn.fetchval("SELECT count(*) FROM owner_accounting_postings WHERE \"propertyId\"=$1",b),0,"other hotel GL untouched")
         check(await conn.fetchval("SELECT count(*) FROM payments"),
               payments_before, "no payments created")
         check(await conn.fetchval(
@@ -159,4 +193,4 @@ async def verify():
         await conn.close()
 
 asyncio.run(verify())
-print("MARINA_ACCOUNTING_DECISIONS_TWO_HOTEL_API_PASS",checks)
+print("MARINA_ACCOUNTING_POSTED_GL_TWO_HOTEL_API_PASS",checks)
