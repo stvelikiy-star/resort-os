@@ -132,7 +132,7 @@ with TestClient(app,base_url="https://batch-isolated.invalid") as client:
         client.post("/api/v1/auth/logout")
         login(hotel,"OWNER")
         period=client.get("/api/v1/admin/finance/owner/accrual-readiness",params={
-            "from_date": "2026-11-01", "to_date":"2027-11-30"})
+            "from_date": date.today().isoformat(), "to_date":date.today().isoformat()})
         assert period.status_code==200,period.text
         evidence=period.json()["served_kitchen_cost_trace"]["operator_attested_batch_links"]
         assert evidence["attributed_portions"]==7 and evidence["unattributed_served_portions"]==0,evidence
