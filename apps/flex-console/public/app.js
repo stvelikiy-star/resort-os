@@ -677,11 +677,13 @@ async function hotelDetail(){
 async function commercialPolicyPanel(){
  const labels={ru:{title:'Утверждённые тарифы',note:'Коммерческие цены. Техническая доступность модулей проверяется отдельно.',setup:'Внедрение',trial:'Пробный период (дней)',term:'Месяцев',discount:'Скидка'},kg:{title:'Бекитилген тарифтер',note:'Коммерциялык баалар. Модулдардын техникалык жеткиликтүүлүгү өзүнчө текшерилет.',setup:'Орнотуу',trial:'Сыноо мезгили (күн)',term:'Ай',discount:'Арзандатуу'},en:{title:'Approved tariffs',note:'Commercial prices. Technical module availability is verified separately.',setup:'Implementation',trial:'Trial (days)',term:'Months',discount:'Discount'}};
  const l=labels[state.lang]||labels.ru;
+ const edit={ru:'Изменить коммерческую цену',kg:'Коммерциялык бааны өзгөртүү',en:'Edit commercial price'}[state.lang]||'Изменить коммерческую цену';
  try{
   const r=await api('/v1/platform/commercial-policy'),p=r.policy;
   return '<section class="panel spacing-top"><h2>'+safe(l.title)+' · v'+safe(r.version)+'</h2>'+
    table([t('packageType'),t('price')],Object.entries(p.monthly_packages).map(([k,v])=>'<tr><td>'+safe(k)+'</td><td>'+money(v.price??v.base_price,p.currency)+'</td></tr>'))+
    '<h3>'+safe(t('features'))+'</h3>'+table([t('sku'),t('price')],Object.entries(p.module_monthly_prices).map(([k,v])=>'<tr><td>'+safe(k)+'</td><td>'+money(v,p.currency)+'</td></tr>'))+
+   '<form id="commercial-price-form" class="admin-form"><h3>'+safe(edit)+'</h3><input type="hidden" name="expected_version" value="'+safe(r.version)+'"><label>'+safe(t('sku'))+'<select name="item">'+['BASE','BUSINESS','PREMIUM'].map(k=>'<option value="PACKAGE:'+safe(k)+'">'+safe(k)+'</option>').join('')+Object.keys(p.module_monthly_prices).map(k=>'<option value="MODULE:'+safe(k)+'">'+safe(k)+'</option>').join('')+'</select></label><label>'+safe(t('price'))+'<input name="monthly_price" type="number" min="0.01" max="999999999999.99" step="0.01" required></label><button type="submit" class="primary">'+safe(t('savePlanned'))+'</button><div role="status" aria-live="polite"></div></form>'+ 
    table([l.term,l.discount],Object.entries(p.term_discounts_pct).map(([k,v])=>'<tr><td>'+safe(k)+'</td><td>'+safe(v)+'%</td></tr>'))+
    '<div class="grid two">'+kv(l.setup,money(p.implementation_fee,p.currency))+kv(l.trial,p.trial.calendar_days)+'</div>'+info(l.note,'info')+'</section>';
  }catch(e){return '<section class="panel">'+info(t('error')+': '+e.message,'error')+'</section>';}
@@ -789,7 +791,15 @@ main.addEventListener('change',e=>{
   refreshDraftEstimate(draft);
  }
 });
+async function submitCommercialPrice(form){
+ const d=new FormData(form),[price_kind,code]=String(d.get('item')).split(':');
+ const button=form.querySelector('button[type=submit]'),status=form.querySelector('[role=status]');
+ button.disabled=true;
+ try{await saveQaCatalogAction('commercial-policy',{expected_version:Number(d.get('expected_version')),price_kind,code,monthly_price:String(d.get('monthly_price'))});await render();}
+ catch(err){status.textContent=err.message;button.disabled=false;}
+}
 main.addEventListener('submit',e=>{
+ if(e.target.id==='commercial-price-form'){e.preventDefault();submitCommercialPrice(e.target);return;}
  if(['profile-email','profile-password'].includes(e.target.id)){e.preventDefault();saveAccountSettings(e.target);return;}
  if(e.target.id==='flex-profile-form'){e.preventDefault();saveProfile(e.target);return;}
  if(e.target.id==='flex-recovery-form'){e.preventDefault();submitRecovery(e.target);return;}
