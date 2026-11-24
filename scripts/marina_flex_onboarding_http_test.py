@@ -175,6 +175,19 @@ class CommercialHotelRegistration(unittest.TestCase):
             ).status_code, 404
         )
 
+    def test_05a_edit_hotel_name_without_changing_status(self):
+        url = f"/v1/onboarding/hotels/{self.created_hotel}/name"
+        payload = {"display_name": "Renamed Independent Hotel", "expected_name": "New Independent Hotel"}
+        admin = {"Authorization": self.auth("administrator", mfa=True)}
+        self.assertEqual(self.writer.post(url, json=payload, headers={"Authorization": self.auth("owner-a")}).status_code, 403)
+        self.assertEqual(self.writer.post(url, json={**payload, "status": "ACTIVE"}, headers=admin).status_code, 422)
+        result = self.writer.post(url, json=payload, headers=admin)
+        self.assertEqual(result.status_code, 200, result.text)
+        self.assertEqual(result.json()["status"], "PENDING")
+        self.assertEqual(self.writer.post(url, json=payload, headers=admin).status_code, 409)
+        rows = self.reader.get("/v1/hotels", headers=admin).json()
+        self.assertEqual(next(h for h in rows if h["id"] == self.created_hotel)["name"], payload["display_name"])
+
     def test_06_signed_deployment_proof_and_single_use(self):
         headers = {"Authorization": self.auth("administrator", mfa=True)}
         url = f"/v1/onboarding/hotels/{self.created_hotel}/challenge"
