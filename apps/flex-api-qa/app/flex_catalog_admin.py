@@ -10,7 +10,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import json
 import os
 import re
@@ -141,6 +141,59 @@ class NewConfigurationDraft(BaseModel):
         if len(set(value)) != len(value) or any(not SKU_RE.fullmatch(s) for s in value):
             raise ValueError("Stable SKU identifiers must be unique")
         return value
+
+
+class NewTariffPackageProposal(BaseModel):
+    # Commercial offer only; NEVER a live tariff, subscription or module grant.
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    hotel_id: uuid.UUID
+    package_kind: str
+    title: str = Field(min_length=2, max_length=120)
+    period_start: date
+    skus: list[str] = Field(min_length=1, max_length=50)
+    discount_pct: str = "0"
+    trial_days: int = Field(default=0, ge=0, le=90)
+    custom_monthly_price: str | None = None
+
+    @field_validator("package_kind")
+    @classmethod
+    def package_kind_allowed(cls, value: str) -> str:
+        if value not in {"BASE", "BUSINESS", "PREMIUM", "CUSTOM"}:
+            raise ValueError("Unknown tariff proposal kind")
+        return value
+
+    @field_validator("skus")
+    @classmethod
+    def package_skus(cls, value: list[str]) -> list[str]:
+        if len(set(value)) != len(value) or any(not SKU_RE.fullmatch(s) for s in value):
+            raise ValueError("Non-unique or invalid SKU identifier")
+        return value
+
+    @field_validator("discount_pct")
+    @classmethod
+    def valid_discount(cls, value: str) -> str:
+        if not isinstance(value, str) or not DECIMAL_RE.fullmatch(value):
+            raise ValueError("Discount must be a decimal percentage string")
+        if Decimal(value)>100:
+            raise ValueError("Discount cannot exceed 100%")
+        return value
+
+    @field_validator("custom_monthly_price")
+    @classmethod
+    def valid_custom(cls, value: str | None) -> str | None:
+        if value is not None and (not isinstance(value, str) or not DECIMAL_RE.fullmatch(value)):
+            raise ValueError("Custom KGS price must be a non-negative decimal string")
+        return value
+
+
+def ensure_package_proposal(payload: NewTariffPackageProposal) -> None:
+    today = datetime.now(ZoneInfo("Asia/Bishkek")).date()
+    if not (today-timedelta(days=1) <= payload.period_start <= today+timedelta(days=366)):
+        raise HTTPException(422, detail="Package start date out of range")
+    if payload.custom_monthly_price is not None and (
+        payload.package_kind!="CUSTOM" or Decimal(payload.discount_pct)!=0
+    ):
+        raise HTTPException(422, detail="Only CUSTOM without discount can override price")
 
 
 def ensure_draft_period(payload: NewConfigurationDraft) -> None:
@@ -291,6 +344,123 @@ async def add_future_price(
                 }
         except (asyncpg.UniqueViolationError, asyncpg.CheckViolationError):
             raise HTTPException(409, detail="Price version conflict") from None
+
+
+@app.get("/v1/platform/tariff-packages")
+async def tariff_packages(
+    request: Request,
+    hotel_id: uuid.UUID = Query(...),
+    principal: PlatformPrincipal = Depends(resolve_platform_principal),
+):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn, principal)
+            rows = await conn.fetch(
+                "SELECT id,hotel_id,package_kind,version,title,sku_snapshot,"
+                "list_monthly_total,discount_pct,trial_days,custom_monthly_price,"
+                "proposed_monthly_total,state,enforcement,currency,created_at "
+                "FROM flex_tariff_package_versions WHERE hotel_id=$1 "
+                "ORDER BY created_at DESC,id DESC LIMIT 100",
+                hotel_id,
+            )
+            return [
+                {
+                    "id":str(r["id"]), "hotel_id":str(r["hotel_id"]),
+                    "package_kind":r["package_kind"], "version":r["version"],
+                    "title":r["title"],
+                    "items":json.loads(r["sku_snapshot"]) if isinstance(r["sku_snapshot"],str) else r["sku_snapshot"],
+                    "list_monthly_total":str(r["list_monthly_total"]),
+                    "discount_pct":str(r["discount_pct"]),
+                    "trial_days":r["trial_days"],
+                    "custom_monthly_price":str(r["custom_monthly_price"]) if r["custom_monthly_price"] is not None else None,
+                    "proposed_monthly_total":str(r["proposed_monthly_total"]),
+                    "state":r["state"], "enforcement":r["enforcement"],
+                    "currency":r["currency"].strip(),
+                    "created_at":r["created_at"].isoformat(),
+                } for r in rows
+            ]
+
+
+@app.post("/v1/platform/tariff-packages", status_code=201)
+async def create_tariff_package_proposal(
+    payload: NewTariffPackageProposal,
+    request: Request,
+    principal: PlatformPrincipal = Depends(resolve_platform_principal),
+):
+    require_admin(principal)
+    ensure_package_proposal(payload)
+    async with request.app.state.flex_pool.acquire() as conn:
+        try:
+            async with conn.transaction():
+                await as_writer(conn, principal)
+                await conn.fetchval(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+                    "FLEX_PACKAGE_"+str(payload.hotel_id)+"_"+payload.package_kind,
+                )
+                hotel = await conn.fetchval(
+                    "SELECT status FROM flex_hotels WHERE id=$1",payload.hotel_id
+                )
+                if hotel not in {"PENDING","ACTIVE"}:
+                    raise HTTPException(404, detail="Commercial hotel unavailable")
+                rows = await conn.fetch(
+                    "SELECT s.sku,p.id AS price_id,p.version,p.monthly_price,p.currency "
+                    "FROM flex_skus s JOIN LATERAL ( "
+                    "SELECT id,version,monthly_price,currency FROM flex_price_versions "
+                    "WHERE sku=s.sku AND valid_from<=($2::date::timestamp AT TIME ZONE 'Asia/Bishkek') "
+                    "AND (valid_to IS NULL OR valid_to>($2::date::timestamp AT TIME ZONE 'Asia/Bishkek')) "
+                    "ORDER BY valid_from DESC,version DESC LIMIT 1 "
+                    ") p ON true WHERE s.sku=ANY($1::text[]) "
+                    "AND s.product_status='AVAILABLE' AND s.is_core=false AND p.currency='KGS' "
+                    "ORDER BY s.sku",
+                    payload.skus,payload.period_start,
+                )
+                if len(rows)!=len(payload.skus):
+                    raise HTTPException(
+                        422, detail="Only published non-core SKU prices effective on start date"
+                    )
+                items=[
+                    {"sku":r["sku"],"price_version_id":str(r["price_id"]),
+                     "price_version":r["version"],"monthly_price":str(r["monthly_price"]),
+                     "currency":"KGS"} for r in rows
+                ]
+                list_total=sum((r["monthly_price"] for r in rows),Decimal("0.00"))
+                discount=Decimal(payload.discount_pct)
+                custom=(Decimal(payload.custom_monthly_price)
+                        if payload.custom_monthly_price is not None else None)
+                total=(custom if custom is not None else
+                       list_total*(Decimal(100)-discount)/Decimal(100)).quantize(
+                           Decimal("0.01"),rounding=ROUND_HALF_UP
+                       )
+                previous=await conn.fetchval(
+                    "SELECT coalesce(max(version),0) FROM flex_tariff_package_versions "
+                    "WHERE hotel_id=$1 AND package_kind=$2",
+                    payload.hotel_id,payload.package_kind,
+                )
+                version=previous+1
+                row=await conn.fetchrow(
+                    "INSERT INTO flex_tariff_package_versions("
+                    "hotel_id,package_kind,version,title,sku_snapshot,"
+                    "list_monthly_total,discount_pct,trial_days,custom_monthly_price,"
+                    "proposed_monthly_total,created_by) "
+                    "VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11) "
+                    "RETURNING id,created_at",
+                    payload.hotel_id,payload.package_kind,version,payload.title,
+                    json.dumps(items),list_total,discount,payload.trial_days,
+                    custom,total,principal.subject_id,
+                )
+                return {
+                    "id":str(row["id"]),"hotel_id":str(payload.hotel_id),
+                    "package_kind":payload.package_kind,"version":version,
+                    "items":items,"list_monthly_total":str(list_total),
+                    "discount_pct":str(discount),"trial_days":payload.trial_days,
+                    "custom_monthly_price":str(custom) if custom is not None else None,
+                    "proposed_monthly_total":str(total),"currency":"KGS",
+                    "state":"DRAFT","enforcement":"OFF",
+                    "subscription_activated":False,"payments_enabled":False,
+                }
+        except (asyncpg.UniqueViolationError,asyncpg.CheckViolationError):
+            raise HTTPException(409,detail="Tariff proposal version conflict") from None
 
 
 @app.get("/v1/platform/subscription-drafts")
