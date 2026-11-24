@@ -45,7 +45,10 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "scripts/marina_shared_manual_refund_evidence_ci.py": "f52d7947e64e935497617834e17535def9a59042",
     "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
     "scripts/marina_shared_kitchen_cost_truth_ci.py": "e955a3cbd8a12ce76f8dd421bf1c277fe1cbde21",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "3ebf8db3c10dadab720626dd5e42e72a64488a8e",
+    "services/api/app/owner_served_kitchen_cost_trace.py": "848956bbe269623462b8979381baad86555b2f36",
+    "services/api/app/owner_accrual_readiness.py": "4d018cea0e9ffd3724594995dab4e91a76b5464f",
+    "scripts/test_owner_served_kitchen_cost_trace.py": "c30f2859bd5769228c7cbcd1a1c6159797369abf",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "cc995a8c56ca45a70e9086459bbe9526bcd3d283",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
@@ -58,6 +61,7 @@ ALLOWED_LEGACY_ERRORS = frozenset({
     "reviewed critical source changed: services/api/app/shared_auth_preview.py",
     "reviewed critical source changed: services/api/app/reservation_payments.py",
     "reviewed critical source changed: services/api/app/pms_reservation_create.py",
+    "reviewed critical source changed: services/api/app/owner_accrual_readiness.py",
 })
 
 def validate_additive() -> list[str]:
