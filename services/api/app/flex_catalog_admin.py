@@ -153,6 +153,7 @@ class NewTariffPackageProposal(BaseModel):
     skus: list[str] = Field(min_length=1, max_length=50)
     discount_pct: str = "0"
     trial_days: int = Field(default=0, ge=0, le=90)
+    source_template_id: uuid.UUID | None = None
     custom_monthly_price: str | None = None
 
     @field_validator("package_kind")
@@ -346,6 +347,63 @@ async def add_future_price(
             raise HTTPException(409, detail="Price version conflict") from None
 
 
+class PublishTemplate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    package_id: uuid.UUID
+
+
+# Extract only module identifiers from the immutable source. The catalog never
+# projects the source hotel's title, discount, trial or negotiated price.
+TEMPLATE_SELECT = """
+    SELECT t.id, t.package_kind, t.revision,
+           ARRAY(SELECT item->>'sku' FROM jsonb_array_elements(p.sku_snapshot) item
+                 ORDER BY item->>'sku') AS skus
+    FROM flex_tariff_templates t JOIN flex_tariff_package_versions p ON p.id=t.id
+"""
+
+
+@app.get("/v1/platform/tariff-templates")
+async def list_tariff_templates(
+    request: Request, principal: PlatformPrincipal = Depends(resolve_platform_principal),
+):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn, principal)
+            rows = await conn.fetch(
+                "SELECT DISTINCT ON (package_kind) * FROM (" + TEMPLATE_SELECT +
+                ") versions ORDER BY package_kind, revision DESC"
+            )
+            return [dict(row) for row in rows]
+
+
+@app.post("/v1/platform/tariff-templates", status_code=201)
+async def publish_tariff_template(
+    payload: PublishTemplate, request: Request,
+    principal: PlatformPrincipal = Depends(resolve_platform_principal),
+):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn, principal)
+            kind = await conn.fetchval(
+                "SELECT package_kind FROM flex_tariff_package_versions WHERE id=$1", payload.package_id
+            )
+            if kind is None:
+                raise HTTPException(404, detail="Package version unavailable")
+            if kind == "CUSTOM":
+                raise HTTPException(422, detail="Choose a standard package")
+            await conn.execute("SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+                               "FLEX_TEMPLATE_" + kind)
+            await conn.execute(
+                "INSERT INTO flex_tariff_templates (id, package_kind, revision, created_by) "
+                "SELECT $1, $2, coalesce(max(revision), 0) + 1, $3 "
+                "FROM flex_tariff_templates WHERE package_kind=$2 ON CONFLICT (id) DO NOTHING",
+                payload.package_id, kind, principal.subject_id,
+            )
+            return dict(await conn.fetchrow(TEMPLATE_SELECT + " WHERE t.id=$1", payload.package_id))
+
+
 @app.get("/v1/platform/tariff-packages")
 async def tariff_packages(
     request: Request,
@@ -357,7 +415,7 @@ async def tariff_packages(
         async with conn.transaction(readonly=True):
             await as_writer(conn, principal)
             rows = await conn.fetch(
-                "SELECT id,hotel_id,package_kind,version,title,sku_snapshot,"
+                "SELECT id,hotel_id,package_kind,version,title,sku_snapshot,source_template_id,"
                 "list_monthly_total,discount_pct,trial_days,custom_monthly_price,"
                 "proposed_monthly_total,state,enforcement,currency,created_at "
                 "FROM flex_tariff_package_versions WHERE hotel_id=$1 "
@@ -368,6 +426,7 @@ async def tariff_packages(
                 {
                     "id":str(r["id"]), "hotel_id":str(r["hotel_id"]),
                     "package_kind":r["package_kind"], "version":r["version"],
+                    "source_template_id":r["source_template_id"],
                     "title":r["title"],
                     "items":json.loads(r["sku_snapshot"]) if isinstance(r["sku_snapshot"],str) else r["sku_snapshot"],
                     "list_monthly_total":str(r["list_monthly_total"]),
@@ -398,6 +457,11 @@ async def create_tariff_package_proposal(
                     "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
                     "FLEX_PACKAGE_"+str(payload.hotel_id)+"_"+payload.package_kind,
                 )
+                if payload.source_template_id is not None:
+                    template = await conn.fetchrow(TEMPLATE_SELECT + " WHERE t.id=$1", payload.source_template_id)
+                    if (not template or template["package_kind"] != payload.package_kind or
+                            set(template["skus"]) != set(payload.skus)):
+                        raise HTTPException(422, detail="Template and selected modules do not match")
                 hotel = await conn.fetchval(
                     "SELECT status FROM flex_hotels WHERE id=$1",payload.hotel_id
                 )
@@ -442,16 +506,17 @@ async def create_tariff_package_proposal(
                     "INSERT INTO flex_tariff_package_versions("
                     "hotel_id,package_kind,version,title,sku_snapshot,"
                     "list_monthly_total,discount_pct,trial_days,custom_monthly_price,"
-                    "proposed_monthly_total,created_by) "
-                    "VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11) "
+                    "proposed_monthly_total,created_by,source_template_id) "
+                    "VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12) "
                     "RETURNING id,created_at",
                     payload.hotel_id,payload.package_kind,version,payload.title,
                     json.dumps(items),list_total,discount,payload.trial_days,
-                    custom,total,principal.subject_id,
+                    custom,total,principal.subject_id,payload.source_template_id,
                 )
                 return {
                     "id":str(row["id"]),"hotel_id":str(payload.hotel_id),
                     "package_kind":payload.package_kind,"version":version,
+                    "source_template_id":payload.source_template_id,
                     "items":items,"list_monthly_total":str(list_total),
                     "discount_pct":str(discount),"trial_days":payload.trial_days,
                     "custom_monthly_price":str(custom) if custom is not None else None,

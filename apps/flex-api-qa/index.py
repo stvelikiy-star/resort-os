@@ -90,18 +90,19 @@ if _ENABLE_ONBOARDING:
     _ROUTES.append(flex_onboarding.app)
 if _ENABLE_CATALOG:
     _ROUTES.append(flex_catalog_admin.app)
-_seen = {"/health"}
+_seen = set()
 for source in _ROUTES:
     for route in source.routes:
         if not isinstance(route, APIRoute) or not route.path.startswith("/v1/"):
             continue
-        if route.path in _seen:
+        route_keys = {(method, route.path) for method in route.methods}
+        if _seen.intersection(route_keys):
             raise RuntimeError("FLEX_ROUTE_COLLISION: " + route.path)
         if not (route.methods <= {"GET", "POST"}):
             raise RuntimeError("FLEX_UNEXPECTED_MUTATION_ROUTE")
         if "POST" in route.methods and source not in (flex_onboarding.app, flex_catalog_admin.app):
             raise RuntimeError("FLEX_UNAUTHORIZED_WRITE_ROUTE")
-        _seen.add(route.path)
+        _seen.update(route_keys)
         app.router.routes.append(route)
 
 

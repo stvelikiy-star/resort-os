@@ -231,5 +231,44 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         asyncio.run(verify_unchanged())
 
 
+    def test_05_reuse_template_across_hotels_with_own_terms(self):
+        templates = "/v1/platform/tariff-templates"
+        packages = "/v1/platform/tariff-packages"
+        start = datetime.now(ZoneInfo("Asia/Bishkek")).date() + timedelta(days=8)
+        proposal = {"hotel_id": HOTEL_A, "package_kind": "BASE", "title": "Hotel A only",
+                    "skus": ["AI_ASSISTANT"], "period_start": start.isoformat(),
+                    "discount_pct": "25", "trial_days": 30}
+        source = self.post(packages, proposal)
+        self.assertEqual(source.status_code, 201, source.text)
+        publish = {"package_id": source.json()["id"]}
+        self.assertEqual(self.post(templates, publish, "owner-a").status_code, 403)
+        self.assertEqual(self.get(templates, mfa=False).status_code, 403)
+        first = self.post(templates, publish)
+        self.assertEqual(first.status_code, 201, first.text)
+        expected = {"id": publish["package_id"], "revision": 1,
+                    "package_kind": "BASE", "skus": ["AI_ASSISTANT"]}
+        self.assertEqual(first.json(), expected)
+        self.assertEqual(self.post(templates, publish).json(), expected)
+        self.assertEqual(self.get(templates).json(), [expected])
+        reuse = {**proposal, "hotel_id": HOTEL_B, "title": "Hotel B",
+                 "discount_pct": "0", "trial_days": 0, "source_template_id": expected["id"]}
+        self.assertEqual(self.post(packages, {**reuse, "skus": ["EXTRA_QA_CI"]}).status_code, 422)
+        self.assertEqual(self.post(packages, {**reuse, "package_kind": "PREMIUM"}).status_code, 422)
+        second = self.post(packages, reuse)
+        self.assertEqual(second.status_code, 201, second.text)
+        self.assertEqual(second.json()["proposed_monthly_total"], "15000.00")
+        self.assertEqual(second.json()["source_template_id"], expected["id"])
+        self.assertEqual(second.json()["state"], "DRAFT")
+        self.assertFalse(second.json()["subscription_activated"])
+        self.assertFalse(second.json()["payments_enabled"])
+        new_template = self.post(templates, {"package_id": second.json()["id"]})
+        self.assertEqual(new_template.json()["revision"], 2)
+        self.assertEqual(self.get(templates).json(), [new_template.json()])
+        saved = self.get(packages + "?hotel_id=" + HOTEL_B).json()[0]
+        self.assertEqual(saved["source_template_id"], expected["id"])
+        individual = self.post(packages, {**proposal, "package_kind": "CUSTOM"})
+        self.assertEqual(self.post(templates, {"package_id": individual.json()["id"]}).status_code, 422)
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)

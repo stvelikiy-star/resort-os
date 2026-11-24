@@ -14,10 +14,13 @@ Returns `state:DRAFT`, `enforcement:OFF`, `subscription_activated:false`, `payme
 - Published prices, custom prices and discounts are never treated as received cash. The package is an *unapproved offer*, not a contract and not a capability grant.
 
 ### Console integration (code only, QA flag remains OFF)
-The existing SUPER ADMIN constructor now has a separate **Save tariff version** button, discount/trial/custom-price inputs and a version history table in the hotel subscription tab. The previous **Save draft** action remains separate and unchanged: it still stores the original DRAFT/OFF subscription configuration. The new button uses an exact allowlisted `/api/actions/tariff-packages` proxy, same-origin/CSRF/role checks and the new server endpoint, only when `FLEX_ENABLE_QA_CATALOG_DRAFTS=true` in an independently accepted QA. No deployed preview currently enables it. This is **per-hotel proposed version history**, not yet a reusable global tariff-template catalog.
+The existing SUPER ADMIN constructor now has a separate **Save tariff version** button, discount/trial/custom-price inputs and a version history table in the hotel subscription tab. The previous **Save draft** action remains separate and unchanged: it still stores the original DRAFT/OFF subscription configuration. The new button uses an exact allowlisted `/api/actions/tariff-packages` proxy, same-origin/CSRF/role checks and the new server endpoint, only when `FLEX_ENABLE_QA_CATALOG_DRAFTS=true` in an independently accepted QA. No deployed preview currently enables it. This history is also the source for explicitly published shared module selections.
+
+### Shared module templates (0013, isolated QA)
+A SUPER_ADMIN can save the module selection from a BASE, BUSINESS or PREMIUM version in hotel subscription history. The constructor lists the latest revision per tier. Selecting it copies only SKU identifiers and the tier. Discount, trial and title are set for the destination hotel. FLEX looks up effective KGS prices again when saving and records the exact immutable template ID on the new proposal. Editing the module selection switches to manual composition. Re-publishing the same source version returns its original revision. CUSTOM packages cannot be published to the shared catalog.
 
 ### Boundaries
-This is **not** a finished global reusable tariff-template catalog. The package is still a DRAFT/OFF and cannot be applied to PMS. No bank or live subscription operations are present.
+The catalog shares module selections. Each hotel keeps its own price snapshot and commercial terms. The package is still a DRAFT/OFF and cannot be applied to PMS. No bank or live subscription operations are present.
 No code is merged into main, no QA Neon or operational database migration, no new Cloudflare, domain or Vercel project. Live payment/payout flags remain false. Separate partner and usage scopes untouched.
 
 ### Test evidence required

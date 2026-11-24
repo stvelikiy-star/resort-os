@@ -84,6 +84,16 @@ class NeonProbePolicy(unittest.TestCase):
             self.assertNotIn("payout", path)
             self.assertNotIn("settlement", path)
 
+    def test_catalog_methods_can_share_a_path_in_enabled_qa(self):
+        import subprocess
+        check = ("from index import app; "
+                 "methods = {m for r in app.routes if r.path == '/v1/platform/tariff-templates' "
+                 "for m in r.methods}; assert methods == {'GET', 'POST'}")
+        subprocess.run([sys.executable, "-c", check], check=True,
+                       cwd=Path(__file__).resolve().parents[1],
+                       env={**os.environ, "FLEX_ENVIRONMENT": "qa",
+                            "FLEX_ENABLE_QA_CATALOG_DRAFTS": "true"})
+
     def test_core_identity_without_token_fails_closed(self):
         r = TestClient(app).get("/v1/me")
         self.assertEqual(r.status_code, 401)

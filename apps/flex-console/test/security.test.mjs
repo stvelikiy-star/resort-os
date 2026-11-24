@@ -314,3 +314,12 @@ test('tariff package version proxy is exact, QA-scoped and does not accept payme
  assert.match(src,/data-package-save/);
  assert.match(src,/if\(data.state!=='DRAFT'\|\|data.enforcement!=='OFF'/);
 });
+
+test('shared template proxy accepts only a source package and a validated reference',()=>{
+ const id='00000000-0000-4000-8000-000000000001';
+ assert.deepEqual(testValidateCatalogAdminAction('template',{package_id:id}),{package_id:id});
+ assert.equal(testValidateCatalogAdminAction('template',{package_id:id,hotel_id:id}),null);
+ assert.equal(testValidateCatalogAdminAction('template',{package_id:'invalid'}),null);
+ assert.equal(testRouteAllowed('/v1/platform/tariff-templates',new URLSearchParams()),'catalog_admin');
+ assert.equal(testRouteAllowed('/v1/platform/tariff-templates',new URLSearchParams('hotel_id='+id)),null);
+});

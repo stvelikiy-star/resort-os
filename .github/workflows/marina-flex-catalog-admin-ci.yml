@@ -73,12 +73,13 @@ jobs:
         run: python -m pip install --disable-pip-version-check -r services/api/requirements-flex-control.txt
       - name: Check disposable FLEX PostgreSQL 16 only
         run: psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_qa_db_preflight.sql
-      - name: Apply complete commercial baseline + isolated 0011-0012
+      - name: Apply complete commercial baseline + isolated 0011-0013
         run: |
           set -euo pipefail
           test -f docs/flex/sql/0010_flex_partner_earnings_preview.sql
           test -f docs/flex/sql/0011_flex_catalog_subscription_drafts_preview.sql
           test -f docs/flex/sql/0012_flex_tariff_package_versions_preview.sql
+          test -f docs/flex/sql/0013_flex_shared_tariff_templates_preview.sql
           for file in docs/flex/sql/00*.sql; do
             echo "Applying $file to disposable FLEX CI only"
             psql -X -v ON_ERROR_STOP=1 -f "$file" > /tmp/flex_catalog_migration.log
