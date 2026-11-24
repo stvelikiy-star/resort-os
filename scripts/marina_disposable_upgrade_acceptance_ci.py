@@ -70,7 +70,7 @@ def verify_preservation():
     assert before == clone, "Dump restore not byte-equivalent at row/field level"
     assert before == rollback, "Independent rollback restore differs"
     assert before["_meta"]["migrations"] == 24, before["_meta"]
-    assert after["_meta"]["migrations"] == 51, after["_meta"]
+    assert after["_meta"]["migrations"] == 52, after["_meta"]
     assert after["_meta"]["property_count"] == before["_meta"]["property_count"] == 2
     for field in ("staff_count", "reservation_count", "payment_kgs", "folio_kgs", "orders_kgs"):
         assert before["_meta"][field] == after["_meta"][field], field
@@ -90,7 +90,7 @@ def verify_preservation():
     assert not unexpected, f"Original fields changed unexpectedly: {unexpected[:12]}"
     print("MIGRATION_ROW_AND_FINANCE_PRESERVATION_PASS", json.dumps({
         "legacy_tables": len(before) - 1, "current_tables": len(after) - 1,
-        "legacy_migrations": 24, "current_migrations": 51,
+        "legacy_migrations": 24, "current_migrations": 52,
         "allowed_timestamp_changes": len(changed), "unexpected_changes": 0,
     }))
 
