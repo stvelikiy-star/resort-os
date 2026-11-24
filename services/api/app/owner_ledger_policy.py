@@ -33,7 +33,7 @@ def exact_amount(value):
     return x.quantize(MONEY)
 
 
-def validate_posting(proposal_lines, *, source_type, evidence_complete, source_amount):
+def validate_posting(proposal_lines, *, source_type, evidence_complete, source_amount,\n                     revenue_service_type=None):
     """Return balanced amount; NO automatic approval of missing evidence.
 
     Inputs must come from database-owned proposal and independently verified
@@ -49,9 +49,13 @@ def validate_posting(proposal_lines, *, source_type, evidence_complete, source_a
         amount=exact_amount(line["amount_kgs"])
         if code not in ACCOUNTS or side not in ("DEBIT","CREDIT"):
             raise ValueError("ACCOUNT_OR_SIDE_UNSUPPORTED")
-        if source_type=="REVENUE_SOURCE" and code not in (
-                "1100","4100","4200","4300","2100"):
-            raise ValueError("SOURCE_ACCOUNT_MISMATCH")
+        if source_type=="REVENUE_SOURCE":
+            revenue_code={"ROOM_NIGHT":"4100","DINING_ORDER":"4200"}.get(
+                revenue_service_type)
+            if revenue_code is None:
+                raise ValueError("REVENUE_SERVICE_CLASSIFICATION_UNVERIFIED")
+            if code not in ("1100",revenue_code,"2100"):
+                raise ValueError("SOURCE_ACCOUNT_MISMATCH")
         if source_type=="OPERATING_EXPENSE" and code not in ("5200","2200"):
             raise ValueError("SOURCE_ACCOUNT_MISMATCH")
         if source_type=="STOCK_CONSUMPTION" and code not in ("5100","1300"):
@@ -64,8 +68,9 @@ def validate_posting(proposal_lines, *, source_type, evidence_complete, source_a
         raise ValueError("SOURCE_AMOUNT_MISMATCH")
     sides={(r["account_code"],r["side"]) for r in proposal_lines}
     if source_type=="REVENUE_SOURCE":
-        if ("1100","DEBIT") not in sides or not any(
-                (code,"CREDIT") in sides for code in REVENUE_CODES):
+        allowed_revenue={"ROOM_NIGHT":"4100","DINING_ORDER":"4200"}[
+            revenue_service_type]
+        if ("1100","DEBIT") not in sides or (allowed_revenue,"CREDIT") not in sides:
             raise ValueError("REVENUE_DOUBLE_ENTRY_PATTERN_INVALID")
     elif source_type=="OPERATING_EXPENSE":
         if not {("5200","DEBIT"),("2200","CREDIT")}<=sides:
