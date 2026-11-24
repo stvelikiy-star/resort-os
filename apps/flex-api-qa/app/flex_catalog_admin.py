@@ -248,6 +248,56 @@ async def commercial_policy(
                     "created_at": row["created_at"].isoformat()}
 
 
+
+class CommercialPriceChange(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(strict=True, ge=1, le=2147483646)
+    price_kind: str
+    code: str
+    monthly_price: str
+
+    @field_validator("monthly_price")
+    @classmethod
+    def validate_amount(cls, value: str) -> str:
+        if not DECIMAL_RE.fullmatch(value) or Decimal(value) <= 0:
+            raise ValueError("Positive KGS amount required")
+        return value
+
+
+@app.post("/v1/platform/commercial-policy", status_code=201)
+async def change_commercial_price(
+    payload: CommercialPriceChange, request: Request,
+    principal: PlatformPrincipal = Depends(resolve_platform_principal),
+):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn, principal)
+            await conn.execute("SELECT pg_advisory_xact_lock(hashtext('flex_commercial_policy_revision'))")
+            row = await conn.fetchrow(
+                "SELECT version,policy FROM flex_commercial_policy_versions ORDER BY version DESC LIMIT 1"
+            )
+            if row is None or row["version"] != payload.expected_version:
+                raise HTTPException(409, detail="Commercial policy version changed; reload")
+            policy = json.loads(row["policy"]) if isinstance(row["policy"], str) else row["policy"]
+            amount = format(Decimal(payload.monthly_price), ".2f")
+            if payload.price_kind == "PACKAGE" and payload.code in {"BASE","BUSINESS","PREMIUM"}:
+                policy["monthly_packages"][payload.code]["price"] = amount
+                if payload.code == "BASE":
+                    policy["monthly_packages"]["CUSTOM"]["minimum"] = amount
+                    policy["monthly_packages"]["CUSTOM"]["base_price"] = amount
+            elif payload.price_kind == "MODULE" and payload.code in policy["module_monthly_prices"]:
+                policy["module_monthly_prices"][payload.code] = amount
+            else:
+                raise HTTPException(422, detail="Unknown commercial price code")
+            version = row["version"] + 1
+            await conn.execute(
+                "INSERT INTO flex_commercial_policy_versions(version,policy,created_by) VALUES($1,$2::jsonb,$3)",
+                version, json.dumps(policy), principal.subject_id
+            )
+            return {"version": version, "policy": policy, "entitlement_changed": False,
+                    "payment_collected": False}
+
 @app.get("/v1/platform/catalog")
 async def catalog(
     request: Request,
