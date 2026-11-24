@@ -15,22 +15,22 @@ class OwnerLedgerPolicyTests(unittest.TestCase):
              {"account_code":"4200","side":"CREDIT","amount_kgs":"650.0000"},
              {"account_code":"2100","side":"CREDIT","amount_kgs":"50.0000"}]
     def test_valid_net_of_tax(self):
-        self.assertEqual(validate_posting(self.revenue,source_type="REVENUE_SOURCE",
+        self.assertEqual(validate_posting(self.revenue,source_type="REVENUE_SOURCE",revenue_service_type="DINING_ORDER",
                          evidence_complete=True,source_amount="700"),"700.0000")
     def test_missing_tax_confirmation_blocks(self):
         with self.assertRaisesRegex(ValueError,"SOURCE_INCOMPLETE"):
-            validate_posting(self.revenue,source_type="REVENUE_SOURCE",
+            validate_posting(self.revenue,source_type="REVENUE_SOURCE",revenue_service_type="DINING_ORDER",
                              evidence_complete=False,source_amount="700")
     def test_unknown_account_blocks(self):
         with self.assertRaisesRegex(ValueError,"ACCOUNT_OR_SIDE"):
             validate_posting([{**self.revenue[0],"account_code":"9999"},*self.revenue[1:]],
-                             source_type="REVENUE_SOURCE",evidence_complete=True,source_amount="700")
+                             source_type="REVENUE_SOURCE",revenue_service_type="DINING_ORDER",evidence_complete=True,source_amount="700")
     def test_unbalanced_and_mismatched_block(self):
         with self.assertRaisesRegex(ValueError,"UNBALANCED"):
-            validate_posting(self.revenue[:-1],source_type="REVENUE_SOURCE",
+            validate_posting(self.revenue[:-1],source_type="REVENUE_SOURCE",revenue_service_type="DINING_ORDER",
                              evidence_complete=True,source_amount="700")
         with self.assertRaisesRegex(ValueError,"SOURCE_AMOUNT"):
-            validate_posting(self.revenue,source_type="REVENUE_SOURCE",
+            validate_posting(self.revenue,source_type="REVENUE_SOURCE",revenue_service_type="DINING_ORDER",
                              evidence_complete=True,source_amount="800")
     def test_operating_expense(self):
         lines=[{"account_code":"5200","side":"DEBIT","amount_kgs":"1200"},
@@ -66,7 +66,7 @@ class OwnerLedgerPolicyTests(unittest.TestCase):
         for v in ["NaN","-1","0.00001","Infinity"]:
             with self.subTest(v=v),self.assertRaises(ValueError):
                 validate_posting([{**self.revenue[0],"amount_kgs":v},*self.revenue[1:]],
-                    source_type="REVENUE_SOURCE",evidence_complete=True,source_amount="700")
+                    source_type="REVENUE_SOURCE",revenue_service_type="DINING_ORDER",evidence_complete=True,source_amount="700")
 
     def test_posting_feature_off_by_default(self):
         with patch.dict(os.environ,{"APP_ENV":"staging",
@@ -90,6 +90,17 @@ class OwnerLedgerPolicyTests(unittest.TestCase):
               "MARINA_ACCOUNTING_POSTING_ENABLED":"true",
               "MARINA_SHARED_AUTH_PREVIEW_ENABLED":"false"}):
             self.assertIsNone(posting_guard())
+
+    def test_hotel_revenue_cannot_be_posted_as_dining_and_vice_versa(self):
+        with self.assertRaisesRegex(ValueError,"SOURCE_ACCOUNT_MISMATCH"):
+            validate_posting(self.revenue,source_type="REVENUE_SOURCE",
+                revenue_service_type="ROOM_NIGHT",evidence_complete=True,
+                source_amount="700")
+        room=[{**r,"account_code":"4100" if r["account_code"]=="4200" else r["account_code"]}
+              for r in self.revenue]
+        self.assertEqual(validate_posting(room,source_type="REVENUE_SOURCE",
+            revenue_service_type="ROOM_NIGHT",evidence_complete=True,
+            source_amount="700"),"700.0000")
 
 
 if __name__=="__main__":
