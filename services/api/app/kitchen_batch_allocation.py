@@ -156,3 +156,41 @@ async def record_served_batch(
                     "portions":body.portions,"cost_kgs":str(total),
                     "source":"OPERATOR_ATTESTED",
                     "recognized_profit_posted":False}
+
+
+@router.get("/{order_id}/batch-allocations")
+async def read_served_batch_allocations(
+    order_id: uuid.UUID, request: Request,
+    user: dict[str, Any] = Depends(operator_only),
+):
+    enforce_batch_staging()
+    async with request.app.state.db.acquire() as conn:
+        pid = await trusted_property_id(conn, user)
+        order = await conn.fetchrow(
+            '''SELECT id,status,"orderNumber" FROM kitchen_orders
+               WHERE id=$1 AND "propertyId"=$2''', order_id,pid,
+        )
+        if not order:
+            raise HTTPException(404, detail={"code": "HOTEL_ORDER_NOT_FOUND"})
+        rows = await conn.fetch(
+            '''SELECT a.id,a."orderItemId",a."productionTargetId",a.portions,
+                      a."totalCostKgs",a.source,t."serviceDate",m."nameRu"
+               FROM kitchen_served_batch_allocations a
+               JOIN kitchen_production_targets t
+                 ON t.id=a."productionTargetId" AND t."propertyId"=a."propertyId"
+               JOIN kitchen_menu_items m
+                 ON m.id=t."menuItemId" AND m."propertyId"=a."propertyId"
+               WHERE a."propertyId"=$1 AND a."orderId"=$2
+               ORDER BY a."createdAt",a.id''', pid,order_id,
+        )
+    return {
+        "order_id":str(order_id), "status":order["status"],
+        "order_number":order["orderNumber"],
+        "items":[{
+            "id":str(r["id"]), "order_item_id":str(r["orderItemId"]),
+            "production_target_id":str(r["productionTargetId"]),
+            "portions":r["portions"],"cost_kgs":str(r["totalCostKgs"]),
+            "service_date":r["serviceDate"].isoformat(),
+            "menu_name":r["nameRu"],"source":r["source"],
+        } for r in rows],
+    }
