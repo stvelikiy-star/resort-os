@@ -313,6 +313,43 @@ async def change_commercial_price(
             return {"version": version, "policy": policy, "entitlement_changed": False,
                     "payment_collected": False}
 
+
+class InstallationConfirmation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    hotel_id: uuid.UUID
+
+
+@app.get("/v1/platform/installation-trial")
+async def installation_trial(request: Request, hotel_id: uuid.UUID = Query(...),
+    principal: PlatformPrincipal = Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn, principal)
+            row = await conn.fetchrow(
+                "SELECT hotel_id,completed_at,trial_start,trial_end_exclusive FROM flex_installation_completions WHERE hotel_id=$1",hotel_id)
+            return dict(row) if row else None
+
+
+@app.post("/v1/platform/installation-trial", status_code=201)
+async def confirm_installation(payload: InstallationConfirmation, request: Request,
+    principal: PlatformPrincipal = Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn, principal)
+            await conn.execute("SELECT pg_advisory_xact_lock(hashtextextended($1,0))","FLEX_INSTALL_"+str(payload.hotel_id))
+            hotel=await conn.fetchval("SELECT status FROM flex_hotels WHERE id=$1",payload.hotel_id)
+            if hotel not in {"PENDING","ACTIVE"}:
+                raise HTTPException(404,detail="Commercial hotel unavailable")
+            await conn.execute(
+                "INSERT INTO flex_installation_completions(hotel_id,completed_by,trial_start,trial_end_exclusive) "
+                "VALUES($1,$2,(now() AT TIME ZONE 'Asia/Bishkek')::date,(now() AT TIME ZONE 'Asia/Bishkek')::date+5) "
+                "ON CONFLICT(hotel_id) DO NOTHING",payload.hotel_id,principal.subject_id)
+            row=await conn.fetchrow(
+                "SELECT hotel_id,completed_at,trial_start,trial_end_exclusive FROM flex_installation_completions WHERE hotel_id=$1",payload.hotel_id)
+            return {**dict(row),"entitlement_changed":False,"payment_collected":False}
+
 @app.get("/v1/platform/catalog")
 async def catalog(
     request: Request,
