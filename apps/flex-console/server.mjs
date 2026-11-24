@@ -296,6 +296,7 @@ const catalogSkuAction=/^\/api\/actions\/catalog\/skus$/;
 const catalogPriceAction=/^\/api\/actions\/catalog\/skus\/([A-Z][A-Z0-9_]{1,79})\/prices$/;
 const configurationDraftAction=/^\/api\/actions\/subscription-drafts$/;
 const tariffPackageAction=/^\/api\/actions\/tariff-packages$/;
+const commercialPolicyPath='/api/actions/commercial-policy';
 const tariffTemplatePath='/api/actions/tariff-templates';
 const catalogVersionsRead=/^\/v1\/platform\/catalog\/skus\/([A-Z][A-Z0-9_]{1,79})\/versions$/;
 const catalogReadOnly=new Set(['/v1/platform/catalog','/v1/platform/subscription-drafts']);
@@ -304,6 +305,10 @@ function validateCatalogAdminAction(kind,body) {
   if(!body || typeof body!=='object'||Array.isArray(body))return null;
   const keys=Object.keys(body);
   const exact=allowed=>keys.length===allowed.length && allowed.every(k=>keys.includes(k));
+  if(kind==='commercial') {
+    if(!exact(['expected_version','price_kind','code','monthly_price'])||!Number.isInteger(body.expected_version)||body.expected_version<1||body.expected_version>2147483646||!['PACKAGE','MODULE'].includes(body.price_kind)||typeof body.code!=='string'||!/^[A-Z][A-Z0-9_]{1,79}$/.test(body.code)||typeof body.monthly_price!=='string'||!amountPattern.test(body.monthly_price)||Number(body.monthly_price)<=0)return null;
+    return body;
+  }
   if(kind==='sku') {
     if(!exact(['sku','title','capability_key']))return null;
     if(typeof body.sku!=='string'||!(/^[A-Z][A-Z0-9_]{1,79}$/.test(body.sku)))return null;
@@ -372,7 +377,7 @@ async function catalogAdminPost(req,res,url) {
   if(!session.csrf||!fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
   const priceMatch=url.pathname.match(catalogPriceAction);
   const kind=catalogSkuAction.test(url.pathname)?'sku':priceMatch?'price':
-    configurationDraftAction.test(url.pathname)?'draft':tariffPackageAction.test(url.pathname)?'package':url.pathname===tariffTemplatePath?'template':null;
+    configurationDraftAction.test(url.pathname)?'draft':tariffPackageAction.test(url.pathname)?'package':url.pathname===tariffTemplatePath?'template':url.pathname===commercialPolicyPath?'commercial':null;
   if(!kind)return json(res,404,{error:'ACTION_NOT_ALLOWED'});
   let raw='';
   for await(const part of req) {
@@ -383,7 +388,7 @@ async function catalogAdminPost(req,res,url) {
   try{parsed=JSON.parse(raw)}catch{return json(res,400,{error:'INVALID_JSON'})}
   const payload=validateCatalogAdminAction(kind,parsed);
   if(!payload)return json(res,422,{error:'INVALID_QA_CONFIGURATION'});
-  const path=kind==='sku'?'/v1/platform/catalog/skus':
+  const path=kind==='commercial'?'/v1/platform/commercial-policy':kind==='sku'?'/v1/platform/catalog/skus':
     kind==='price'?'/v1/platform/catalog/skus/'+priceMatch[1]+'/prices':
     kind==='template'?'/v1/platform/tariff-templates':kind==='package'?'/v1/platform/tariff-packages':'/v1/platform/subscription-drafts';
   const upstream=await fetch(catalogAdminApiOrigin+path,{
@@ -399,6 +404,7 @@ async function catalogAdminPost(req,res,url) {
   try{result=JSON.parse(response)}catch{return json(res,502,{error:'UPSTREAM_INVALID_JSON'})}
   if(!upstream.ok)return json(res,upstream.status,{error:'FLEX_QA_ADMIN_REJECTED',detail:
     typeof result.detail==='string'?result.detail:'Backend rejected the request'});
+  if(kind==='commercial' && !(result.version===payload.expected_version+1&&result.entitlement_changed===false&&result.payment_collected===false))return json(res,502,{error:'UNEXPECTED_PRICE_STATE'});
   if(kind==='sku' && !(result.status==='PLANNED'&&result.published===false&&result.entitlement_changed===false))
     return json(res,502,{error:'UNEXPECTED_SKU_STATE'});
   if(kind==='price' && !(result.entitlement_changed===false&&result.payment_collected===false))
@@ -466,13 +472,13 @@ export async function handler(req,res) {
         exp:Date.now() + lifetimeSeconds * 1000};
       return cookie(cookies.session,seal(session),lifetimeSeconds);
     }:null);
-    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||hotelNameRoute.test(url.pathname)||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
+    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||hotelNameRoute.test(url.pathname)||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath||url.pathname===commercialPolicyPath))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
     if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,password_login:bridgeConfigured && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true',identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
     if(url.pathname==='/api/session') { const s=await commercialSession(req);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
     if(req.method==='POST'&&hotelNameRoute.test(url.pathname))return await hotelNameAction(req,res,url);
     if(req.method==='POST'&&(linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))return await trustedLinkAction(req,res,url);
-    if(req.method==='POST'&&(catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath))return await catalogAdminPost(req,res,url);
+    if(req.method==='POST'&&(catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath||url.pathname===commercialPolicyPath))return await catalogAdminPost(req,res,url);
     if(url.pathname==='/api/auth/login') return await authLogin(res);
     if(url.pathname==='/api/auth/callback') return await authCallback(req,res,url);
     if(url.pathname==='/api/auth/logout') return redirect(res,'/',{'Set-Cookie':cookie(cookies.session,'',0)});
