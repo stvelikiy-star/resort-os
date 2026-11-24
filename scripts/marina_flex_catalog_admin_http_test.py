@@ -359,5 +359,21 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         self.assertEqual(self.post(path,{**data,"discount_pct":"10"}).status_code,422)
 
 
+
+    def test_09_installation_trial_is_one_time_and_admin_only(self):
+        path="/v1/platform/installation-trial"
+        data={"hotel_id":HOTEL_A}
+        self.assertEqual(self.post(path,data,"owner-a").status_code,403)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A).json(),None)
+        first=self.post(path,data)
+        self.assertEqual(first.status_code,201,first.text)
+        row=first.json()
+        self.assertEqual(date.fromisoformat(row["trial_end_exclusive"])-date.fromisoformat(row["trial_start"]),timedelta(days=5))
+        self.assertEqual(self.post(path,data).json(),row)
+        self.assertFalse(row["entitlement_changed"])
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_B).json(),None)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A,who="owner-b").status_code,403)
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)
