@@ -57,9 +57,9 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     ".github/workflows/marina-zz113-rollback-ci.yml": "a2d23ca8be3734cd2e7bb8d160f8d582dd61acea",
     "services/api/app/app_entry.py": "088b69374b5b0e5ee3b86eab6cd59a8cf8f6642f",
     "services/api/app/shared_auth_preview.py": "efb78195889db902fffc70df422f915fe6178409",
-    "services/api/app/kitchen_batch_allocation.py": "b02b46e4adffc29020fb3f9e60e89843bfbac346",
+    "services/api/app/kitchen_batch_allocation.py": "cfccc3b3b159b012bc1aab6cd89e3a8ce336d588",
     "services/api/app/owner_served_kitchen_cost_trace.py": "d051cd2f1962fb4540434b026dec75e8c2afc6a7",
-    "scripts/marina_shared_batch_allocation_ci.py": "1c9bcd4fc879c4c035288ec9629c2a8a1d591074",
+    "scripts/marina_shared_batch_allocation_ci.py": "5c3689cb810200467cdb8bf4d0d396a4520f59f9",
     ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "24e9586d68e90e4292bb5f53f44d7fddeead7849",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
