@@ -330,15 +330,17 @@ function validateCatalogAdminAction(kind,body) {
   }
   if(kind==='package') {
     const source='source_template_id' in body;
+    const commercial='commercial_policy_version' in body;
+    if(commercial&&(!Number.isInteger(body.commercial_policy_version)||body.commercial_policy_version<1||source))return null;
     if(source && (typeof body.source_template_id!=='string'||!flexUuidRe.test(body.source_template_id)))return null;
-    if(!exact(['hotel_id','package_kind','title','period_start','skus','discount_pct','trial_days','custom_monthly_price',...(source?['source_template_id']:[])]))return null;
+    if(!exact(['hotel_id','package_kind','title','period_start','skus','discount_pct','trial_days','custom_monthly_price',...(source?['source_template_id']:[]),...(commercial?['commercial_policy_version']:[])]))return null;
     if(typeof body.hotel_id!=='string'||!flexUuidRe.test(body.hotel_id))return null;
     if(!['BASE','BUSINESS','PREMIUM','CUSTOM'].includes(body.package_kind))return null;
     if(typeof body.title!=='string'||body.title.trim().length<2||body.title.trim().length>120)return null;
     if(typeof body.period_start!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(body.period_start)||
        !Number.isFinite(Date.parse(body.period_start))||
        new Date(body.period_start).toISOString().slice(0,10)!==body.period_start)return null;
-    if(!Array.isArray(body.skus)||body.skus.length<1||body.skus.length>50||
+    if(!Array.isArray(body.skus)||(!commercial&&body.skus.length<1)||body.skus.length>50||
        new Set(body.skus).size!==body.skus.length||
        !body.skus.every(x=>typeof x==='string'&&/^[A-Z][A-Z0-9_]{1,79}$/.test(x)))return null;
     if(typeof body.discount_pct!=='string'||!amountPattern.test(body.discount_pct)||
@@ -350,7 +352,7 @@ function validateCatalogAdminAction(kind,body) {
     return {hotel_id:body.hotel_id,package_kind:body.package_kind,title:body.title.trim(),
       period_start:body.period_start,skus:body.skus,discount_pct:body.discount_pct,
       trial_days:body.trial_days,custom_monthly_price:body.custom_monthly_price,
-      ...(source?{source_template_id:body.source_template_id}:{})};
+      ...(source?{source_template_id:body.source_template_id}:{}),...(commercial?{commercial_policy_version:body.commercial_policy_version}:{})};
   }
   if(kind==='draft') {
     if(!exact(['hotel_id','title','period_start','period_end','skus']))return null;
