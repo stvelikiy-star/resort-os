@@ -6,6 +6,7 @@ General P&L remains NOT_READY until all income/cost/tax evidence is reconciled.
 """
 import os
 import uuid
+import asyncpg
 from datetime import date
 from decimal import Decimal
 from typing import Literal
@@ -61,84 +62,88 @@ def posting_view(row,lines,replay=False):
 async def post_accounting(proposal_id:uuid.UUID,body:PostAccounting,request:Request,
                           user=Depends(owner_only)):
     guard()
-    async with request.app.state.db.acquire() as conn:
-        async with conn.transaction():
-            pid=await trusted_property_id(conn,user)
-            actor=uuid.UUID(str(user["id"]))
-            await lock_keys(conn,"owner-posting:"+str(pid)+":"+str(proposal_id))
-            proposal=await conn.fetchrow(
-                'SELECT * FROM owner_accounting_journal_proposals WHERE id=$1 AND "propertyId"=$2',
-                proposal_id,pid)
-            if not proposal:
-                raise HTTPException(404,detail={"code":"ACCOUNTING_PROPOSAL_NOT_FOUND"})
-            old=await conn.fetchrow(
-                '''SELECT * FROM owner_accounting_postings
-                   WHERE "propertyId"=$1 AND "proposalId"=$2 AND action=$3''',
-                pid,proposal_id,body.action)
-            if old:
-                if old["id"]!=body.id or old["postedById"]!=actor or old["reason"]!=body.reason:
-                    raise HTTPException(409,detail={"code":"ACCOUNTING_POSTING_CONFLICT"})
-                lines=await conn.fetch(
-                    'SELECT * FROM owner_accounting_posting_lines WHERE "propertyId"=$1 AND "postingId"=$2 ORDER BY "lineNo"',
-                    pid,old["id"])
-                return posting_view(old,lines,True)
-            if actor==proposal["createdById"]:
-                raise HTTPException(403,detail={"code":"ACCOUNTING_POSTER_MUST_BE_INDEPENDENT"})
-            approval=await conn.fetchrow(
-                '''SELECT * FROM owner_accounting_journal_decisions
-                   WHERE "propertyId"=$1 AND "proposalId"=$2 AND action='APPROVE' ''',
-                pid,proposal_id)
-            if not approval:
-                raise HTTPException(409,detail={"code":"ACCOUNTING_APPROVAL_REQUIRED"})
-            if body.action=="POST":
-                if await conn.fetchval(
-                    '''SELECT 1 FROM owner_accounting_journal_decisions
-                       WHERE "propertyId"=$1 AND "proposalId"=$2 AND action='REVERSE' ''',
-                    pid,proposal_id):
-                    raise HTTPException(409,detail={"code":"ACCOUNTING_APPROVAL_REVERSED"})
-                original_id=None
-                lines=await conn.fetch(
-                    '''SELECT * FROM owner_accounting_journal_proposal_lines
-                       WHERE "propertyId"=$1 AND "proposalId"=$2 ORDER BY "lineNo"''',
-                    pid,proposal_id)
-            else:
-                original=await conn.fetchrow(
+    try:
+        async with request.app.state.db.acquire() as conn:
+            async with conn.transaction():
+                pid=await trusted_property_id(conn,user)
+                actor=uuid.UUID(str(user["id"]))
+                await lock_keys(conn,"owner-posting:"+str(pid)+":"+str(proposal_id))
+                proposal=await conn.fetchrow(
+                    'SELECT * FROM owner_accounting_journal_proposals WHERE id=$1 AND "propertyId"=$2',
+                    proposal_id,pid)
+                if not proposal:
+                    raise HTTPException(404,detail={"code":"ACCOUNTING_PROPOSAL_NOT_FOUND"})
+                old=await conn.fetchrow(
                     '''SELECT * FROM owner_accounting_postings
-                       WHERE "propertyId"=$1 AND "proposalId"=$2 AND action='POST' ''',
+                       WHERE "propertyId"=$1 AND "proposalId"=$2 AND action=$3''',
+                    pid,proposal_id,body.action)
+                if old:
+                    if old["id"]!=body.id or old["postedById"]!=actor or old["reason"]!=body.reason:
+                        raise HTTPException(409,detail={"code":"ACCOUNTING_POSTING_CONFLICT"})
+                    lines=await conn.fetch(
+                        'SELECT * FROM owner_accounting_posting_lines WHERE "propertyId"=$1 AND "postingId"=$2 ORDER BY "lineNo"',
+                        pid,old["id"])
+                    return posting_view(old,lines,True)
+                if actor==proposal["createdById"]:
+                    raise HTTPException(403,detail={"code":"ACCOUNTING_POSTER_MUST_BE_INDEPENDENT"})
+                approval=await conn.fetchrow(
+                    '''SELECT * FROM owner_accounting_journal_decisions
+                       WHERE "propertyId"=$1 AND "proposalId"=$2 AND action='APPROVE' ''',
                     pid,proposal_id)
-                if not original:
-                    raise HTTPException(409,detail={"code":"ACCOUNTING_POSTING_REQUIRED"})
-                original_id=original["id"]
-                lines=await conn.fetch(
-                    '''SELECT * FROM owner_accounting_posting_lines
-                       WHERE "propertyId"=$1 AND "postingId"=$2 ORDER BY "lineNo"''',
-                    pid,original_id)
-            row=await conn.fetchrow(
-                '''INSERT INTO owner_accounting_postings
-                   (id,"propertyId","proposalId","decisionId",action,"reversesId",
-                    "postedById",reason,"accountingDate","policyVersion")
-                   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *''',
-                body.id,pid,proposal_id,approval["id"],body.action,original_id,
-                actor,body.reason,proposal["accountingDate"],proposal["policyVersion"])
-            for line in lines:
-                side=(line["side"] if body.action=="POST" else
-                      "CREDIT" if line["side"]=="DEBIT" else "DEBIT")
+                if not approval:
+                    raise HTTPException(409,detail={"code":"ACCOUNTING_APPROVAL_REQUIRED"})
+                if body.action=="POST":
+                    if await conn.fetchval(
+                        '''SELECT 1 FROM owner_accounting_journal_decisions
+                           WHERE "propertyId"=$1 AND "proposalId"=$2 AND action='REVERSE' ''',
+                        pid,proposal_id):
+                        raise HTTPException(409,detail={"code":"ACCOUNTING_APPROVAL_REVERSED"})
+                    original_id=None
+                    lines=await conn.fetch(
+                        '''SELECT * FROM owner_accounting_journal_proposal_lines
+                           WHERE "propertyId"=$1 AND "proposalId"=$2 ORDER BY "lineNo"''',
+                        pid,proposal_id)
+                else:
+                    original=await conn.fetchrow(
+                        '''SELECT * FROM owner_accounting_postings
+                           WHERE "propertyId"=$1 AND "proposalId"=$2 AND action='POST' ''',
+                        pid,proposal_id)
+                    if not original:
+                        raise HTTPException(409,detail={"code":"ACCOUNTING_POSTING_REQUIRED"})
+                    original_id=original["id"]
+                    lines=await conn.fetch(
+                        '''SELECT * FROM owner_accounting_posting_lines
+                           WHERE "propertyId"=$1 AND "postingId"=$2 ORDER BY "lineNo"''',
+                        pid,original_id)
+                row=await conn.fetchrow(
+                    '''INSERT INTO owner_accounting_postings
+                       (id,"propertyId","proposalId","decisionId",action,"reversesId",
+                        "postedById",reason,"accountingDate","policyVersion")
+                       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *''',
+                    body.id,pid,proposal_id,approval["id"],body.action,original_id,
+                    actor,body.reason,proposal["accountingDate"],proposal["policyVersion"])
+                for line in lines:
+                    side=(line["side"] if body.action=="POST" else
+                          "CREDIT" if line["side"]=="DEBIT" else "DEBIT")
+                    await conn.execute(
+                        '''INSERT INTO owner_accounting_posting_lines
+                           ("postingId","propertyId","lineNo","accountCode",side,"amountKgs",memo)
+                           VALUES($1,$2,$3,$4,$5,$6,$7)''',
+                        body.id,pid,line["lineNo"],line["accountCode"],side,
+                        line["amountKgs"],line["memo"])
                 await conn.execute(
-                    '''INSERT INTO owner_accounting_posting_lines
-                       ("postingId","propertyId","lineNo","accountCode",side,"amountKgs",memo)
-                       VALUES($1,$2,$3,$4,$5,$6,$7)''',
-                    body.id,pid,line["lineNo"],line["accountCode"],side,
-                    line["amountKgs"],line["memo"])
-            await conn.execute(
-                '''INSERT INTO audit_logs
-                   (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"createdAt")
-                   VALUES($1,$2,'STAFF',$3,$4,'AccountingPosting',$5,'WEB_ADMIN','SUCCESS',now())''',
-                uuid.uuid4(),pid,str(actor),"ACCOUNTING_"+body.action,str(body.id))
-            posted=await conn.fetch(
-                '''SELECT * FROM owner_accounting_posting_lines
-                   WHERE "propertyId"=$1 AND "postingId"=$2 ORDER BY "lineNo"''',pid,body.id)
-            return posting_view(row,posted)
-
+                    '''INSERT INTO audit_logs
+                       (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"createdAt")
+                       VALUES($1,$2,'STAFF',$3,$4,'AccountingPosting',$5,'WEB_ADMIN','SUCCESS',now())''',
+                    uuid.uuid4(),pid,str(actor),"ACCOUNTING_"+body.action,str(body.id))
+                posted=await conn.fetch(
+                    '''SELECT * FROM owner_accounting_posting_lines
+                       WHERE "propertyId"=$1 AND "postingId"=$2 ORDER BY "lineNo"''',pid,body.id)
+                return posting_view(row,posted)
+    
+    except (asyncpg.CheckViolationError, asyncpg.UniqueViolationError,
+            asyncpg.ForeignKeyViolationError) as exc:
+        raise HTTPException(409,detail={"code":"ACCOUNTING_POSTING_SOURCE_OR_LINES_INVALID"}) from exc
 
 @router.get("/proposals/{proposal_id}/postings")
 async def list_postings(proposal_id:uuid.UUID,request:Request,user=Depends(owner_only)):
