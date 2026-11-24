@@ -86,6 +86,17 @@ async def seed():
         await conn.close()
 
 facts = asyncio.run(seed())
+
+async def payment_count():
+    conn = await asyncpg.connect(os.environ["DATABASE_URL"].split("?")[0])
+    try:
+        return await conn.fetchval("SELECT COUNT(*) FROM payments")
+    finally:
+        await conn.close()
+
+# Earlier lifecycle steps may legitimately seed payments in the shared disposable DB.
+# The batch-allocation operation must not create additional payment records.
+payments_before = asyncio.run(payment_count())
 checks=0
 with TestClient(app,base_url="https://batch-isolated.invalid") as client:
     def login(code,role):
@@ -174,7 +185,7 @@ async def verify():
                 """SELECT COUNT(*)::int FROM audit_logs
                    WHERE "propertyId"=$1 AND action='KITCHEN_SERVED_BATCH_ALLOCATION'""",p)
             assert proof==1
-        assert await conn.fetchval("SELECT COUNT(*) FROM payments")==0
+        assert await conn.fetchval("SELECT COUNT(*) FROM payments")==payments_before
     finally:
         await conn.close()
 asyncio.run(verify())
