@@ -48,7 +48,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
     "scripts/marina_shared_kitchen_cost_truth_ci.py": "e955a3cbd8a12ce76f8dd421bf1c277fe1cbde21",
     "services/api/app/owner_served_kitchen_cost_trace.py": "848956bbe269623462b8979381baad86555b2f36",
-    "services/api/app/owner_accrual_readiness.py": "4d018cea0e9ffd3724594995dab4e91a76b5464f",
+    "services/api/app/owner_accrual_readiness.py": "a6484821beaae10aa3f3de3bbf5011e38389872f",
     "scripts/test_owner_served_kitchen_cost_trace.py": "c30f2859bd5769228c7cbcd1a1c6159797369abf",
     "scripts/marina_shared_served_cost_trace_ci.py": "0d8a608004d04fd6b4ad01f548da34fc59627385",
     "apps/admin/components/HotelFinanceBoard.tsx": "20cdda5d8839fa3c3b9a59bfd686c52a69ae14ab",
@@ -67,6 +67,9 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "scripts/marina_shared_batch_allocation_ci.py": "ba9ce140bb72bfdb7954cb7081ea4f312bb4a168",
     "scripts/marina_owner_accounting_decision_ci.py": "4b84740d89e497f976accaa6da3da082129e349e",
     "services/api/app/owner_accounting_journal.py": "fcb45a4a75f7935e12d6793dcdd95062a5d7c8d6",
+    "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
+    "scripts/test_owner_recognition_policy.py": "7a856095b84319c654c9b536f763e1d763cf790a",
+    ".github/workflows/marina-owner-recognition-policy-ci.yml": "7965e38127aaf6a9ffe73f0c0ce755425d36d6e1",
     "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
     ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "402ab2ad026fd31f2b43910c1675a8d9ec23f8f8",
 }
