@@ -14,6 +14,7 @@ from .owner_kitchen_reconciliation import owner_inventory_reconciliation
 from .owner_delivered_revenue import delivered_sources
 from .owner_revenue_source_journal import source_approval_snapshot
 from .owner_revenue_corrections import correction_snapshot
+from .owner_served_kitchen_cost_trace import owner_served_kitchen_cost_trace
 
 router = APIRouter(prefix="/api/v1/admin/finance/owner",
                  tags=["owner-accrual-readiness"])
@@ -144,6 +145,7 @@ async def accrual_source_snapshot(conn,pid,from_date:date,to_date:date,tz:str):
     delivered=await delivered_sources(conn,pid,from_date,to_date,tz)
     approvals=await source_approval_snapshot(conn,pid,from_date,to_date)
     corrections=await correction_snapshot(conn,pid,from_date,to_date)
+    served_cost=await owner_served_kitchen_cost_trace(conn,pid,from_date,to_date,tz)
     stock=reconciliation["inventory"]
     supplier=reconciliation["supplier_documents"]
     blockers=[
@@ -183,6 +185,7 @@ async def accrual_source_snapshot(conn,pid,from_date:date,to_date:date,tz:str):
             "sample_movement_gross_kgs":amount(samples),
             "costs_are_reconciled_to_revenue":False,
         },
+        "served_kitchen_cost_trace":served_cost,
         "revenue_source_candidates":{
             "served_dining_orders_count":dining["served_count"],
             "served_dining_face_value_kgs":amount(dining["served_face_value"]),
