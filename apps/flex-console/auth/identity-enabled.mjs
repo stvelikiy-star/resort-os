@@ -15,7 +15,21 @@ export function createFlexAuthConfig({database,baseURL}) {
     baseURL,basePath:'/api/identity',database,
     emailAndPassword:{
       enabled:true,disableSignUp:true,requireEmailVerification:true,
-      minPasswordLength:12,maxPasswordLength:128
+      minPasswordLength:12,maxPasswordLength:128,
+      resetPasswordTokenExpiresIn:900,
+      revokeSessionsOnPasswordReset:true,
+      sendResetPassword:async ({user,token})=>{
+        const key=process.env.FLEX_RESEND_API_KEY;
+        const from=process.env.FLEX_RECOVERY_FROM;
+        if(!key||!from)throw Error('FLEX_RECOVERY_MAIL_NOT_CONFIGURED');
+        const link=new URL('/',baseURL);
+        link.hash=new URLSearchParams({reset:token}).toString();
+        const response=await fetch('https://api.resend.com/emails',{
+          method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
+          body:JSON.stringify({from,to:[user.email],subject:'MARINA SMART FLEX — Password reset',text:'Восстановление пароля / Сырсөздү калыбына келтирүү / Password reset\n'+link.href+'\n15 минут / 15 мүнөт / 15 minutes'})
+        });
+        if(!response.ok)throw Error('FLEX_RECOVERY_MAIL_FAILED');
+      }
     },
     session:{expiresIn:3600,updateAge:900},
     rateLimit:{enabled:true,storage:'database',window:60,max:15},
