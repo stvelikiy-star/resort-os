@@ -2,6 +2,7 @@
 """Deterministic MARINA FLEX quote tests. No PostgreSQL, payments or network."""
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 import uuid
@@ -11,7 +12,7 @@ from decimal import Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services" / "api"))
-from app.flex_pricing import PriceItem, quote_month  # noqa: E402
+from app.flex_pricing import PriceItem, quote_month, quote_package_term  # noqa: E402
 
 HOTEL = str(uuid.UUID("00000000-0000-0000-0000-00000000000a"))
 
@@ -105,6 +106,55 @@ class CommercialQuoteTest(unittest.TestCase):
             quote_month(hotel_id="from-user-header", period_start=date(2026, 11, 1), catalog_items=(self.base(),))
         with self.assertRaises(ValueError):
             quote_month(hotel_id=HOTEL, period_start=date(2026, 11, 1), catalog_items=())
+
+
+
+
+class PackageTermTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.policy = json.loads((Path(__file__).resolve().parents[1] / "docs/flex/commercial-policy-20261124.json").read_text())
+        cls.addons = {k: Decimal(v) for k, v in cls.policy["module_monthly_prices"].items()}
+
+    def quote(self, kind, months, discount, addons=(), one_time=0):
+        plan = self.policy["monthly_packages"][kind]
+        return quote_package_term(package_kind=kind,
+            package_monthly_price=Decimal(plan.get("price", plan.get("base_price"))),
+            included_modules=tuple(plan["modules"]), addon_monthly_prices=self.addons,
+            selected_addons=addons, months=months, discount_pct=Decimal(discount),
+            one_time_total=Decimal(one_time))
+
+    def test_approved_package_totals(self):
+        for kind, totals in {
+            "BASE": (5000, 13500, 24000, 42000, 36000),
+            "BUSINESS": (15000, 40500, 72000, 126000, 108000),
+            "PREMIUM": (25000, 67500, 120000, 210000, 180000),
+        }.items():
+            for (months, discount), expected in zip(((1,0),(3,10),(6,20),(12,30),(12,40)), totals):
+                with self.subTest(kind=kind, months=months, discount=discount):
+                    self.assertEqual(self.quote(kind, months, discount).subscription_total, Decimal(expected))
+
+    def test_included_modules_not_billed_twice(self):
+        q = self.quote("BUSINESS", 1, 0, ("RESTAURANT", "MULTI_HOTEL"))
+        self.assertEqual(q.monthly_total, Decimal(20000))
+        self.assertEqual(q.extra_modules, ("MULTI_HOTEL",))
+
+    def test_setup_not_discounted(self):
+        q = self.quote("BASE", 12, 40, one_time=25000)
+        self.assertEqual(q.payable_total, Decimal(61000))
+        self.assertEqual(q.one_time_total, Decimal(25000))
+
+    def test_custom_base_plus_modules(self):
+        self.assertEqual(self.quote("CUSTOM", 1, 0, ("QR_ZONE", "RESTAURANT")).monthly_total, Decimal(10000))
+
+    def test_reject_duplicate_unknown_and_invalid_term(self):
+        for addons in (("QR_ZONE", "QR_ZONE"), ("UNKNOWN",), ("PMS",)):
+            with self.assertRaises(ValueError):
+                self.quote("BASE", 1, 0, addons)
+        with self.assertRaises(ValueError):
+            self.quote("BASE", 2, 0)
+        with self.assertRaises(ValueError):
+            self.quote("BASE", 1, 101)
 
 
 if __name__ == "__main__":

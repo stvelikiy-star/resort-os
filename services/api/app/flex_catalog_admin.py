@@ -228,6 +228,26 @@ async def health():
     }
 
 
+@app.get("/v1/platform/commercial-policy")
+async def commercial_policy(
+    request: Request,
+    principal: PlatformPrincipal = Depends(resolve_platform_principal),
+):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn, principal)
+            row = await conn.fetchrow(
+                "SELECT version,policy,created_at FROM flex_commercial_policy_versions "
+                "ORDER BY version DESC LIMIT 1"
+            )
+            if row is None:
+                raise HTTPException(404, detail="Commercial policy unavailable")
+            policy = json.loads(row["policy"]) if isinstance(row["policy"], str) else row["policy"]
+            return {"version": row["version"], "policy": policy,
+                    "created_at": row["created_at"].isoformat()}
+
+
 @app.get("/v1/platform/catalog")
 async def catalog(
     request: Request,
