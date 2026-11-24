@@ -152,7 +152,8 @@ class NewTariffPackageProposal(BaseModel):
     package_kind: str
     title: str = Field(min_length=2, max_length=120)
     period_start: date
-    skus: list[str] = Field(min_length=1, max_length=50)
+    skus: list[str] = Field(max_length=50)
+    commercial_policy_version: int | None = Field(default=None, strict=True, ge=1)
     discount_pct: str = "0"
     trial_days: int = Field(default=0, ge=0, le=90)
     source_template_id: uuid.UUID | None = None
@@ -190,6 +191,10 @@ class NewTariffPackageProposal(BaseModel):
 
 
 def ensure_package_proposal(payload: NewTariffPackageProposal) -> None:
+    if payload.commercial_policy_version is None and not payload.skus:
+        raise HTTPException(422, detail="Select at least one legacy SKU")
+    if payload.commercial_policy_version is not None and payload.source_template_id is not None:
+        raise HTTPException(422, detail="Legacy template cannot override commercial package")
     today = datetime.now(ZoneInfo("Asia/Bishkek")).date()
     if not (today-timedelta(days=1) <= payload.period_start <= today+timedelta(days=366)):
         raise HTTPException(422, detail="Package start date out of range")
@@ -539,28 +544,52 @@ async def create_tariff_package_proposal(
                 )
                 if hotel not in {"PENDING","ACTIVE"}:
                     raise HTTPException(404, detail="Commercial hotel unavailable")
-                rows = await conn.fetch(
-                    "SELECT s.sku,p.id AS price_id,p.version,p.monthly_price,p.currency "
-                    "FROM flex_skus s JOIN LATERAL ( "
-                    "SELECT id,version,monthly_price,currency FROM flex_price_versions "
-                    "WHERE sku=s.sku AND valid_from<=($2::date::timestamp AT TIME ZONE 'Asia/Bishkek') "
-                    "AND (valid_to IS NULL OR valid_to>($2::date::timestamp AT TIME ZONE 'Asia/Bishkek')) "
-                    "ORDER BY valid_from DESC,version DESC LIMIT 1 "
-                    ") p ON true WHERE s.sku=ANY($1::text[]) "
-                    "AND s.product_status='AVAILABLE' AND s.is_core=false AND p.currency='KGS' "
-                    "ORDER BY s.sku",
-                    payload.skus,payload.period_start,
-                )
-                if len(rows)!=len(payload.skus):
-                    raise HTTPException(
-                        422, detail="Only published non-core SKU prices effective on start date"
+                if payload.commercial_policy_version is not None:
+                    policy_row = await conn.fetchrow(
+                        "SELECT version,policy FROM flex_commercial_policy_versions ORDER BY version DESC LIMIT 1"
                     )
-                items=[
-                    {"sku":r["sku"],"price_version_id":str(r["price_id"]),
-                     "price_version":r["version"],"monthly_price":str(r["monthly_price"]),
-                     "currency":"KGS"} for r in rows
-                ]
-                list_total=sum((r["monthly_price"] for r in rows),Decimal("0.00"))
+                    if not policy_row or policy_row["version"] != payload.commercial_policy_version:
+                        raise HTTPException(409, detail="Commercial policy version changed; reload")
+                    policy = json.loads(policy_row["policy"]) if isinstance(policy_row["policy"],str) else policy_row["policy"]
+                    package = policy["monthly_packages"][payload.package_kind]
+                    prices = policy["module_monthly_prices"]
+                    included = set(package["modules"])
+                    selected = set(payload.skus)
+                    if not selected.issubset(prices):
+                        raise HTTPException(422, detail="Unknown commercial module")
+                    base = Decimal(str(package.get("price",package.get("base_price"))))
+                    extra = selected - included
+                    list_total = base + sum((Decimal(str(prices[k])) for k in extra),Decimal("0"))
+                    if payload.custom_monthly_price is not None and Decimal(payload.custom_monthly_price) < base:
+                        raise HTTPException(422, detail="CUSTOM price below mandatory base")
+                    items = [{"sku":"BASE_PMS","monthly_price":str(base),"currency":"KGS",
+                              "commercial_policy_version":policy_row["version"],"pricing_source":"COMMERCIAL_PACKAGE"}]
+                    items.extend({"sku":k,"monthly_price":str(Decimal("0") if k in included else Decimal(str(prices[k]))),
+                                  "currency":"KGS","commercial_policy_version":policy_row["version"],
+                                  "included_in_package":k in included} for k in sorted(included | selected))
+                else:
+                    rows = await conn.fetch(
+                        "SELECT s.sku,p.id AS price_id,p.version,p.monthly_price,p.currency "
+                        "FROM flex_skus s JOIN LATERAL ( "
+                        "SELECT id,version,monthly_price,currency FROM flex_price_versions "
+                        "WHERE sku=s.sku AND valid_from<=($2::date::timestamp AT TIME ZONE 'Asia/Bishkek') "
+                        "AND (valid_to IS NULL OR valid_to>($2::date::timestamp AT TIME ZONE 'Asia/Bishkek')) "
+                        "ORDER BY valid_from DESC,version DESC LIMIT 1 "
+                        ") p ON true WHERE s.sku=ANY($1::text[]) "
+                        "AND s.product_status='AVAILABLE' AND s.is_core=false AND p.currency='KGS' "
+                        "ORDER BY s.sku",
+                        payload.skus,payload.period_start,
+                    )
+                    if len(rows)!=len(payload.skus):
+                        raise HTTPException(
+                            422, detail="Only published non-core SKU prices effective on start date"
+                        )
+                    items=[
+                        {"sku":r["sku"],"price_version_id":str(r["price_id"]),
+                         "price_version":r["version"],"monthly_price":str(r["monthly_price"]),
+                         "currency":"KGS"} for r in rows
+                    ]
+                    list_total=sum((r["monthly_price"] for r in rows),Decimal("0.00"))
                 discount=Decimal(payload.discount_pct)
                 custom=(Decimal(payload.custom_monthly_price)
                         if payload.custom_monthly_price is not None else None)
