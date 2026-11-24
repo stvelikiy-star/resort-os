@@ -222,6 +222,38 @@ class SharedAuthTests(unittest.TestCase):
                     bad_method, bad_route).status_code, 503, bad_route)
             self.assertEqual(self.client.post('/api/v1/auth/logout').status_code, 204)
 
+    def test_full_manual_refund_never_opens_in_production_or_legacy(self):
+        from fastapi import HTTPException
+        from app import reservation_payments
+        with patch.object(reservation_payments, "MARINA_SHARED_AUTH_PREVIEW_ENABLED", False):
+            with self.assertRaises(HTTPException) as denied:
+                reservation_payments.enforce_manual_refund_staging()
+            self.assertEqual(denied.exception.status_code, 503)
+        with patch.object(reservation_payments, "MARINA_SHARED_AUTH_PREVIEW_ENABLED", True), \
+             patch.dict('os.environ', APP_ENV='production'):
+            with self.assertRaises(HTTPException) as denied:
+                reservation_payments.enforce_manual_refund_staging()
+            self.assertEqual(denied.exception.status_code, 503)
+        with patch.object(reservation_payments, "MARINA_SHARED_AUTH_PREVIEW_ENABLED", True):
+            reservation_payments.enforce_manual_refund_staging()
+
+    def test_full_manual_refund_path_is_exactly_scoped(self):
+        valid = '11111111-1111-4111-8111-111111111111'
+        base = '/api/v1/admin/booking/reservations/' + valid + '/payments/' + valid
+        route = base + '/confirm-manual-refund'
+        # Test fixture does not attach the real payment router: 404 means that
+        # middleware admitted the route; 503 would mean it rejected it.
+        self.assertEqual(self.login('HOTEL_A').status_code, 200)
+        self.assertEqual(self.client.post(route, json={}).status_code, 404)
+        for method, path in (
+            ('GET', route),
+            ('DELETE', route),
+            ('POST', base + '/confirm-refund'),
+            ('POST', base + '/confirm-manual-refund/extra'),
+            ('POST', base[:-36] + '/not-a-uuid/confirm-manual-refund'),
+        ):
+            self.assertEqual(self.client.request(method, path).status_code, 503, path)
+
     def test_shared_dashboard_never_falls_back_to_previous_hotel(self):
         route = '/api/v1/admin/dashboard'
         self.assertEqual(self.login('HOTEL_A').status_code, 200)

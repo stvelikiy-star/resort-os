@@ -14,12 +14,13 @@ class MarinaFinanceTenantBoundary(unittest.TestCase):
         path = ROOT / "services/api/app/reservation_payments.py"
         source = path.read_text(encoding="utf-8")
         self.assertIn("from .auth import require_roles, trusted_property_id", source)
-        self.assertEqual(source.count("pid = await trusted_property_id(conn, user)"), 3)
+        self.assertEqual(source.count("pid = await trusted_property_id(conn, user)"), 4)
         self.assertNotIn('SELECT id FROM properties WHERE code=$1', source)
         for handler in (
             "reservation_acquiring_readiness",
             "cancellation_finance_review",
             "record_reservation_payment",
+            "confirm_manual_full_refund",
         ):
             body = source.split("async def " + handler + "(", 1)[1].split("\n\n@router.", 1)[0]
             self.assertIn("pid = await trusted_property_id(conn, user)", body, handler)

@@ -51,17 +51,23 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "f6eeaa3be2044711674719b025f8608b391808ee",
+    "scripts/marina_rc3_additive_gate.py": "612cb739c06eca5a47c2a17f302432a29c5231be",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
-    "services/api/app/shared_auth_preview.py": "def6ae43b34ab7946ab903f71ac207adf375fce8",
-    "scripts/test_marina_shared_auth.py": "866325b1ef4f0d14f98798fec9d3364ebe7b00a7",
+    "services/api/app/shared_auth_preview.py": "cb4acbe3083a5981f550f6f614d67bc4f2acb436",
+    "scripts/test_marina_shared_auth.py": "9c90ca127cba6c0eee2d22f0c6512bf586319509",
     "apps/staff/components/StoreStaffStock.tsx": "82b87098c1ab1355562551ec76cd8b4eb7b5478c",
     "apps/staff/components/StaffRoleGateway.tsx": "957821d21a17350529f9fcef442527772a42e0c9",
     # Reviewed P0 two-hotel OWNER financial facts, exact method-scoped routes,
     # and test-only workflow. No production shared-auth promotion.
     "scripts/marina_shared_owner_finance_p0_ci.py": "71cabedce521c0019a3fd900d075830d51891a13",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "9cfef5e35c189f792cedf768aaab595b18b23fdb",
+    # Full refund can only be recorded after external evidence; nothing is sent.
+    "services/api/app/reservation_payments.py": "f7e533861624cd8a62fd29e81c7b0d73337717f3",
+    "services/api/app/pms_reservation_create.py": "f068836d615409443f1742fc492f27886f9d6aee",
+    "scripts/marina_shared_manual_refund_evidence_ci.py": "f52d7947e64e935497617834e17535def9a59042",
+    "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
+    "scripts/marina_shared_kitchen_cost_truth_ci.py": "e955a3cbd8a12ce76f8dd421bf1c277fe1cbde21",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "3ebf8db3c10dadab720626dd5e42e72a64488a8e",
     "apps/staff/components/WaiterEntry.module.css": "7218c412d73930418c4d703267bf83e5f8153c0e",
     "scripts/test_marina_staff_legacy_dining_preservation.py": "15fb8274b823c5dcb0842aa6be4ca585b85d05a5",
 }
