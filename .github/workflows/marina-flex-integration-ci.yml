@@ -64,7 +64,7 @@ jobs:
           echo "Historical November Release RC Truth stays a separate NO-GO for main."
 
   clean-install-and-recovery:
-    name: FLEX ten-migration PostgreSQL bootstrap, backup and restore acceptance
+    name: FLEX PostgreSQL bootstrap, backup and restore acceptance
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -100,13 +100,13 @@ jobs:
           psql --version
       - name: Refuse installation outside empty disposable PostgreSQL 16 database
         run: psql -X -v ON_ERROR_STOP=1 -d flex_ci -f scripts/marina_flex_qa_db_preflight.sql
-      - name: Install all twelve independent FLEX preview migrations in exact order
+      - name: Install all fifteen independent FLEX preview migrations in exact order
         run: |
           set -euo pipefail
           test -f "docs/flex/sql/0010_flex_partner_earnings_preview.sql"
           test -f "docs/flex/sql/0011_flex_catalog_subscription_drafts_preview.sql"
           test -f "docs/flex/sql/0012_flex_tariff_package_versions_preview.sql"
-          for file in 0001_flex_control_plane_preview.sql 0002_flex_platform_identity_rls_preview.sql 0003_flex_price_version_guard_preview.sql 0004_flex_hotel_onboarding_preview.sql 0005_flex_deployment_attestation_preview.sql 0006_flex_agreements_subscription_preview.sql 0007_flex_invoice_ledger_preview.sql 0008_flex_refund_reconciliation_preview.sql 0009_flex_signed_qa_settlement_preview.sql 0010_flex_partner_earnings_preview.sql 0011_flex_catalog_subscription_drafts_preview.sql 0012_flex_tariff_package_versions_preview.sql 0013_flex_shared_tariff_templates_preview.sql 0014_flex_hotel_name_edit_preview.sql; do
+          for file in 0001_flex_control_plane_preview.sql 0002_flex_platform_identity_rls_preview.sql 0003_flex_price_version_guard_preview.sql 0004_flex_hotel_onboarding_preview.sql 0005_flex_deployment_attestation_preview.sql 0006_flex_agreements_subscription_preview.sql 0007_flex_invoice_ledger_preview.sql 0008_flex_refund_reconciliation_preview.sql 0009_flex_signed_qa_settlement_preview.sql 0010_flex_partner_earnings_preview.sql 0011_flex_catalog_subscription_drafts_preview.sql 0012_flex_tariff_package_versions_preview.sql 0013_flex_shared_tariff_templates_preview.sql 0014_flex_hotel_name_edit_preview.sql 0015_flex_commercial_policy_preview.sql; do
             psql -X -v ON_ERROR_STOP=1 -d flex_ci -f "docs/flex/sql/$file"
           done
           sha256sum docs/flex/sql/*.sql
