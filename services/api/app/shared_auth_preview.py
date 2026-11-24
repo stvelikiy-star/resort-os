@@ -110,6 +110,10 @@ class SharedAuthPreviewBoundary:
             # Exact UUID-only Staff mutations. Unreviewed financial posting,
             # procurement,
             # menu publication, and guest routes remain fail-closed.
+            batch_assignment = (scope['type'] == 'http' and method in {'POST', 'OPTIONS'} and
+                                isinstance(path, str) and re.fullmatch(
+                                    r'/api/v1/kitchen/orders/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/batch-allocations',
+                                    path) is not None)
             kitchen_status = (scope['type'] == 'http' and method in {'PATCH', 'OPTIONS'} and
                               isinstance(path, str) and re.fullmatch(
                                   r'/api/v1/kitchen/orders/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/status',
@@ -137,9 +141,9 @@ class SharedAuthPreviewBoundary:
                            isinstance(path, str) and re.fullmatch(
                                r'/api/v1/ops/tasks/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/history',
                                path) is not None)
-            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history or kitchen_status or waiter_assignment or dining_reservation_status or owner_expense_mutation or manual_full_refund
+            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history or kitchen_status or batch_assignment or waiter_assignment or dining_reservation_status or owner_expense_mutation or manual_full_refund
             if method == 'OPTIONS':
-                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history or kitchen_status or waiter_assignment or dining_reservation_status or owner_expense_mutation or manual_full_refund
+                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history or kitchen_status or batch_assignment or waiter_assignment or dining_reservation_status or owner_expense_mutation or manual_full_refund
             if not valid:
                 raise HTTPException(503, detail='Only authentication is available in the shared staging preview')
         except HTTPException as error:
