@@ -390,14 +390,14 @@ async function commercialHotelOfferForm(){
  '<label>'+safe(t('periodStart'))+'<input type="date" name="period_start" required value="'+safe(dateValue(2))+'"></label>'+
  '<fieldset><legend>'+safe(l.extras)+'</legend>'+Object.entries(p.module_monthly_prices).map(([k,v])=>'<label class="check-row"><input type="checkbox" name="extras" value="'+safe(k)+'"><span>'+safe(k)+' · '+money(v,p.currency)+'</span></label>').join('')+'</fieldset>'+
  '<label>'+safe(t('packageDiscount'))+'<input name="discount_pct" type="number" min="0" max="100" step="0.01" value="0" required></label>'+
- '<button class="primary" type="submit">'+safe(t('packageSave'))+'</button><div role="status" aria-live="polite"></div></form></section>';
+ '<label>'+safe({ru:'Месяцев',kg:'Ай',en:'Months'}[state.lang]||'Месяцев')+'<select name="term_months">'+[1,3,6,12].map(n=>'<option value="'+n+'">'+n+'</option>').join('')+'</select></label><label class="check-row"><input type="checkbox" name="standard_term_discount">'+safe({ru:'Стандартная скидка за срок',kg:'Мөөнөт үчүн стандарттык арзандатуу',en:'Standard term discount'}[state.lang]||'Стандартная скидка')+'</label><label class="check-row"><input type="checkbox" name="include_implementation">'+safe({ru:'Включить внедрение',kg:'Орнотууну кошуу',en:'Include implementation'}[state.lang]||'Включить внедрение')+'</label><button class="primary" type="submit">'+safe(t('packageSave'))+'</button><div role="status" aria-live="polite"></div></form></section>';
 }
 async function saveCommercialHotelOffer(form){
  const d=new FormData(form),button=form.querySelector('button[type=submit]'),status=form.querySelector('[role=status]');
  button.disabled=true;
  try{
  const kind=String(d.get('package_kind'));
- await saveQaCatalogAction('tariff-packages',{hotel_id:state.hotelId,package_kind:kind,title:kind,period_start:String(d.get('period_start')),skus:d.getAll('extras'),discount_pct:String(d.get('discount_pct')),trial_days:5,custom_monthly_price:null,commercial_policy_version:Number(d.get('policy_version'))});
+ await saveQaCatalogAction('tariff-packages',{hotel_id:state.hotelId,package_kind:kind,title:kind,period_start:String(d.get('period_start')),skus:d.getAll('extras'),discount_pct:String(d.get('discount_pct')),trial_days:5,custom_monthly_price:null,commercial_policy_version:Number(d.get('policy_version')),term_months:Number(d.get('term_months')),standard_term_discount:d.has('standard_term_discount'),include_implementation:d.has('include_implementation')});
  await render();
  }catch(e){status.textContent=e.message;button.disabled=false;}
 }
