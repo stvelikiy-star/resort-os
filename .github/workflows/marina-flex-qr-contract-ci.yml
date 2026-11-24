@@ -1,0 +1,28 @@
+name: MARINA FLEX QR Provider Contract
+
+on:
+  pull_request:
+    paths:
+      - "services/api/app/flex_qr_provider.py"
+      - "scripts/marina_flex_qr_provider_contract_test.py"
+      - "docs/flex/FLEX_QR_PROVIDER_EVALUATION.md"
+      - ".github/workflows/marina-flex-qr-contract-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provider-contract:
+    name: FLEX QR intent safety and provider trust boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile offline provider contract
+        run: python -m py_compile services/api/app/flex_qr_provider.py scripts/marina_flex_qr_provider_contract_test.py
+      - name: Negative amount, HTTPS, webhook and issuer checks
+        run: python scripts/marina_flex_qr_provider_contract_test.py

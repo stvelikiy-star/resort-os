@@ -1,0 +1,83 @@
+name: MARINA FLEX Console Read-Only CI
+on:
+  pull_request:
+    paths:
+      # Release candidate gate: every FLEX change must check the SAME head SHA.
+      - ".github/workflows/marina-flex-*.yml"
+      - "apps/flex-console/**"
+      - "apps/flex-api-qa/**"
+      - "docs/flex/**"
+      - "services/api/app/flex_*.py"
+      - "scripts/marina_flex_*"
+      - "apps/flex-console/**"
+      - "docs/flex/ui/**"
+      - "scripts/marina_flex_release_scope_guard.py"
+      - ".github/workflows/marina-flex-console-ci.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  isolated-console:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: flex_ci
+          POSTGRES_USER: ci_no_login
+          POSTGRES_PASSWORD: ci_no_secret
+        ports:
+          - 55449:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_no_login -d flex_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned FLEX Console auth dependencies
+        working-directory: apps/flex-console
+        run: npm ci --ignore-scripts --no-fund --no-audit
+      - name: Prepare disposable CI PostgreSQL schema (never Neon)
+        working-directory: apps/flex-console
+        run: |
+          node --input-type=module -e "import pg from 'pg'; const pool=new pg.Pool({connectionString:'postgresql://ci_no_login:ci_no_secret@127.0.0.1:55449/flex_ci'}); await pool.query('CREATE SCHEMA IF NOT EXISTS flex_auth'); await pool.end();"
+      - name: Generate isolated Better Auth + TOTP SQL for review (never apply)
+        working-directory: apps/flex-console
+        env:
+          FLEX_AUTH_SCHEMA_DRY_RUN: "true"
+          BETTER_AUTH_SECRET: "github-ci-only-test-secret-not-for-deployment-123456789"
+        run: |
+          npx --yes auth@1.7.27 generate --config auth/schema-config.mjs --output /tmp/flex-auth-schema.sql --yes
+          test -s /tmp/flex-auth-schema.sql
+          echo "FLEX_AUTH_SCHEMA_GENERATED"
+          cat /tmp/flex-auth-schema.sql
+      - name: Syntax + isolated HTTP security tests
+        working-directory: apps/flex-console
+        run: npm run check
+      - name: Pinned identity-gate and browser unit tests (no skipped MFA imports)
+        run: NODE_ENV=test node --test apps/flex-console/test/*.test.mjs
+      - name: First invitation, TOTP and signed platform token on disposable PostgreSQL
+        working-directory: apps/flex-console
+        run: node test/first-login-postgres.mjs
+      - name: Browser template publishing and two-hotel reuse (RU/KG/EN)
+        run: |
+          python -m venv /tmp/flex-browser
+          /tmp/flex-browser/bin/pip install --disable-pip-version-check playwright==1.58.0
+          /tmp/flex-browser/bin/python scripts/marina_flex_tariff_template_browser.py
+      - name: FLEX-only cumulative additive guard self-test
+        run: python3 scripts/marina_flex_release_scope_guard.py --self-test
+      - name: Console cannot modify hotel PMS
+        shell: bash
+        run: |
+          if git diff --name-only "origin/main"...HEAD | grep -Eq '^(apps/(admin|staff|mobile|web)/|packages/database/|services/api/app/main\.py)'; then
+            echo 'Forbidden operational PMS change'
+            exit 1
+          fi
+          echo 'PASS: operational PMS is unchanged'

@@ -1,0 +1,8 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Первый вход · MARINA SMART FLEX</title><link rel="stylesheet" href="/styles.css"><script defer src="/enroll.js"></script></head>
+<body><main class="panel"><h1>Первый вход в MARINA SMART FLEX</h1>
+<form id="enroll"><label>Почта из приглашения <input name="email" required type="email" autocomplete="username"></label>
+<label>Пароль (от 12 символов) <input name="password" required type="password" minlength="12" maxlength="128" autocomplete="new-password"></label>
+<button>Продолжить</button></form>
+<p role="status" id="status"></p><section hidden id="setup"><h2>Настройка приложения-аутентификатора</h2><p>Добавьте в приложение новую запись с этим ключом.</p><code id="secret"></code>
+<p>Сохраните резервные коды в менеджере паролей.</p><pre id="backup"></pre>
+<form id="verify"><label>Шестизначный код <input required name="code" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code"></label><button>Проверить код</button></form></section><a href="/">В консоль</a></main></body></html>
