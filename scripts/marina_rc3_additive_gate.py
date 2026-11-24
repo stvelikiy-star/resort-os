@@ -35,12 +35,12 @@ WORKFLOW_PATH = ".github/workflows/marina-shared-rc3-source-ci.yml"
 # No historical manifest, RC3 gate, or original SQL hash is rewritten.
 REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/shared_auth_preview.py": "cb4acbe3083a5981f550f6f614d67bc4f2acb436",
-    "scripts/test_marina_shared_auth.py": "61e7e68db81c4414436abb7f36f7d344e4ea3134",
+    "scripts/test_marina_shared_auth.py": "9c90ca127cba6c0eee2d22f0c6512bf586319509",
     "apps/staff/components/StaffRoleGateway.tsx": "957821d21a17350529f9fcef442527772a42e0c9",
     "apps/staff/components/StoreStaffStock.tsx": "82b87098c1ab1355562551ec76cd8b4eb7b5478c",
     "scripts/marina_shared_owner_finance_p0_ci.py": "71cabedce521c0019a3fd900d075830d51891a13",
     # Reviewed evidence-only full refund: no external transfer, no partial refund.
-    "services/api/app/reservation_payments.py": "fe9e0afb085f8343e073a4ba55c3d2b64efc070e",
+    "services/api/app/reservation_payments.py": "f7e533861624cd8a62fd29e81c7b0d73337717f3",
     "services/api/app/pms_reservation_create.py": "f068836d615409443f1742fc492f27886f9d6aee",
     "scripts/marina_shared_manual_refund_evidence_ci.py": "f52d7947e64e935497617834e17535def9a59042",
     "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
