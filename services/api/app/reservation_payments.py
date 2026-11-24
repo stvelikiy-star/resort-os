@@ -435,3 +435,122 @@ async def record_reservation_payment(
         "finance": totals,
         "truth": "Internal staff-recorded payment fact only. Actual payment time and record time are stored separately. No acquiring confirmation is implied.",
     }
+
+class ManualFullRefundConfirmation(BaseModel):
+    """Evidence of a refund already performed outside MARINA SMART.
+
+    This is not a payout instruction. Partial refunds require a separate
+    accounting/event model and are deliberately not supported here.
+    """
+    amount_kgs: int = Field(gt=0)
+    evidence_reference: str = Field(min_length=8, max_length=180)
+    note: str = Field(min_length=8, max_length=500)
+
+
+@router.post("/reservations/{reservation_id}/payments/{payment_id}/confirm-manual-refund")
+async def confirm_manual_full_refund(
+    reservation_id: uuid.UUID,
+    payment_id: uuid.UUID,
+    payload: ManualFullRefundConfirmation,
+    request: Request,
+    user: dict[str, Any] = Depends(payment_access),
+):
+    """Record independently completed full refund; never move funds.
+
+    Existing Payment.status is used only for a FULL reversal of a received
+    MANAGER_MANUAL payment, keeping the legacy finance ledger consistent.
+    The reference is locked and unique across this property's audit journal.
+    """
+    reference = normalize_required_text(payload.evidence_reference)
+    note = normalize_required_text(payload.note)
+    if len(reference) < 8 or len(note) < 8:
+        raise HTTPException(status_code=422, detail={"code": "REFUND_EVIDENCE_REQUIRED"})
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await trusted_property_id(conn, user)
+            reservation = await conn.fetchrow(
+                'SELECT id FROM reservations WHERE id=$1 AND "propertyId"=$2 FOR UPDATE',
+                reservation_id, pid,
+            )
+            if not reservation:
+                raise HTTPException(status_code=404, detail={"code": "RESERVATION_NOT_FOUND"})
+            # Lock evidence reference even when the payment has not been updated.
+            # A reused external evidence reference must never confirm two refunds.
+            await conn.execute(
+                'SELECT pg_advisory_xact_lock(hashtextextended($1,0))',
+                'marina-manual-full-refund:' + reference,
+            )
+            row = await conn.fetchrow(
+                '''SELECT id,"reservationId","amountKgs",method,provider,status::text AS status,
+                          metadata
+                   FROM payments WHERE id=$1 AND "reservationId"=$2 FOR UPDATE''',
+                payment_id, reservation_id,
+            )
+            if not row:
+                raise HTTPException(status_code=404, detail={"code": "PAYMENT_NOT_FOUND"})
+            if row["provider"] != "MANAGER_MANUAL":
+                raise HTTPException(status_code=409, detail={"code": "REFUND_PROVIDER_NOT_MANUAL"})
+            if payload.amount_kgs != int(row["amountKgs"]):
+                raise HTTPException(status_code=422, detail={"code": "ONLY_FULL_MANUAL_REFUND_SUPPORTED"})
+            metadata = row["metadata"] or {}
+            if isinstance(metadata, str):
+                import json
+                metadata = json.loads(metadata)
+            prior = metadata.get("manual_full_refund_evidence")
+            if row["status"] == "REFUNDED":
+                if (isinstance(prior, dict)
+                        and prior.get("reference") == reference
+                        and prior.get("note") == note
+                        and int(prior.get("amount_kgs", 0)) == payload.amount_kgs):
+                    return {
+                        "reservation_id": str(reservation_id),
+                        "payment_id": str(payment_id),
+                        "status": "REFUNDED",
+                        "already_processed": True,
+                        "refund_executed_by_platform": False,
+                        "source": "INDEPENDENT_MANUAL_REFUND_EVIDENCE",
+                    }
+                raise HTTPException(status_code=409, detail={"code": "REFUND_ALREADY_RECORDED"})
+            if row["status"] != "RECEIVED":
+                raise HTTPException(status_code=409, detail={"code": "PAYMENT_NOT_RECEIVED"})
+            reused = await conn.fetchval(
+                '''SELECT id FROM audit_logs
+                   WHERE action='CONFIRM_MANUAL_FULL_REFUND'
+                     AND "afterJson"->>'evidence_reference'=$1 LIMIT 1''',
+                reference,
+            )
+            if reused:
+                raise HTTPException(status_code=409, detail={"code": "REFUND_EVIDENCE_REFERENCE_REUSED"})
+            await conn.execute(
+                '''UPDATE payments
+                   SET status='REFUNDED',"updatedAt"=now(),
+                       metadata=coalesce(metadata,'{}'::jsonb) ||
+                          jsonb_build_object('manual_full_refund_evidence',
+                            jsonb_build_object('reference',$2::text,'note',$3::text,
+                              'amount_kgs',$4::integer,'recorded_by_staff_id',$5::text,
+                              'origin','EXTERNAL_ALREADY_COMPLETED','funds_sent_by_platform',false))
+                   WHERE id=$1''',
+                payment_id, reference, note, payload.amount_kgs, user["id"],
+            )
+            await conn.execute(
+                '''INSERT INTO audit_logs
+                   (id,"propertyId","actorType","actorId",action,resource,"resourceId",
+                    source,result,"afterJson","createdAt")
+                   VALUES($1,$2,'STAFF',$3,'CONFIRM_MANUAL_FULL_REFUND','Payment',$4,
+                    'PMS_MANUAL_REFUND','SUCCESS',
+                    jsonb_build_object(
+                      'reservation_id',$5::text,'evidence_reference',$6::text,
+                      'amount_kgs',$7::integer,'external_refund_previously_completed',true,
+                      'funds_sent_by_platform',false),now())''',
+                uuid.uuid4(), pid, user["id"], str(payment_id), str(reservation_id),
+                reference, payload.amount_kgs,
+            )
+    return {
+        "reservation_id": str(reservation_id),
+        "payment_id": str(payment_id),
+        "status": "REFUNDED",
+        "already_processed": False,
+        "refund_executed_by_platform": False,
+        "source": "INDEPENDENT_MANUAL_REFUND_EVIDENCE",
+        "truth": "Operator attests refund happened outside the platform. No bank transfer was initiated.",
+    }
