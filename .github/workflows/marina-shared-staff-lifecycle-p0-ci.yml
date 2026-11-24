@@ -113,3 +113,9 @@ jobs:
         env:
           MARINA_BATCH_ALLOCATION_CI_CONFIRM: ISOLATED_BATCH_ALLOCATION_ONLY
         run: python scripts/marina_shared_batch_allocation_ci.py
+      - name: Verify independent OWNER accounting decisions without posting P&L
+        env:
+          MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'false'
+          PROPERTY_CODE: HOTEL_A
+          MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED: 'true'
+        run: python scripts/marina_owner_accounting_decision_ci.py
