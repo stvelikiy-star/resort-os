@@ -480,12 +480,30 @@ async function submitAdminForm(form,kind){
 function billingHold(){
  return heading('BILLING',t('billingHold'))+info(t('billingHold'),'info');
 }
+const profileCopy={
+ ru:{title:'Мой профиль',name:'Имя и фамилия',email:'Электронная почта',role:'Роль',save:'Сохранить имя',saved:'Имя сохранено',failed:'Не удалось сохранить имя',unavailable:'Сессия недоступна. Войдите снова.',security:'Безопасность аккаунта',password:'Для восстановления пароля используйте ссылку на странице входа. Изменение email и пароля из профиля пока недоступно.'},
+ kg:{title:'Менин профилим',name:'Аты-жөнү',email:'Электрондук почта',role:'Роль',save:'Атты сактоо',saved:'Аты сакталды',failed:'Атты сактоо мүмкүн болгон жок',unavailable:'Сессия жеткиликсиз. Кайра кириңиз.',security:'Аккаунттун коопсуздугу',password:'Сырсөздү калыбына келтирүү үчүн кирүү бетиндеги шилтемени колдонуңуз. Профилден email жана сырсөздү өзгөртүү азырынча жеткиликсиз.'},
+ en:{title:'My profile',name:'Full name',email:'Email',role:'Role',save:'Save name',saved:'Name saved',failed:'Unable to save name',unavailable:'Session unavailable. Sign in again.',security:'Account security',password:'Use the recovery link on the sign-in page to reset your password. Changing email and password in the profile is not yet available.'}
+};
+const profileText=k=>(profileCopy[state.lang]||profileCopy.ru)[k];
+async function profile(){
+ const session=await identitySession();
+ const p=profileText;
+ if(!session?.user)return heading(p('title'))+info(p('unavailable'));
+ return heading(p('title'))+'<section class="panel"><form id="flex-profile-form"><label>'+safe(p('name'))+'<input name="name" required maxlength="120" autocomplete="name" value="'+safe(session.user.name)+'"></label><label>'+safe(p('email'))+'<input type="email" readonly value="'+safe(session.user.email)+'"></label><p>'+safe(p('role'))+': '+safe(state.me.role)+'</p><button class="primary" type="submit">'+safe(p('save'))+'</button><p role="status" id="flex-profile-result"></p></form></section><section class="panel"><h2>'+safe(p('security'))+'</h2><p>'+safe(p('password'))+'</p></section>';
+}
+async function saveProfile(form){
+ const button=form.querySelector('button[type="submit"]'), result=form.querySelector('[role="status"]');
+ button.disabled=true;
+ try{const name=form.elements.name.value.trim();if(!name)throw Error('EMPTY_NAME');await identityRequest('update-user',{name});state.identitySession=await identitySession();result.textContent=profileText('saved');}catch{result.textContent=profileText('failed');}finally{button.disabled=false;}
+}
 function renderNav(){
  const r=state.me?.role;
  const choices=r==='SUPER_ADMIN'?[['overview','overview','◈'],['hotels','hotels','⌂'],['catalog','catalog','◇'],['obligations','obligations','↗']]:
  r==='HOTEL_OWNER'?[['subscription','subscription','⌂'],['catalog','catalog','◇']]:
  r==='SALES_AGENT'||r==='INVESTOR'?[['earnings','earnings','↗']]:[];
- nav.innerHTML=choices.map(([id,label,icon])=>'<button type="button" data-view="'+id+'" class="'+(state.view===id?'active':'')+'"><span>'+icon+'</span>'+safe(t(label))+'</button>').join('');
+ if(state.me&&state.status?.identity_ready)choices.push(['profile','profile','◎']);
+ nav.innerHTML=choices.map(([id,label,icon])=>'<button type="button" data-view="'+id+'" class="'+(state.view===id?'active':'')+'"><span>'+icon+'</span>'+safe(label==='profile'?profileText('title'):t(label))+'</button>').join('');
  document.getElementById('session-button').textContent=t(state.me?'logout':'login');
  document.querySelectorAll('[data-i18n]').forEach(x=>x.textContent=t(x.dataset.i18n));
  const themeButton=document.getElementById('theme');themeButton.title=t('theme');themeButton.setAttribute('aria-label',t('theme'));document.getElementById('lang').setAttribute('aria-label',t('lang'));nav.setAttribute('aria-label',t('navigation'));document.title=t('footerBrand');
@@ -647,7 +665,7 @@ async function render(){
  renderNav();
  if(!state.me){showLogin();return;}
  main.innerHTML='<div class="skeleton" aria-label="'+safe(t('loading'))+'"></div>';
- try{const views={overview,'billing-hold':billingHold,hotels:hotelList,catalog,'catalog-new':skuForm,'catalog-price':futurePriceForm,'catalog-versions':versionsPage,'subscription-draft':subscriptionDraftForm,obligations,hotel:hotelDetail,'hotel-new':registrationForm,'hotel-link':linkWizard,subscription,earnings};const html=await (views[state.view]||overview)();if(serial!==state.serial)return;main.innerHTML=html;}
+ try{const views={overview,'billing-hold':billingHold,hotels:hotelList,catalog,'catalog-new':skuForm,'catalog-price':futurePriceForm,'catalog-versions':versionsPage,'subscription-draft':subscriptionDraftForm,obligations,hotel:hotelDetail,'hotel-new':registrationForm,'hotel-link':linkWizard,subscription,earnings,profile};const html=await (views[state.view]||overview)();if(serial!==state.serial)return;main.innerHTML=html;}
  catch(err){if(serial===state.serial)errorPage(err);}
 }
 async function start(){
@@ -710,6 +728,7 @@ main.addEventListener('change',e=>{
  }
 });
 main.addEventListener('submit',e=>{
+ if(e.target.id==='flex-profile-form'){e.preventDefault();saveProfile(e.target);return;}
  if(e.target.id==='flex-recovery-form'){e.preventDefault();submitRecovery(e.target);return;}
  if(e.target.id==='flex-identity-signin'||e.target.id==='flex-identity-totp'){e.preventDefault();submitIdentityForm(e.target)}
  if(e.target.id==='hotel-registration'){e.preventDefault();submitRegistration(e.target)}
