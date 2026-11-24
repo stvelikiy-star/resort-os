@@ -36,6 +36,20 @@ class SharedAuthPreviewBoundary:
             # Reviewed hotel-scoped staff lifecycle (stage 2 / isolated staging only).
             ('GET', '/api/v1/admin/staff/overview'),
             ('POST', '/api/v1/admin/staff'),
+            # Shared operational Staff: property comes from the authenticated
+            # tenant session, never a caller-supplied hotel selector.
+            # Endpoint role checks still apply (COOK/WAITER/STORE_STAFF).
+            ('GET', '/api/v1/kitchen/menu'),
+            ('GET', '/api/v1/kitchen/orders'),
+            ('POST', '/api/v1/kitchen/orders'),
+            ('GET', '/api/v1/kitchen/stock'),
+            ('GET', '/api/v1/kitchen/stock/losses'),
+            ('POST', '/api/v1/kitchen/stock/receipts'),
+            ('POST', '/api/v1/kitchen/stock/losses'),
+            ('GET', '/api/v1/dining/floor'),
+            ('GET', '/api/v1/dining/menu-day'),
+            ('GET', '/api/v1/dining/table-reservations'),
+            ('POST', '/api/v1/dining/table-reservations'),
             ('GET', '/health/ready'), ('GET', '/health/live'),
         }
         try:
@@ -86,13 +100,27 @@ class SharedAuthPreviewBoundary:
                                (method == 'OPTIONS' or
                                 (method == 'POST' and (path.endswith('/claim') or path.endswith('/complete-report'))) or
                                 (method == 'PATCH' and (path.endswith('/status') or path.endswith('/assignee')))))
+            # Exact UUID-only Staff mutations. Unreviewed finance, procurement,
+            # menu publication, and guest routes remain fail-closed.
+            kitchen_status = (scope['type'] == 'http' and method in {'PATCH', 'OPTIONS'} and
+                              isinstance(path, str) and re.fullmatch(
+                                  r'/api/v1/kitchen/orders/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/status',
+                                  path) is not None)
+            waiter_assignment = (scope['type'] == 'http' and method in {'PATCH', 'OPTIONS'} and
+                                 isinstance(path, str) and re.fullmatch(
+                                     r'/api/v1/dining/orders/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/waiter',
+                                     path) is not None)
+            dining_reservation_status = (scope['type'] == 'http' and method in {'PATCH', 'OPTIONS'} and
+                                         isinstance(path, str) and re.fullmatch(
+                                             r'/api/v1/dining/table-reservations/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}',
+                                             path) is not None)
             ops_history = (scope['type'] == 'http' and method in {'GET', 'OPTIONS'} and
                            isinstance(path, str) and re.fullmatch(
                                r'/api/v1/ops/tasks/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/history',
                                path) is not None)
-            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history
+            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history or kitchen_status or waiter_assignment or dining_reservation_status
             if method == 'OPTIONS':
-                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history
+                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history or kitchen_status or waiter_assignment or dining_reservation_status
             if not valid:
                 raise HTTPException(503, detail='Only authentication is available in the shared staging preview')
         except HTTPException as error:
