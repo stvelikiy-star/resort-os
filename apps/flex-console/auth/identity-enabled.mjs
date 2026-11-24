@@ -9,26 +9,38 @@ import {hashPassword} from 'better-auth/crypto';
 import {redeemFirstInvite} from './first-invite.mjs';
 import {identityReadiness} from './identity-gate.mjs';
 export const passwordMode=()=>process.env.FLEX_ENVIRONMENT==='qa' && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true';
+async function sendAccountMail(to, subject, text) {
+  const key=process.env.FLEX_RESEND_API_KEY;
+  const from=process.env.FLEX_RECOVERY_FROM;
+  if(!key||!from)throw Error('FLEX_RECOVERY_MAIL_NOT_CONFIGURED');
+  const response=await fetch('https://api.resend.com/emails',{
+    method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
+    body:JSON.stringify({from,to:[to],subject,text})
+  });
+  if(!response.ok)throw Error('FLEX_RECOVERY_MAIL_FAILED');
+}
 export function createFlexAuthConfig({database,baseURL}) {
   return betterAuth({
     appName:'MARINA SMART FLEX',
     baseURL,basePath:'/api/identity',database,
+    user:{changeEmail:{enabled:true}},
+    emailVerification:{
+      async sendVerificationEmail({user,url}) {
+        if(new URL(url).origin!==new URL(baseURL).origin) throw Error('FLEX_MAIL_ORIGIN');
+        await sendAccountMail(user.email,'MARINA SMART FLEX · Подтверждение / Ырастоо / Verification',
+          'Подтвердите электронную почту.\nЭлектрондук почтаңызды ырастаңыз.\nConfirm your email address.\n'+url);
+      }
+    },
     emailAndPassword:{
       enabled:true,disableSignUp:true,requireEmailVerification:true,
       minPasswordLength:12,maxPasswordLength:128,
       resetPasswordTokenExpiresIn:900,
       revokeSessionsOnPasswordReset:true,
       sendResetPassword:async ({user,token})=>{
-        const key=process.env.FLEX_RESEND_API_KEY;
-        const from=process.env.FLEX_RECOVERY_FROM;
-        if(!key||!from)throw Error('FLEX_RECOVERY_MAIL_NOT_CONFIGURED');
         const link=new URL('/',baseURL);
         link.hash=new URLSearchParams({reset:token}).toString();
-        const response=await fetch('https://api.resend.com/emails',{
-          method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},
-          body:JSON.stringify({from,to:[user.email],subject:'MARINA SMART FLEX — Password reset',text:'Восстановление пароля / Сырсөздү калыбына келтирүү / Password reset\n'+link.href+'\n15 минут / 15 мүнөт / 15 minutes'})
-        });
-        if(!response.ok)throw Error('FLEX_RECOVERY_MAIL_FAILED');
+        await sendAccountMail(user.email,'MARINA SMART FLEX · Восстановление / Калыбына келтирүү / Reset',
+          'Восстановление пароля / Сырсөздү калыбына келтирүү / Password reset\n'+link.href+'\n15 минут / 15 мүнөт / 15 minutes');
       }
     },
     session:{expiresIn:3600,updateAge:900},

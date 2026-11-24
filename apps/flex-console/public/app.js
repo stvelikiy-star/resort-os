@@ -481,21 +481,43 @@ function billingHold(){
  return heading('BILLING',t('billingHold'))+info(t('billingHold'),'info');
 }
 const profileCopy={
- ru:{title:'Мой профиль',name:'Имя и фамилия',email:'Электронная почта',role:'Роль',save:'Сохранить имя',saved:'Имя сохранено',failed:'Не удалось сохранить имя',unavailable:'Сессия недоступна. Войдите снова.',security:'Безопасность аккаунта',password:'Для восстановления пароля используйте ссылку на странице входа. Изменение email и пароля из профиля пока недоступно.'},
- kg:{title:'Менин профилим',name:'Аты-жөнү',email:'Электрондук почта',role:'Роль',save:'Атты сактоо',saved:'Аты сакталды',failed:'Атты сактоо мүмкүн болгон жок',unavailable:'Сессия жеткиликсиз. Кайра кириңиз.',security:'Аккаунттун коопсуздугу',password:'Сырсөздү калыбына келтирүү үчүн кирүү бетиндеги шилтемени колдонуңуз. Профилден email жана сырсөздү өзгөртүү азырынча жеткиликсиз.'},
- en:{title:'My profile',name:'Full name',email:'Email',role:'Role',save:'Save name',saved:'Name saved',failed:'Unable to save name',unavailable:'Session unavailable. Sign in again.',security:'Account security',password:'Use the recovery link on the sign-in page to reset your password. Changing email and password in the profile is not yet available.'}
+ ru:{title:'Мой профиль',name:'Имя и фамилия',email:'Электронная почта',role:'Роль',save:'Сохранить имя',saved:'Имя сохранено',failed:'Не удалось сохранить имя',unavailable:'Сессия недоступна. Войдите снова.',security:'Безопасность аккаунта',"newEmail": "Новая почта", "changeEmail": "Изменить почту", "checkInbox": "Проверьте новый почтовый ящик для подтверждения.", "currentPassword": "Текущий пароль", "newPassword": "Новый пароль", "changePassword": "Изменить пароль", "accountError": "Не удалось сохранить изменение. Проверьте данные."},
+ kg:{title:'Менин профилим',name:'Аты-жөнү',email:'Электрондук почта',role:'Роль',save:'Атты сактоо',saved:'Аты сакталды',failed:'Атты сактоо мүмкүн болгон жок',unavailable:'Сессия жеткиликсиз. Кайра кириңиз.',security:'Аккаунттун коопсуздугу',"newEmail": "Жаңы электрондук почта", "changeEmail": "Почтаны өзгөртүү", "checkInbox": "Ырастоо үчүн жаңы почтаңызды текшериңиз.", "currentPassword": "Учурдагы сырсөз", "newPassword": "Жаңы сырсөз", "changePassword": "Сырсөздү өзгөртүү", "accountError": "Өзгөртүү сакталган жок. Маалыматтарды текшериңиз."},
+ en:{title:'My profile',name:'Full name',email:'Email',role:'Role',save:'Save name',saved:'Name saved',failed:'Unable to save name',unavailable:'Session unavailable. Sign in again.',security:'Account security',"newEmail": "New email address", "changeEmail": "Change email", "checkInbox": "Check the new inbox to confirm your address.", "currentPassword": "Current password", "newPassword": "New password", "changePassword": "Change password", "accountError": "The change could not be saved. Check your details."}
 };
 const profileText=k=>(profileCopy[state.lang]||profileCopy.ru)[k];
 async function profile(){
  const session=await identitySession();
  const p=profileText;
  if(!session?.user)return heading(p('title'))+info(p('unavailable'));
- return heading(p('title'))+'<section class="panel"><form id="flex-profile-form"><label>'+safe(p('name'))+'<input name="name" required maxlength="120" autocomplete="name" value="'+safe(session.user.name)+'"></label><label>'+safe(p('email'))+'<input type="email" readonly value="'+safe(session.user.email)+'"></label><p>'+safe(p('role'))+': '+safe(state.me.role)+'</p><button class="primary" type="submit">'+safe(p('save'))+'</button><p role="status" id="flex-profile-result"></p></form></section><section class="panel"><h2>'+safe(p('security'))+'</h2><p>'+safe(p('password'))+'</p></section>';
+ return heading(p('title'))+'<section class="panel"><form id="flex-profile-form"><label>'+safe(p('name'))+'<input name="name" required maxlength="120" autocomplete="name" value="'+safe(session.user.name)+'"></label><label>'+safe(p('email'))+'<input type="email" readonly value="'+safe(session.user.email)+'"></label><p>'+safe(p('role'))+': '+safe(state.me.role)+'</p><button class="primary" type="submit">'+safe(p('save'))+'</button><p role="status" id="flex-profile-result"></p></form></section><section class="panel"><h2>'+safe(p('security'))+'</h2><form id="profile-email"><label>'+safe(p('newEmail'))+'<input required type="email" name="newEmail" autocomplete="email"></label><button type="submit">'+safe(p('changeEmail'))+'</button><p role="status"></p></form><form id="profile-password"><label>'+safe(p('currentPassword'))+'<input required type="password" name="currentPassword" autocomplete="current-password"></label><label>'+safe(p('newPassword'))+'<input required type="password" name="newPassword" minlength="12" maxlength="128" autocomplete="new-password"></label><button type="submit">'+safe(p('changePassword'))+'</button><p role="status"></p></form></section>';
 }
 async function saveProfile(form){
  const button=form.querySelector('button[type="submit"]'), result=form.querySelector('[role="status"]');
  button.disabled=true;
  try{const name=form.elements.name.value.trim();if(!name)throw Error('EMPTY_NAME');await identityRequest('update-user',{name});state.identitySession=await identitySession();result.textContent=profileText('saved');}catch{result.textContent=profileText('failed');}finally{button.disabled=false;}
+}
+async function saveAccountSettings(form) {
+ const button=form.querySelector('button');
+ const status=form.querySelector('[role="status"]');
+ button.disabled=true;
+ try {
+   if(form.id==='profile-email') {
+     await identityRequest('change-email',{newEmail:form.elements.newEmail.value.trim(),callbackURL:'/'});
+     form.reset();
+     status.textContent=profileText('checkInbox');
+   } else {
+     await identityRequest('change-password',{currentPassword:form.elements.currentPassword.value,
+       newPassword:form.elements.newPassword.value,revokeOtherSessions:true});
+     form.reset();
+     await identityRequest('sign-out',{});
+     location.replace('/api/auth/logout');
+   }
+ } catch {
+   status.textContent=profileText('accountError');
+ } finally {
+   button.disabled=false;
+ }
 }
 function renderNav(){
  const r=state.me?.role;
@@ -728,6 +750,7 @@ main.addEventListener('change',e=>{
  }
 });
 main.addEventListener('submit',e=>{
+ if(['profile-email','profile-password'].includes(e.target.id)){e.preventDefault();saveAccountSettings(e.target);return;}
  if(e.target.id==='flex-profile-form'){e.preventDefault();saveProfile(e.target);return;}
  if(e.target.id==='flex-recovery-form'){e.preventDefault();submitRecovery(e.target);return;}
  if(e.target.id==='flex-identity-signin'||e.target.id==='flex-identity-totp'){e.preventDefault();submitIdentityForm(e.target)}
