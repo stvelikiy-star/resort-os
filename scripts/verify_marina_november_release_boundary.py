@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "23599a5214835242f1ec3459ca5bb02e6d79177a",
+    "scripts/marina_rc3_additive_gate.py": "6f4c3610157372feec38242c1ac6591f5f0dff2a",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -76,12 +76,12 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/CookBatchAssignments.tsx": "884a3290e678f8777167999e5aceaa60d470902b",
     "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",
     # MARINA batch provenance: reviewed additive migration, API and executable test.
-    "scripts/release_contract.py": "19a3a63c01c7e2a7616bcd3f18a3e650b3bfd2d2",
-    "scripts/release_contract_test.py": "443e97cebd5dcb841a7aedc932343cf636760cc5",
-    ".github/workflows/marina-zz113-rollback-ci.yml": "d205d4615d996343319f1d35cbf2a41b1a163765",
+    "scripts/release_contract.py": "b4793006c017a75d1cbe2a50299acf76ff0b6639",
+    "scripts/release_contract_test.py": "8d8988b26704dd1662b9719f763bd55e26304b42",
+    ".github/workflows/marina-zz113-rollback-ci.yml": "44fdddd225e29efb56bae9626b59c3cb0d88aa2d",
     "scripts/marina_disposable_upgrade_acceptance_ci.py": "b877c5976def9451853953b86ec48b6804ab16b0",
     ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "9bf375ac39d02cf78122dbe4544f1d69d3335cb6",
-    "services/api/app/app_entry.py": "088b69374b5b0e5ee3b86eab6cd59a8cf8f6642f",
+    "services/api/app/app_entry.py": "8b8e630073ddbe6a8855a5494116c5cac11064ca",
     "services/api/app/kitchen_batch_allocation.py": "21f71b7bd7d7a6c4aa2b044b4617a4547a16be47",
     "scripts/marina_shared_batch_allocation_ci.py": "ba9ce140bb72bfdb7954cb7081ea4f312bb4a168",
     "packages/database/prisma/migrations/zz127_marina_served_batch_allocation_20261124/migration.sql": "36ccf6d1b520389c45f532a0e5477ce2021a6fc2",
@@ -89,6 +89,10 @@ APPROVED_P0_BLOBS = {
     "packages/database/prisma/migrations/zz128_marina_owner_accounting_decision_evidence_20261124/migration.sql": "f1243f4eb4762f416d9f67369c36e5d388e4e224",
     "services/api/app/owner_accounting_journal.py": "fcb45a4a75f7935e12d6793dcdd95062a5d7c8d6",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
+    "services/api/app/owner_ledger_policy.py": "c0a42b1b2c0d9a1f88a6a1bba30e982d7b39cb3e",
+    "services/api/app/owner_accounting_postings.py": "635d57caab60ec7d8d9a0ddb662bece7421d5b57",
+    "scripts/test_owner_ledger_policy.py": "7649c4053753a4c9f2da6c1cf49dfe9be245c9d1",
+    "packages/database/prisma/migrations/zz129_marina_owner_accounting_postings_20261125/migration.sql": "bffc8229696d7e4ef55b0a2ed4725f26df1b9896",
     "scripts/test_owner_recognition_policy.py": "7a856095b84319c654c9b536f763e1d763cf790a",
     ".github/workflows/marina-owner-recognition-policy-ci.yml": "7965e38127aaf6a9ffe73f0c0ce755425d36d6e1",
     "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
