@@ -110,7 +110,15 @@ def run():
         signin.locator('button[type="submit"]').click()
         challenge = page.locator("#flex-identity-totp")
         challenge.locator('[name="code"]').fill(totp(secret))
-        challenge.locator('button[type="submit"]').click()
+        with page.expect_response(ORIGIN + "/api/identity/two-factor/verify-totp") as verified:
+            challenge.locator('button[type="submit"]').click()
+        verification = verified.value.json()
+        assert verified.value.status == 200 and verification.get("platform_session") is True, (
+            "login challenge", verified.value.status, verification.get("code"), sorted(verification.keys()))
+        assert any(c["name"] == "flex_session" for c in context.cookies()), "Missing platform session cookie"
+        for path in ["/api/data/v1/me", "/api/data/v1/hotels"]:
+            status = page.request.get(ORIGIN + path, ignore_https_errors=True)
+            assert status.status == 200, (path, status.status, status.text()[:200])
         expect(page.locator(f'[data-hotel="{HOTEL_A}"]')).to_be_visible(timeout=15000)
         me = page.evaluate("async () => (await fetch('/api/data/v1/me')).json()")
         assert me["role"] == "SUPER_ADMIN"

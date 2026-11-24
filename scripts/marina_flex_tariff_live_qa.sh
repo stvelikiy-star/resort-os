@@ -119,4 +119,7 @@ for endpoint in "$FLEX_API_ORIGIN/health" "$FLEX_PUBLIC_ORIGIN/api/status"; do
        --cacert "$PGSSLROOTCERT" "$endpoint"; then tail -40 "$qa_dir/api.log" "$qa_dir/console.log"; exit 1; fi
 done
 export QA_TLS_PIN="$(openssl x509 -in "$QA_TLS_CERT" -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | openssl base64 -A)"
-python scripts/marina_flex_tariff_live_browser.py
+if ! python scripts/marina_flex_tariff_live_browser.py; then
+  grep -E 'GET /v1/|POST /v1/|asyncpg.exceptions|UndefinedTable|PermissionError|InsufficientPrivilege|RuntimeError' "$qa_dir/api.log" | tail -25 || true
+  exit 1
+fi
