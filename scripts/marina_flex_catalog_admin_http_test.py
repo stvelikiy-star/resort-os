@@ -12,6 +12,7 @@ import sys
 import time
 import unittest
 import uuid
+from decimal import Decimal
 from datetime import datetime, timedelta, timezone, date, time as clock_time
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -303,6 +304,35 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
                 self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
             finally:await con.close()
         asyncio.run(verify_history())
+
+
+
+    def test_07_approved_hotel_package_prices(self):
+        path="/v1/platform/tariff-packages"
+        base={"hotel_id":HOTEL_A,"package_kind":"BUSINESS","title":"Approved business",
+              "period_start":(datetime.now(ZoneInfo("Asia/Bishkek")).date()+timedelta(days=4)).isoformat(),
+              "skus":["QR_ZONE","MULTI_HOTEL"],"commercial_policy_version":3,
+              "discount_pct":"10","trial_days":5,"custom_monthly_price":None}
+        self.assertEqual(self.post(path,base,"owner-a").status_code,403)
+        self.assertEqual(self.post(path,{**base,"commercial_policy_version":1}).status_code,409)
+        self.assertEqual(self.post(path,{**base,"skus":["UNKNOWN_MODULE"]}).status_code,422)
+        made=self.post(path,base)
+        self.assertEqual(made.status_code,201,made.text)
+        row=made.json()
+        self.assertEqual(Decimal(row["list_monthly_total"]),Decimal("20000"))
+        self.assertEqual(Decimal(row["proposed_monthly_total"]),Decimal("18000"))
+        self.assertFalse(row["subscription_activated"])
+        items={i["sku"]:i for i in row["items"]}
+        self.assertEqual(Decimal(items["QR_ZONE"]["monthly_price"]),Decimal(0))
+        self.assertEqual(items["BASE_PMS"]["commercial_policy_version"],3)
+        other=self.post(path,{**base,"hotel_id":HOTEL_B,"package_kind":"BASE","skus":[],"discount_pct":"0"})
+        self.assertEqual(other.status_code,201,other.text)
+        self.assertEqual(Decimal(other.json()["proposed_monthly_total"]),Decimal("5500"))
+        self.assertEqual(self.post(path,{**base,"package_kind":"CUSTOM","discount_pct":"0",
+            "custom_monthly_price":"4999"}).status_code,422)
+        history=self.get(path+"?hotel_id="+HOTEL_A).json()
+        self.assertEqual(history[0]["id"],row["id"])
+        self.assertEqual(Decimal(history[0]["proposed_monthly_total"]),Decimal("18000"))
 
 
 if __name__=="__main__":
