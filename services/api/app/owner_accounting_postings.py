@@ -43,6 +43,14 @@ def posting_guard():
 
 async def qualified_posting_source(conn,pid,proposal):
     """Only unmodified, verified delivered-source evidence; never client amounts."""
+    if proposal["sourceType"]=="STOCK_CONSUMPTION":
+        cost=await conn.fetchval(
+            """SELECT owner_accounting_served_cogs_proof(
+                  $1::uuid,$2::uuid,$3::date)""",
+            pid,proposal["sourceId"],proposal["accountingDate"])
+        if cost is None:
+            raise HTTPException(409,detail={"code":"ACCOUNTING_SERVED_COGS_INCOMPLETE_OR_FOLIO_MISSING"})
+        return {"faceValueKgs":cost,"sourceType":"STOCK_CONSUMPTION"}
     if proposal["sourceType"]=="OPERATING_EXPENSE":
         row=await conn.fetchrow(
             """SELECT e."amountKgs" AS "faceValueKgs",
