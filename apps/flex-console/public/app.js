@@ -592,6 +592,32 @@ function hotelCardTabs(){
  return '<nav class="toolbar" aria-label="'+safe(t('selected'))+'">'+sections.map(([key,label])=>
    '<button type="button" data-hotel-tab="'+key+'" class="'+(state.hotelTab===key?'primary':'outline')+'" aria-current="'+(state.hotelTab===key?'page':'false')+'">'+safe(t(label))+'</button>').join('')+'</nav>';
 }
+
+function hotelEditText(key){
+ const labels={ru:{edit:'Редактировать гостиницу',save:'Сохранить',saved:'Название сохранено'},kg:{edit:'Мейманкананы түзөтүү',save:'Сактоо',saved:'Аталышы сакталды'},en:{edit:'Edit hotel',save:'Save',saved:'Hotel name saved'}};
+ return (labels[state.lang]||labels.ru)[key];
+}
+async function hotelNameForm(id){
+ if(state.me?.role!=='SUPER_ADMIN'||!state.status?.qa_onboarding_enabled)return '';
+ const hotels=await api('/v1/hotels');
+ const hotel=hotels.find(h=>h.id===id);
+ if(!hotel||!['PENDING','ACTIVE'].includes(hotel.status))return '';
+ return '<section class="panel spacing-top"><h2>'+safe(hotelEditText('edit'))+'</h2><form id="hotel-name-form" data-id="'+safe(id)+'">'+
+ '<label for="hotel-edit-name">'+safe(t('name'))+'</label><br><input id="hotel-edit-name" name="display_name" required minlength="2" maxlength="180" value="'+safe(hotel.name)+'">'+
+ '<input type="hidden" name="expected_name" value="'+safe(hotel.name)+'"><div class="formbar"><button class="primary" type="submit">'+safe(hotelEditText('save'))+'</button></div>'+
+ '<div role="status" aria-live="polite"></div></form></section>';
+}
+async function submitHotelName(form){
+ const button=form.querySelector('button[type=submit]'),output=form.querySelector('[role=status]');
+ button.disabled=true;
+ try{
+  const result=await postQaLink('hotels/'+form.dataset.id+'/name',{display_name:form.elements.display_name.value.trim(),expected_name:form.elements.expected_name.value});
+  form.elements.expected_name.value=result.name;form.elements.display_name.value=result.name;
+  output.textContent=hotelEditText('saved');
+ }catch(e){output.textContent=t('error')+': '+e.message;}
+ finally{button.disabled=false;}
+}
+
 async function hotelDetail(){
  const id=state.hotelId;
  if(!/^[0-9a-fA-F-]{36}$/.test(id||'')) return heading(t('noSelected'))+empty(t('noSelected'));
@@ -644,7 +670,7 @@ async function hotelDetail(){
    empty(t('noInvoices')))+'</section>';
  if(state.hotelTab==='finance')return metadata+invoicesInfo+info(t('warning'),'info');
  if(state.hotelTab==='subscription')return metadata+summary+subscriptionInfo+draftHistory+info(t('draftOnly'),'info');
- return metadata+summary+subscriptionInfo+info(t('warning'),'info');
+ return metadata+await hotelNameForm(id)+summary+subscriptionInfo+info(t('warning'),'info');
 }
 
 async function catalog(){
@@ -754,6 +780,7 @@ main.addEventListener('submit',e=>{
  if(e.target.id==='flex-profile-form'){e.preventDefault();saveProfile(e.target);return;}
  if(e.target.id==='flex-recovery-form'){e.preventDefault();submitRecovery(e.target);return;}
  if(e.target.id==='flex-identity-signin'||e.target.id==='flex-identity-totp'){e.preventDefault();submitIdentityForm(e.target)}
+ if(e.target.id==='hotel-name-form'){e.preventDefault();submitHotelName(e.target);return;}
  if(e.target.id==='hotel-registration'){e.preventDefault();submitRegistration(e.target)}
  if(e.target.id==='link-challenge-form'){e.preventDefault();handleLinkForm(e.target,'challenge')}
  if(e.target.id==='link-confirm-form'){e.preventDefault();handleLinkForm(e.target,'confirm')}
