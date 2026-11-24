@@ -47,7 +47,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/pms_reservation_create.py": "f068836d615409443f1742fc492f27886f9d6aee",
     "scripts/marina_shared_manual_refund_evidence_ci.py": "f52d7947e64e935497617834e17535def9a59042",
     "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
-    "scripts/marina_shared_kitchen_cost_truth_ci.py": "e955a3cbd8a12ce76f8dd421bf1c277fe1cbde21",
+    "scripts/marina_shared_kitchen_cost_truth_ci.py": "da7a8f7dc0719fad59482b3312c22aeef22a60f0",
     "services/api/app/owner_served_kitchen_cost_trace.py": "848956bbe269623462b8979381baad86555b2f36",
     "services/api/app/owner_accrual_readiness.py": "a6484821beaae10aa3f3de3bbf5011e38389872f",
     "scripts/test_owner_served_kitchen_cost_trace.py": "c30f2859bd5769228c7cbcd1a1c6159797369abf",
