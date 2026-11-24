@@ -50,7 +50,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/owner_accrual_readiness.py": "4d018cea0e9ffd3724594995dab4e91a76b5464f",
     "scripts/test_owner_served_kitchen_cost_trace.py": "c30f2859bd5769228c7cbcd1a1c6159797369abf",
     "scripts/marina_shared_served_cost_trace_ci.py": "0d8a608004d04fd6b4ad01f548da34fc59627385",
-    "apps/admin/components/HotelFinanceBoard.tsx": "48472078d48cb3a707355f1fac36b46d02b80734",
+    "apps/admin/components/HotelFinanceBoard.tsx": "20cdda5d8839fa3c3b9a59bfd686c52a69ae14ab",
     # MARINA-specific 52nd migration, exact batch-to-served item ledger.
     "scripts/release_contract.py": "30a001c5fc1eed727ff600f24d6c22bf2a5d0756",
     "services/api/app/app_entry.py": "088b69374b5b0e5ee3b86eab6cd59a8cf8f6642f",
