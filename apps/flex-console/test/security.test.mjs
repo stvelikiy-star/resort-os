@@ -258,3 +258,27 @@ test('commercial proposal estimate uses only effective published noncore KGS pri
  assert.match(source,/draftEstimate\(state\.draftPriceRows,checked,form\.elements\.period_start\.value\)===null/);
  assert.match(source,/draftEstimateDisclaimer/);
 });
+
+
+test('tariff proposal labels are safe without assigning fabricated modules or activation',()=>{
+ const source=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ const fragment=source.slice(source.indexOf('function packageProposalTitle('),source.indexOf('function applyPackageProposal('));
+ assert.ok(fragment.startsWith('function packageProposalTitle('));
+ const format=vm.runInNewContext('('+fragment.trim()+')');
+ assert.equal(format('BASE','BASE'),'BASE');
+ assert.equal(format('BUSINESS','BUSINESS'),'BUSINESS');
+ assert.equal(format('PREMIUM','Extra analytics'),'PREMIUM — Extra analytics');
+ assert.equal(format('CUSTOM','Hotel network 12'),'Hotel network 12');
+ assert.equal(format('CUSTOM',''),null);
+ assert.equal(format('ADMIN','Grant all'),null);
+ assert.equal(format('BASE','x'.repeat(121)),null);
+ assert.match(source,/name="package_kind"/);
+ assert.match(source,/packageNote/);
+ const draft=source.slice(source.indexOf("}else if(kind==='draft'){"),source.indexOf("if(data.state!=='DRAFT'"));
+ assert.match(draft,/packageProposalTitle/);
+ assert.doesNotMatch(draft,/enforcement:'ENFORCE'|subscription_activated:true|payment_collected:true/);
+ const head=source.slice(source.indexOf('const translations = ')+21,source.indexOf('\nconst main='));
+ const dict=vm.runInNewContext('('+head.slice(0,head.lastIndexOf(';'))+')');
+ for(const lang of ['ru','kg','en'])for(const key of ['packageType','packageCustom','packageNote','packageTitleRequired'])
+  assert.ok(dict[lang][key]?.length,lang+':'+key);
+});
