@@ -129,6 +129,8 @@ DECLARE
  debit_total numeric(24,4);
  credit_total numeric(24,4);
  mismatch_count integer;
+ source_service_type text;
+ expected_revenue_code text;
 BEGIN
  IF TG_TABLE_NAME='owner_accounting_postings' THEN
    SELECT * INTO p FROM owner_accounting_postings WHERE id=NEW.id;
@@ -146,11 +148,17 @@ BEGIN
  IF p.action='POST' THEN
    -- Revenue posting: debit receivable for the source's exact face value;
    -- credit an approved revenue account and optional tax payable only.
-   SELECT e."faceValueKgs" INTO debit_total
+   SELECT e."faceValueKgs",e."sourceType" INTO debit_total,source_service_type
      FROM owner_accounting_journal_proposals pr
      JOIN owner_revenue_source_events e ON e.id=pr."sourceId"
        AND e."propertyId"=pr."propertyId"
     WHERE pr.id=p."proposalId" AND pr."propertyId"=p."propertyId";
+   expected_revenue_code := CASE source_service_type
+     WHEN 'ROOM_NIGHT' THEN '4100'
+     WHEN 'DINING_ORDER' THEN '4200' ELSE NULL END;
+   IF expected_revenue_code IS NULL THEN
+      RAISE EXCEPTION 'ACCOUNTING_POSTING_SERVICE_ACCOUNT_UNKNOWN' USING ERRCODE='23514';
+   END IF;
    IF NOT EXISTS (
        SELECT 1 FROM owner_accounting_posting_lines l
        WHERE l."postingId"=p.id AND l."accountCode"='1100'
@@ -158,12 +166,12 @@ BEGIN
        OR NOT EXISTS (
        SELECT 1 FROM owner_accounting_posting_lines l
        WHERE l."postingId"=p.id AND l.side='CREDIT'
-         AND l."accountCode" IN ('4100','4200','4300'))
+         AND l."accountCode"=expected_revenue_code)
        OR EXISTS (
        SELECT 1 FROM owner_accounting_posting_lines l
        WHERE l."postingId"=p.id AND NOT (
          (l.side='DEBIT' AND l."accountCode"='1100')
-         OR (l.side='CREDIT' AND l."accountCode" IN ('4100','4200','4300','2100'))))
+         OR (l.side='CREDIT' AND l."accountCode" IN (expected_revenue_code,'2100'))))
    THEN
        RAISE EXCEPTION 'ACCOUNTING_POSTING_REVENUE_ACCOUNT_POLICY_INVALID'
          USING ERRCODE='23514';
