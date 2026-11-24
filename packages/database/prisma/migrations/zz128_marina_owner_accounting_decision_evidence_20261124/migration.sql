@@ -33,12 +33,16 @@ CREATE TRIGGER owner_accounting_decisions_append_only
 CREATE FUNCTION guard_owner_accounting_decision_insert() RETURNS trigger AS $$
 DECLARE
   proposal_creator uuid;
+  proposal_source_type text;
+  proposal_source_id uuid;
+  source_valid boolean;
   actor_property uuid;
   actor_role text;
   actor_active boolean;
   parent_row record;
 BEGIN
-  SELECT "createdById" INTO proposal_creator
+  SELECT "createdById","sourceType","sourceId"
+    INTO proposal_creator,proposal_source_type,proposal_source_id
     FROM owner_accounting_journal_proposals
     WHERE id=NEW."proposalId" AND "propertyId"=NEW."propertyId";
   SELECT "propertyId",role::text,"isActive"
@@ -49,6 +53,37 @@ BEGIN
      OR proposal_creator=NEW."actorId" THEN
     RAISE EXCEPTION 'ACCOUNTING_DECISION_APPROVER_NOT_INDEPENDENT'
       USING ERRCODE='23514';
+  END IF;
+  -- Keep the database as strict as the API. A direct SQL actor may not
+  -- approve a missing, foreign, or already reversed source.
+  IF NEW.action='APPROVE' THEN
+    IF proposal_source_type='REVENUE_SOURCE' THEN
+      SELECT EXISTS(
+        SELECT 1 FROM owner_revenue_source_events e
+        WHERE e.id=proposal_source_id AND e."propertyId"=NEW."propertyId"
+          AND e.action='APPROVE_SOURCE'
+          AND NOT EXISTS (
+            SELECT 1 FROM owner_revenue_source_events rev
+            WHERE rev."propertyId"=NEW."propertyId" AND rev."reversesId"=e.id)
+      ) INTO source_valid;
+    ELSIF proposal_source_type='REVENUE_CORRECTION' THEN
+      SELECT EXISTS(
+        SELECT 1 FROM owner_revenue_correction_events e
+        JOIN owner_revenue_evidence_documents d
+          ON d.id=e."evidenceDocumentId" AND d."propertyId"=e."propertyId"
+        WHERE e.id=proposal_source_id AND e."propertyId"=NEW."propertyId"
+          AND e.action='RECORD'
+          AND NOT EXISTS (
+            SELECT 1 FROM owner_revenue_correction_events rev
+            WHERE rev."propertyId"=NEW."propertyId" AND rev."reversesId"=e.id)
+      ) INTO source_valid;
+    ELSE
+      source_valid:=false;
+    END IF;
+    IF source_valid IS DISTINCT FROM true THEN
+      RAISE EXCEPTION 'ACCOUNTING_DECISION_SOURCE_UNVERIFIED'
+        USING ERRCODE='23514';
+    END IF;
   END IF;
   IF NEW.action='REVERSE' THEN
     SELECT "propertyId","proposalId",action INTO parent_row
