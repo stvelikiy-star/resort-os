@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "aa4f09dec05730be37ee0bba61590785c34eb2b7",
+    "scripts/marina_rc3_additive_gate.py": "390d2ad6d2bff7de89e50f0383cd76472c3840c7",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -87,19 +87,20 @@ APPROVED_P0_BLOBS = {
     "packages/database/prisma/migrations/zz127_marina_served_batch_allocation_20261124/migration.sql": "36ccf6d1b520389c45f532a0e5477ce2021a6fc2",
     # P0 proposal decision evidence: explicit, hash-pinned release extension.
     "packages/database/prisma/migrations/zz128_marina_owner_accounting_decision_evidence_20261124/migration.sql": "f1243f4eb4762f416d9f67369c36e5d388e4e224",
-    "services/api/app/owner_accounting_journal.py": "b594a58a313bed9cc3379ff91458053fb42dba47",
+    "services/api/app/owner_accounting_journal.py": "bfadba59080ec2badb554ee03ed39d964cb04c0e",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
     "services/api/app/owner_ledger_policy.py": "4dc0694917e9bb9d7a80786a265a87d7480beead",
-    "services/api/app/owner_accounting_postings.py": "cb6c9be247315d53683610f33b7c6d840cb4289f",
+    "services/api/app/owner_accounting_postings.py": "06cbaebb29983316e36e60701fcfb5b775316f3c",
     "scripts/test_owner_ledger_policy.py": "cbf493b03dafafc33b6a035df674736cd3978be9",
     "scripts/marina_owner_posting_api_ci.py": "b493d85669ca903d63e5a49a2314b38bdcb6c117",
     "scripts/marina_owner_expense_posting_ci.py": "3c5879734d3bff96269559b1aa08e25adfe937c2",
-    "packages/database/prisma/migrations/zz129_marina_owner_accounting_postings_20261125/migration.sql": "db8063eed4a2ba4de96884ed5602a838995de7d3",
+    "scripts/marina_owner_served_cogs_posting_ci.py": "75bb2cc1fb85ff6379ec0b8010115a4aad6b290b",
+    "packages/database/prisma/migrations/zz129_marina_owner_accounting_postings_20261125/migration.sql": "d26106e29e9314bd3260564a6f32312b0fd159d1",
     "scripts/test_owner_recognition_policy.py": "7a856095b84319c654c9b536f763e1d763cf790a",
     ".github/workflows/marina-owner-recognition-policy-ci.yml": "7965e38127aaf6a9ffe73f0c0ce755425d36d6e1",
     "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
     "scripts/marina_owner_accounting_decision_ci.py": "4b84740d89e497f976accaa6da3da082129e349e",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "9c5b5ad7961a4e2df3eb87dc717748224b0bbd6a",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "cd0a18a72e74d74b26502a34177624c8b2b82cfb",
     "apps/staff/components/WaiterEntry.module.css": "7218c412d73930418c4d703267bf83e5f8153c0e",
     "scripts/test_marina_staff_legacy_dining_preservation.py": "15fb8274b823c5dcb0842aa6be4ca585b85d05a5",
 }
