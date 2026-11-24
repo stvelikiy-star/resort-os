@@ -281,3 +281,90 @@ CREATE TRIGGER owner_accounting_post_lines_atomic
 
 -- No account balances or recognized P&L are computed by this migration.
 -- All statement outputs require independent full-period completeness proof.
+
+-- Approved non-stock expense proposals retain independent OWNER review.
+-- Older zz128 migration stays immutable; SQL validation extends its guard.
+CREATE OR REPLACE FUNCTION guard_owner_accounting_decision_insert() RETURNS trigger AS $$
+DECLARE
+  proposal_creator uuid;
+  proposal_source_type text;
+  proposal_source_id uuid;
+  source_valid boolean;
+  actor_property uuid;
+  actor_role text;
+  actor_active boolean;
+  parent_row record;
+BEGIN
+  SELECT "createdById","sourceType","sourceId"
+    INTO proposal_creator,proposal_source_type,proposal_source_id
+    FROM owner_accounting_journal_proposals
+    WHERE id=NEW."proposalId" AND "propertyId"=NEW."propertyId";
+  SELECT "propertyId",role::text,"isActive"
+    INTO actor_property,actor_role,actor_active
+    FROM staff_users WHERE id=NEW."actorId";
+  IF proposal_creator IS NULL OR actor_property IS DISTINCT FROM NEW."propertyId"
+     OR actor_role IS DISTINCT FROM 'OWNER' OR actor_active IS DISTINCT FROM true
+     OR proposal_creator=NEW."actorId" THEN
+    RAISE EXCEPTION 'ACCOUNTING_DECISION_APPROVER_NOT_INDEPENDENT'
+      USING ERRCODE='23514';
+  END IF;
+  -- Keep the database as strict as the API. A direct SQL actor may not
+  -- approve a missing, foreign, or already reversed source.
+  IF NEW.action='APPROVE' THEN
+    IF proposal_source_type='REVENUE_SOURCE' THEN
+      SELECT EXISTS(
+        SELECT 1 FROM owner_revenue_source_events e
+        WHERE e.id=proposal_source_id AND e."propertyId"=NEW."propertyId"
+          AND e.action='APPROVE_SOURCE'
+          AND NOT EXISTS (
+            SELECT 1 FROM owner_revenue_source_events rev
+            WHERE rev."propertyId"=NEW."propertyId" AND rev."reversesId"=e.id)
+      ) INTO source_valid;
+    ELSIF proposal_source_type='REVENUE_CORRECTION' THEN
+      SELECT EXISTS(
+        SELECT 1 FROM owner_revenue_correction_events e
+        JOIN owner_revenue_evidence_documents d
+          ON d.id=e."evidenceDocumentId" AND d."propertyId"=e."propertyId"
+        WHERE e.id=proposal_source_id AND e."propertyId"=NEW."propertyId"
+          AND e.action='RECORD'
+          AND NOT EXISTS (
+            SELECT 1 FROM owner_revenue_correction_events rev
+            WHERE rev."propertyId"=NEW."propertyId" AND rev."reversesId"=e.id)
+      ) INTO source_valid;
+    ELSIF proposal_source_type='OPERATING_EXPENSE' THEN
+      SELECT EXISTS(
+        SELECT 1 FROM owner_expenses e
+        JOIN owner_accounting_journal_proposals pr
+          ON pr."propertyId"=e."propertyId" AND pr."sourceId"=e.id
+        WHERE e.id=proposal_source_id AND e."propertyId"=NEW."propertyId"
+          AND pr.id=NEW."proposalId"
+          AND e.status='POSTED' AND e."expenseDate"=pr."accountingDate"
+          AND e.category IN ('UTILITIES','PAYROLL','MAINTENANCE','RENT','MARKETING')
+          AND e."supplierName" IS NOT NULL
+          AND e."documentReference" IS NOT NULL
+          AND NOT EXISTS(SELECT 1 FROM kitchen_supplier_documents d
+            WHERE d."propertyId"=e."propertyId"
+              AND d."supplierName"=e."supplierName"
+              AND d."documentReference"=e."documentReference")
+      ) INTO source_valid;
+    ELSE
+      source_valid:=false;
+    END IF;
+    IF source_valid IS DISTINCT FROM true THEN
+      RAISE EXCEPTION 'ACCOUNTING_DECISION_SOURCE_UNVERIFIED'
+        USING ERRCODE='23514';
+    END IF;
+  END IF;
+  IF NEW.action='REVERSE' THEN
+    SELECT "propertyId","proposalId",action INTO parent_row
+      FROM owner_accounting_journal_decisions WHERE id=NEW."approvalId";
+    IF NOT FOUND OR parent_row."propertyId" IS DISTINCT FROM NEW."propertyId"
+       OR parent_row."proposalId" IS DISTINCT FROM NEW."proposalId"
+       OR parent_row.action IS DISTINCT FROM 'APPROVE' THEN
+      RAISE EXCEPTION 'ACCOUNTING_DECISION_REVERSE_TARGET_INVALID'
+        USING ERRCODE='23514';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
