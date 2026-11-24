@@ -125,4 +125,62 @@ async def owner_served_kitchen_cost_trace(conn, property_id, from_date, to_date,
         GROUP BY i."menuItemId", (o."completedAt" AT TIME ZONE $4)::date
         """, property_id, from_date, end, timezone,
     )
-    return reconcile_menu_day(prepared, served)
+    candidate = reconcile_menu_day(prepared, served)
+    # Explicit operator-attested order-item-to-batch facts are distinct from the
+    # above proportional estimate. Include only served orders of THIS property.
+    allocated = await conn.fetch(
+        """
+        SELECT a.id,a."orderId" AS order_id,a."orderItemId" AS order_item_id,
+               a."productionTargetId" AS production_target_id,
+               a.portions,a."totalCostKgs" AS cost_kgs,
+               a.source,a."createdAt" AS recorded_at
+        FROM kitchen_served_batch_allocations a
+        JOIN kitchen_orders o ON o.id=a."orderId" AND o."propertyId"=a."propertyId"
+        JOIN kitchen_order_items i ON i.id=a."orderItemId" AND i."orderId"=o.id
+        WHERE a."propertyId"=$1 AND o.status='SERVED'
+          AND i.status='SERVED'
+          AND (o."completedAt" AT TIME ZONE $4)::date BETWEEN $2 AND $3
+        ORDER BY a."createdAt",a.id
+        """, property_id, from_date, to_date, timezone,
+    )
+    coverage = await conn.fetchrow(
+        """
+        SELECT COUNT(*)::int AS order_items,
+               COALESCE(SUM(i.quantity),0)::int AS served_portions,
+               COALESCE(SUM(COALESCE(assigned.portions,0)),0)::int AS attributed_portions,
+               COUNT(*) FILTER (WHERE COALESCE(assigned.portions,0)=i.quantity)::int
+                   AS fully_attributed_items
+        FROM kitchen_orders o
+        JOIN kitchen_order_items i ON i."orderId"=o.id AND i.status='SERVED'
+        LEFT JOIN LATERAL (
+          SELECT SUM(a.portions)::int AS portions
+          FROM kitchen_served_batch_allocations a
+          WHERE a."propertyId"=o."propertyId"
+            AND a."orderId"=o.id AND a."orderItemId"=i.id
+        ) assigned ON true
+        WHERE o."propertyId"=$1 AND o.status='SERVED'
+          AND (o."completedAt" AT TIME ZONE $4)::date BETWEEN $2 AND $3
+        """, property_id, from_date, to_date, timezone,
+    )
+    total_attributed_cost=sum((Decimal(r["cost_kgs"]) for r in allocated),Decimal(0))
+    candidate["operator_attested_batch_links"] = {
+        "status":"OPERATOR_RECORDED_NOT_ACCOUNTING_POSTED",
+        "cost_is_recognized_cogs":False,
+        "attribution_source":"MANUAL_BATCH_TO_ORDER_ITEM_ASSERTION",
+        "order_items":coverage["order_items"],
+        "fully_attributed_order_items":coverage["fully_attributed_items"],
+        "served_portions":coverage["served_portions"],
+        "attributed_portions":coverage["attributed_portions"],
+        "unattributed_served_portions":coverage["served_portions"]-coverage["attributed_portions"],
+        "attributed_cost_kgs":money(total_attributed_cost),
+        "allocations":[{
+            "id":str(row["id"]),
+            "order_id":str(row["order_id"]),
+            "order_item_id":str(row["order_item_id"]),
+            "production_target_id":str(row["production_target_id"]),
+            "portions":row["portions"],
+            "cost_kgs":money(row["cost_kgs"]),
+            "source":row["source"],
+        } for row in allocated],
+    }
+    return candidate

@@ -191,6 +191,31 @@ class SharedAuthTests(unittest.TestCase):
                      '/api/v1/kitchen/stock/items'):
             self.assertEqual(self.client.post(path).status_code, 503, path)
 
+    def test_cook_batch_picker_routes_only_expose_exact_shared_staging_methods(self):
+        valid = '11111111-1111-4111-8111-111111111111'
+        batch = '/api/v1/kitchen/orders/' + valid + '/batch-allocations'
+        plan = '/api/v1/kitchen/production-targets'
+        # Middleware admission is independent of COOK role checks.
+        # Test app deliberately omits the real batch routers: admitted routes
+        # are 404 even anonymously; rejected methods/paths must be 503.
+        self.assertEqual(self.client.get(plan).status_code, 404)
+        self.assertEqual(self.client.get(batch).status_code, 404)
+        self.assertEqual(self.client.post(batch).status_code, 404)
+        self.assertEqual(self.login('HOTEL_A').status_code, 200)
+        self.assertEqual(self.client.get(plan).status_code, 404)
+        self.assertEqual(self.client.get(batch).status_code, 404)
+        self.assertEqual(self.client.post(batch).status_code, 404)
+        for method, path in (
+            ('PUT', plan),
+            ('PATCH', batch),
+            ('DELETE', batch),
+            ('GET', '/api/v1/kitchen/orders/not-a-uuid/batch-allocations'),
+            ('POST', batch + '/commit'),
+            ('GET', '/api/v1/kitchen/production-targets/staff-list'),
+        ):
+            self.assertEqual(self.client.request(method, path).status_code, 503, path)
+        self.assertEqual(self.client.post('/api/v1/auth/logout').status_code, 204)
+
     def test_owner_finance_routes_admitted_exactly_and_other_finance_closed(self):
         # Middleware admission is separate from actual OWNER-only checks.
         reads = (

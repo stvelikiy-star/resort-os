@@ -47,6 +47,7 @@ from .kitchen import admin_router as kitchen_admin_router
 from .kitchen_arrivals import router as kitchen_arrivals_router
 from .kitchen_menu_management import router as kitchen_menu_management_router
 from .kitchen_stock import router as kitchen_stock_router
+from .kitchen_batch_allocation import router as kitchen_batch_allocation_router
 from .kitchen_procurement import router as kitchen_procurement_router
 from .owner_kitchen_management import router as owner_kitchen_management_router
 from .owner_expenses import router as owner_expenses_router
@@ -258,6 +259,7 @@ app.include_router(staff_guest_requests_router)
 # authorization no longer depends on include_router order.
 app.include_router(kitchen_menu_management_router)
 app.include_router(kitchen_stock_router)
+app.include_router(kitchen_batch_allocation_router)
 app.include_router(kitchen_procurement_router)
 app.include_router(owner_kitchen_management_router)
 app.include_router(owner_expenses_router)

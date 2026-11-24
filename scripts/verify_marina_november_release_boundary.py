@@ -51,11 +51,11 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "fc5709a067fd7095319ed80f73ac0e898774ce84",
+    "scripts/marina_rc3_additive_gate.py": "e3bbd94e1f5210abd57da57f97b49562a9ed0e37",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
-    "services/api/app/shared_auth_preview.py": "cb4acbe3083a5981f550f6f614d67bc4f2acb436",
-    "scripts/test_marina_shared_auth.py": "9c90ca127cba6c0eee2d22f0c6512bf586319509",
+    "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
+    "scripts/test_marina_shared_auth.py": "edb42395111dbd19fe2e3e3facaa9ff4d4cfe39e",
     "apps/staff/components/StoreStaffStock.tsx": "82b87098c1ab1355562551ec76cd8b4eb7b5478c",
     "apps/staff/components/StaffRoleGateway.tsx": "957821d21a17350529f9fcef442527772a42e0c9",
     # Reviewed P0 two-hotel OWNER financial facts, exact method-scoped routes,
@@ -68,12 +68,24 @@ APPROVED_P0_BLOBS = {
     "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
     "scripts/marina_shared_kitchen_cost_truth_ci.py": "e955a3cbd8a12ce76f8dd421bf1c277fe1cbde21",
     # Read-only production-to-served dish cost reconciliation, NOT booked COGS.
-    "services/api/app/owner_served_kitchen_cost_trace.py": "848956bbe269623462b8979381baad86555b2f36",
+    "services/api/app/owner_served_kitchen_cost_trace.py": "d051cd2f1962fb4540434b026dec75e8c2afc6a7",
     "services/api/app/owner_accrual_readiness.py": "4d018cea0e9ffd3724594995dab4e91a76b5464f",
     "scripts/test_owner_served_kitchen_cost_trace.py": "c30f2859bd5769228c7cbcd1a1c6159797369abf",
     "scripts/marina_shared_served_cost_trace_ci.py": "0d8a608004d04fd6b4ad01f548da34fc59627385",
-    "apps/admin/components/HotelFinanceBoard.tsx": "48472078d48cb3a707355f1fac36b46d02b80734",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "001a6bf8a0205a64c4560a0a68bd9b234d4f127b",
+    "apps/admin/components/HotelFinanceBoard.tsx": "20cdda5d8839fa3c3b9a59bfd686c52a69ae14ab",
+    "apps/staff/components/CookBatchAssignments.tsx": "884a3290e678f8777167999e5aceaa60d470902b",
+    "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",
+    # MARINA batch provenance: reviewed additive migration, API and executable test.
+    "scripts/release_contract.py": "30a001c5fc1eed727ff600f24d6c22bf2a5d0756",
+    "scripts/release_contract_test.py": "99455c81fd8c275ba1a1d24e86e1008490e05ce6",
+    ".github/workflows/marina-zz113-rollback-ci.yml": "a2d23ca8be3734cd2e7bb8d160f8d582dd61acea",
+    "scripts/marina_disposable_upgrade_acceptance_ci.py": "8fe78f31a4d3ca74baafc6129c6c368dd73d871f",
+    ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "fadfe76cd59a2db944b82f72f5c8abf0dda89b5c",
+    "services/api/app/app_entry.py": "088b69374b5b0e5ee3b86eab6cd59a8cf8f6642f",
+    "services/api/app/kitchen_batch_allocation.py": "21f71b7bd7d7a6c4aa2b044b4617a4547a16be47",
+    "scripts/marina_shared_batch_allocation_ci.py": "ba9ce140bb72bfdb7954cb7081ea4f312bb4a168",
+    "packages/database/prisma/migrations/zz127_marina_served_batch_allocation_20261124/migration.sql": "36ccf6d1b520389c45f532a0e5477ce2021a6fc2",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "24e9586d68e90e4292bb5f53f44d7fddeead7849",
     "apps/staff/components/WaiterEntry.module.css": "7218c412d73930418c4d703267bf83e5f8153c0e",
     "scripts/test_marina_staff_legacy_dining_preservation.py": "15fb8274b823c5dcb0842aa6be4ca585b85d05a5",
 }

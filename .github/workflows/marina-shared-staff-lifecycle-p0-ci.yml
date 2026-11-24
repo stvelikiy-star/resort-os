@@ -15,6 +15,10 @@ on:
       - 'services/api/app/owner_served_kitchen_cost_trace.py'
       - 'scripts/test_owner_served_kitchen_cost_trace.py'
       - 'scripts/marina_shared_served_cost_trace_ci.py'
+      - 'scripts/marina_shared_batch_allocation_ci.py'
+      - 'services/api/app/kitchen_batch_allocation.py'
+      - 'services/api/app/owner_served_kitchen_cost_trace.py'
+      - 'packages/database/prisma/migrations/zz127_marina_served_batch_allocation_20261124/migration.sql'
       - 'services/api/app/section_permissions.py'
       - '.github/workflows/marina-shared-staff-lifecycle-p0-ci.yml'
   workflow_dispatch:
@@ -105,3 +109,7 @@ jobs:
         env:
           MARINA_SERVED_COST_TRACE_CI_CONFIRM: ISOLATED_SERVED_COST_TRACE_ONLY
         run: python scripts/marina_shared_served_cost_trace_ci.py
+      - name: Verify precise operator-attested batch links on two live hotels
+        env:
+          MARINA_BATCH_ALLOCATION_CI_CONFIRM: ISOLATED_BATCH_ALLOCATION_ONLY
+        run: python scripts/marina_shared_batch_allocation_ci.py

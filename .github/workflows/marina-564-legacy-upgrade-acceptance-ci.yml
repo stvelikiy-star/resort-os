@@ -123,7 +123,7 @@ jobs:
           set -euo pipefail
           psql "postgresql://marina_audit:synthetic-disposable-only@127.0.0.1:55432/postgres" -v ON_ERROR_STOP=1 -c "CREATE DATABASE marina_clean"
           (cd packages/database && DATABASE_URL="postgresql://marina_audit:synthetic-disposable-only@127.0.0.1:55432/marina_clean" npx prisma migrate deploy)
-          test "$(psql "postgresql://marina_audit:synthetic-disposable-only@127.0.0.1:55432/marina_clean" -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 51
+          test "$(psql "postgresql://marina_audit:synthetic-disposable-only@127.0.0.1:55432/marina_clean" -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 52
       - name: Launch isolated upgraded APIs for both hotels in customer-safe mode
         shell: bash
         run: |
