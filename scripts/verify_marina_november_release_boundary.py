@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "5db2956e33e70f28d1b7e0c226751da7028b1be6",
+    "scripts/marina_rc3_additive_gate.py": "a12675b80b736c974043a1a6f8f75e9244b50676",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -89,11 +89,11 @@ APPROVED_P0_BLOBS = {
     "packages/database/prisma/migrations/zz128_marina_owner_accounting_decision_evidence_20261124/migration.sql": "f1243f4eb4762f416d9f67369c36e5d388e4e224",
     "services/api/app/owner_accounting_journal.py": "fcb45a4a75f7935e12d6793dcdd95062a5d7c8d6",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
-    "services/api/app/owner_ledger_policy.py": "c0a42b1b2c0d9a1f88a6a1bba30e982d7b39cb3e",
-    "services/api/app/owner_accounting_postings.py": "52f385df8812f56169064771c052d9753032d364",
-    "scripts/test_owner_ledger_policy.py": "ef82e4ced2f577b6b92831251a4e9cd40283f3ad",
+    "services/api/app/owner_ledger_policy.py": "4dc0694917e9bb9d7a80786a265a87d7480beead",
+    "services/api/app/owner_accounting_postings.py": "7d99a50f440731dbfaca9140aafd21bdfc58255e",
+    "scripts/test_owner_ledger_policy.py": "cbf493b03dafafc33b6a035df674736cd3978be9",
     "scripts/marina_owner_posting_api_ci.py": "b493d85669ca903d63e5a49a2314b38bdcb6c117",
-    "packages/database/prisma/migrations/zz129_marina_owner_accounting_postings_20261125/migration.sql": "bffc8229696d7e4ef55b0a2ed4725f26df1b9896",
+    "packages/database/prisma/migrations/zz129_marina_owner_accounting_postings_20261125/migration.sql": "6ae80f66e83e03107358c38317473f936c57a028",
     "scripts/test_owner_recognition_policy.py": "7a856095b84319c654c9b536f763e1d763cf790a",
     ".github/workflows/marina-owner-recognition-policy-ci.yml": "7965e38127aaf6a9ffe73f0c0ce755425d36d6e1",
     "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
