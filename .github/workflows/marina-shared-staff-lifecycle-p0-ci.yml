@@ -19,6 +19,9 @@ on:
       - 'scripts/marina_owner_accounting_decision_ci.py'
       - 'scripts/test_owner_accounting_decision_evidence.py'
       - 'services/api/app/owner_accounting_journal.py'
+      - 'services/api/app/owner_posted_journal.py'
+      - 'scripts/test_owner_posted_journal.py'
+      - 'packages/database/prisma/migrations/zz129_marina_owner_posted_journal_20261125/migration.sql'
       - 'packages/database/prisma/migrations/zz128_marina_owner_accounting_decision_evidence_20261124/migration.sql'
       - 'services/api/app/kitchen_batch_allocation.py'
       - 'services/api/app/owner_served_kitchen_cost_trace.py'
@@ -119,9 +122,12 @@ jobs:
         run: python scripts/marina_shared_batch_allocation_ci.py
       - name: Verify accounting approval feature is fail-closed by default
         run: python -m unittest scripts.test_owner_accounting_decision_evidence -v
-      - name: Verify independent OWNER accounting decisions without posting P&L
+      - name: Verify staged posted accounting is disabled in Production
+        run: python -m unittest scripts.test_owner_posted_journal -v
+      - name: Verify independently approved posting and exact reversals on two hotels
         env:
           MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'false'
           PROPERTY_CODE: HOTEL_A
           MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED: 'true'
+          MARINA_ACCOUNTING_POSTING_ENABLED: 'true'
         run: python scripts/marina_owner_accounting_decision_ci.py
