@@ -31,6 +31,14 @@ NEW_MIGRATIONS = {
 TASK_REPORT_PATH = "services/api/app/staff_task_reports.py"
 TASK_REPORT_BLOB = "3a874ddc986fd91a5537540ee808d192c4fd6144"
 WORKFLOW_PATH = ".github/workflows/marina-shared-rc3-source-ci.yml"
+# Approved current-release P0 (PR #592) is additive to immutable RC3.
+# No historical manifest, RC3 gate, or original SQL hash is rewritten.
+REVIEWED_SHARED_STAFF_P0_BLOBS = {
+    "services/api/app/shared_auth_preview.py": "38c7a4992a7a4a7a822ca58159e49ccb16037953",
+    "scripts/test_marina_shared_auth.py": "6786e5b4681248bbf7432167bbb5a255395d3201",
+    "apps/staff/components/StaffRoleGateway.tsx": "957821d21a17350529f9fcef442527772a42e0c9",
+    "apps/staff/components/StoreStaffStock.tsx": "82b87098c1ab1355562551ec76cd8b4eb7b5478c",
+}
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
     "reviewed critical source changed: " + TASK_REPORT_PATH,
@@ -38,6 +46,8 @@ ALLOWED_LEGACY_ERRORS = frozenset({
     "reviewed critical source changed: services/api/app/hotel_finance.py",
     "reviewed critical source changed: apps/admin/app/shared-auth-preview/page.tsx",
     "reviewed critical source changed: services/api/app/section_permissions.py",
+    "reviewed critical source changed: scripts/test_marina_shared_auth.py",
+    "reviewed critical source changed: services/api/app/shared_auth_preview.py",
 })
 
 def validate_additive() -> list[str]:
@@ -65,6 +75,13 @@ def validate_additive() -> list[str]:
 
     if git_blob_sha((ROOT / TASK_REPORT_PATH).read_bytes()) != TASK_REPORT_BLOB:
         errors.append("reviewed additive task report source changed")
+
+    # Explicitly re-verify every new executable/blob exception. This keeps the
+    # old RC3 evidence immutable and prevents broadening by path alone.
+    for path, expected_blob in REVIEWED_SHARED_STAFF_P0_BLOBS.items():
+        target = ROOT / path
+        if not target.is_file() or git_blob_sha(target.read_bytes()) != expected_blob:
+            errors.append("reviewed shared staff P0 blob mismatch: " + path)
 
     legacy_errors = validate(rc3, ROOT)
     for error in legacy_errors:
