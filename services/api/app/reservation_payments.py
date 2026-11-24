@@ -436,6 +436,13 @@ async def record_reservation_payment(
         "truth": "Internal staff-recorded payment fact only. Actual payment time and record time are stored separately. No acquiring confirmation is implied.",
     }
 
+def enforce_manual_refund_staging() -> None:
+    """Never enable evidence-only refund posting in legacy/Production mode."""
+    if not MARINA_SHARED_AUTH_PREVIEW_ENABLED or os.environ.get("APP_ENV") != "staging":
+        raise HTTPException(status_code=503, detail={"code": "REFUND_EVIDENCE_STAGING_ONLY"})
+    auth_module.shared_auth_preview_guard()
+
+
 class ManualFullRefundConfirmation(BaseModel):
     """Evidence of a refund already performed outside MARINA SMART.
 
@@ -461,6 +468,7 @@ async def confirm_manual_full_refund(
     MANAGER_MANUAL payment, keeping the legacy finance ledger consistent.
     The reference is locked and unique across this property's audit journal.
     """
+    enforce_manual_refund_staging()
     reference = normalize_required_text(payload.evidence_reference)
     note = normalize_required_text(payload.note)
     if len(reference) < 8 or len(note) < 8:
