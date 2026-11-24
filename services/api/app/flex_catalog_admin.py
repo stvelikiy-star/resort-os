@@ -12,6 +12,7 @@ from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from decimal import Decimal, ROUND_HALF_UP
 import json
+from calendar import monthrange
 import os
 import re
 import uuid
@@ -154,6 +155,9 @@ class NewTariffPackageProposal(BaseModel):
     period_start: date
     skus: list[str] = Field(max_length=50)
     commercial_policy_version: int | None = Field(default=None, strict=True, ge=1)
+    term_months: int | None = Field(default=None, strict=True)
+    include_implementation: bool = Field(default=False, strict=True)
+    standard_term_discount: bool = Field(default=False, strict=True)
     discount_pct: str = "0"
     trial_days: int = Field(default=0, ge=0, le=90)
     source_template_id: uuid.UUID | None = None
@@ -191,6 +195,12 @@ class NewTariffPackageProposal(BaseModel):
 
 
 def ensure_package_proposal(payload: NewTariffPackageProposal) -> None:
+    if payload.term_months is not None and payload.term_months not in {1,3,6,12}:
+        raise HTTPException(422, detail="Unsupported subscription term")
+    if payload.commercial_policy_version is None and (payload.term_months is not None or payload.include_implementation or payload.standard_term_discount):
+        raise HTTPException(422, detail="Commercial policy required")
+    if payload.standard_term_discount and (Decimal(payload.discount_pct)!=0 or payload.custom_monthly_price is not None):
+        raise HTTPException(422, detail="Choose standard term discount or individual terms")
     if payload.commercial_policy_version is None and not payload.skus:
         raise HTTPException(422, detail="Select at least one legacy SKU")
     if payload.commercial_policy_version is not None and payload.source_template_id is not None:
@@ -494,7 +504,7 @@ async def tariff_packages(
             rows = await conn.fetch(
                 "SELECT id,hotel_id,package_kind,version,title,sku_snapshot,source_template_id,"
                 "list_monthly_total,discount_pct,trial_days,custom_monthly_price,"
-                "proposed_monthly_total,state,enforcement,currency,created_at "
+                "proposed_monthly_total,state,enforcement,currency,created_at,commercial_policy_version,term_months,period_start,period_end_exclusive,subscription_term_total,implementation_total "
                 "FROM flex_tariff_package_versions WHERE hotel_id=$1 "
                 "ORDER BY created_at DESC,id DESC LIMIT 100",
                 hotel_id,
@@ -505,6 +515,10 @@ async def tariff_packages(
                     "package_kind":r["package_kind"], "version":r["version"],
                     "source_template_id":r["source_template_id"],
                     "title":r["title"],
+                    "commercial_policy_version":r["commercial_policy_version"],"term_months":r["term_months"],
+                    "period_start":r["period_start"],"period_end_exclusive":r["period_end_exclusive"],
+                    "subscription_term_total":str(r["subscription_term_total"]) if r["subscription_term_total"] is not None else None,
+                    "implementation_total":str(r["implementation_total"]) if r["implementation_total"] is not None else None,
                     "items":json.loads(r["sku_snapshot"]) if isinstance(r["sku_snapshot"],str) else r["sku_snapshot"],
                     "list_monthly_total":str(r["list_monthly_total"]),
                     "discount_pct":str(r["discount_pct"]),
@@ -591,12 +605,23 @@ async def create_tariff_package_proposal(
                     ]
                     list_total=sum((r["monthly_price"] for r in rows),Decimal("0.00"))
                 discount=Decimal(payload.discount_pct)
+                months = start = end = term_total = implementation = None
+                if payload.commercial_policy_version is not None:
+                    months = payload.term_months or 1
+                    start = payload.period_start
+                    year, month = divmod(start.year*12+start.month-1+months,12)
+                    end = date(year,month+1,min(start.day,monthrange(year,month+1)[1]))
+                    if payload.standard_term_discount:
+                        discount = Decimal(str(policy["term_discounts_pct"][str(months)]))
+                    implementation = Decimal(str(policy["implementation_fee"])) if payload.include_implementation else Decimal("0")
                 custom=(Decimal(payload.custom_monthly_price)
                         if payload.custom_monthly_price is not None else None)
                 total=(custom if custom is not None else
                        list_total*(Decimal(100)-discount)/Decimal(100)).quantize(
                            Decimal("0.01"),rounding=ROUND_HALF_UP
                        )
+                if months is not None:
+                    term_total = ((custom if custom is not None else list_total*(Decimal(100)-discount)/Decimal(100))*months).quantize(Decimal("0.01"),rounding=ROUND_HALF_UP)
                 previous=await conn.fetchval(
                     "SELECT coalesce(max(version),0) FROM flex_tariff_package_versions "
                     "WHERE hotel_id=$1 AND package_kind=$2",
@@ -607,18 +632,21 @@ async def create_tariff_package_proposal(
                     "INSERT INTO flex_tariff_package_versions("
                     "hotel_id,package_kind,version,title,sku_snapshot,"
                     "list_monthly_total,discount_pct,trial_days,custom_monthly_price,"
-                    "proposed_monthly_total,created_by,source_template_id) "
-                    "VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12) "
+                     "proposed_monthly_total,created_by,source_template_id,commercial_policy_version,term_months,period_start,period_end_exclusive,subscription_term_total,implementation_total) "
+                    "VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) "
                     "RETURNING id,created_at",
                     payload.hotel_id,payload.package_kind,version,payload.title,
                     json.dumps(items),list_total,discount,payload.trial_days,
-                    custom,total,principal.subject_id,payload.source_template_id,
+                    custom,total,principal.subject_id,payload.source_template_id,payload.commercial_policy_version,months,start,end,term_total,implementation,
                 )
                 return {
                     "id":str(row["id"]),"hotel_id":str(payload.hotel_id),
                     "package_kind":payload.package_kind,"version":version,
                     "source_template_id":payload.source_template_id,
                     "items":items,"list_monthly_total":str(list_total),
+                    "term_months":months,"period_start":start,"period_end_exclusive":end,
+                    "subscription_term_total":str(term_total) if term_total is not None else None,
+                    "implementation_total":str(implementation) if implementation is not None else None,
                     "discount_pct":str(discount),"trial_days":payload.trial_days,
                     "custom_monthly_price":str(custom) if custom is not None else None,
                     "proposed_monthly_total":str(total),"currency":"KGS",
