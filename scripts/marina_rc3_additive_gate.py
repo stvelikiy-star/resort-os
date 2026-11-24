@@ -70,12 +70,13 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/owner_accounting_journal.py": "fcb45a4a75f7935e12d6793dcdd95062a5d7c8d6",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
     "services/api/app/owner_ledger_policy.py": "c0a42b1b2c0d9a1f88a6a1bba30e982d7b39cb3e",
-    "services/api/app/owner_accounting_postings.py": "635d57caab60ec7d8d9a0ddb662bece7421d5b57",
-    "scripts/test_owner_ledger_policy.py": "7649c4053753a4c9f2da6c1cf49dfe9be245c9d1",
+    "services/api/app/owner_accounting_postings.py": "52f385df8812f56169064771c052d9753032d364",
+    "scripts/test_owner_ledger_policy.py": "ef82e4ced2f577b6b92831251a4e9cd40283f3ad",
+    "scripts/marina_owner_posting_api_ci.py": "b493d85669ca903d63e5a49a2314b38bdcb6c117",
     "scripts/test_owner_recognition_policy.py": "7a856095b84319c654c9b536f763e1d763cf790a",
     ".github/workflows/marina-owner-recognition-policy-ci.yml": "7965e38127aaf6a9ffe73f0c0ce755425d36d6e1",
     "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "402ab2ad026fd31f2b43910c1675a8d9ec23f8f8",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "b515882c01b968a7c7ae0a2ccd91c533670fe36e",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
