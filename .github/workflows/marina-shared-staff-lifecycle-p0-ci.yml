@@ -11,6 +11,10 @@ on:
       - 'services/api/app/reservation_payments.py'
       - 'scripts/marina_shared_manual_refund_evidence_ci.py'
       - 'scripts/marina_shared_kitchen_cost_truth_ci.py'
+      - 'services/api/app/owner_accrual_readiness.py'
+      - 'services/api/app/owner_served_kitchen_cost_trace.py'
+      - 'scripts/test_owner_served_kitchen_cost_trace.py'
+      - 'scripts/marina_shared_served_cost_trace_ci.py'
       - 'services/api/app/section_permissions.py'
       - '.github/workflows/marina-shared-staff-lifecycle-p0-ci.yml'
   workflow_dispatch:
@@ -95,3 +99,9 @@ jobs:
         env:
           MARINA_KITCHEN_COST_CI_CONFIRM: ISOLATED_KITCHEN_COST_ONLY
         run: python scripts/marina_shared_kitchen_cost_truth_ci.py
+      - name: Check day/menu production cost candidates, not recognized COGS
+        run: python -m unittest scripts.test_owner_served_kitchen_cost_trace -v
+      - name: Verify actual two-hotel production targets and served dish cost trace
+        env:
+          MARINA_SERVED_COST_TRACE_CI_CONFIRM: ISOLATED_SERVED_COST_TRACE_ONLY
+        run: python scripts/marina_shared_served_cost_trace_ci.py

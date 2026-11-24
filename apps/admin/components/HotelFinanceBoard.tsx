@@ -132,6 +132,28 @@ type FinanceResponse = {
       production_cost_candidate_kgs:string;
       loss_cost_candidate_kgs:string;
     };
+    served_kitchen_cost_trace?:{
+      status:"CANDIDATE_NOT_RECOGNIZED";
+      matching_basis:string;
+      batch_to_order_link_verified:false;
+      served_cost_is_accounting_cogs:false;
+      totals:{
+        production_cost_kgs:string;
+        proportional_served_cost_candidate_kgs:string;
+        unallocated_production_cost_candidate_kgs:string;
+        served_without_same_day_production_portions:number;
+      };
+      items:Array<{
+        menu_item_id:string;service_date:string;meal_type_count:number;
+        prepared_portions:number;deducted_portions:number;served_portions:number;
+        potentially_matched_portions:number;
+        served_without_same_day_production_portions:number;
+        produced_not_matched_to_served_portions:number;
+        production_cost_kgs:string;proportional_served_cost_candidate_kgs:string;
+        unallocated_production_cost_candidate_kgs:string;batch_match_verified:false;
+      }>;
+      limitations:string;
+    };
     revenue_source_candidates:{
       served_dining_face_value_kgs:string;
       served_without_linked_folio_count:number;
@@ -352,6 +374,21 @@ export default function HotelFinanceBoard() {
                 <strong>{exactSom(data.owner_accrual_readiness_snapshot.kitchen_cost_movements.production_cost_candidate_kgs)}</strong></div>
               <div><span>Потери кухни</span>
                 <strong>{exactSom(data.owner_accrual_readiness_snapshot.kitchen_cost_movements.loss_cost_candidate_kgs)}</strong></div>
+              {data.owner_accrual_readiness_snapshot.served_kitchen_cost_trace && <>
+                <div data-testid="owner-served-kitchen-cost-candidate">
+                  <span>Расчётная себестоимость поданных блюд</span>
+                  <strong>{exactSom(data.owner_accrual_readiness_snapshot.served_kitchen_cost_trace.totals.proportional_served_cost_candidate_kgs)}</strong>
+                  <small>По блюду и дате; партия к заказу не подтверждена. Не бухгалтерская себестоимость.</small>
+                </div>
+                <div><span>Не распределённая себестоимость приготовления</span>
+                  <strong>{exactSom(data.owner_accrual_readiness_snapshot.served_kitchen_cost_trace.totals.unallocated_production_cost_candidate_kgs)}</strong>
+                  <small>Без назначения на обслуженные заказы; сверка не завершена.</small>
+                </div>
+                <div><span>Поданные порции без производства в тот же день</span>
+                  <strong>{data.owner_accrual_readiness_snapshot.served_kitchen_cost_trace.totals.served_without_same_day_production_portions}</strong>
+                  <small>Требуется проверить другие даты приготовления и склад.</small>
+                </div>
+              </>}
               <div><span>Обслуженные заказы (не выручка)</span>
                 <strong>{exactSom(data.owner_accrual_readiness_snapshot.revenue_source_candidates.served_dining_face_value_kgs)}</strong></div>
               <div><span>Брони после выезда (не выручка)</span>
