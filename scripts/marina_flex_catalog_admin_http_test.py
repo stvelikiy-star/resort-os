@@ -279,5 +279,31 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         self.assertEqual(self.post(templates, {"package_id": individual.json()["id"]}).status_code, 422)
 
 
+
+    def test_06_commercial_price_revision(self):
+        path="/v1/platform/commercial-policy"
+        payload={"expected_version":1,"price_kind":"PACKAGE","code":"BASE","monthly_price":"5500.00"}
+        self.assertEqual(self.post(path,payload,"owner-a").status_code,403)
+        self.assertEqual(self.post(path,{**payload,"monthly_price":"0"}).status_code,422)
+        self.assertEqual(self.post(path,{**payload,"code":"UNKNOWN"}).status_code,422)
+        first=self.post(path,payload)
+        self.assertEqual(first.status_code,201,first.text)
+        self.assertEqual(first.json()["version"],2)
+        self.assertEqual(first.json()["policy"]["monthly_packages"]["CUSTOM"]["minimum"],"5500.00")
+        self.assertFalse(first.json()["payment_collected"])
+        self.assertEqual(self.post(path,payload).status_code,409)
+        second=self.post(path,{"expected_version":2,"price_kind":"MODULE","code":"QR_ZONE","monthly_price":"2200"})
+        self.assertEqual(second.status_code,201,second.text)
+        self.assertEqual(self.get(path).json()["policy"]["module_monthly_prices"]["QR_ZONE"],"2200.00")
+        async def verify_history():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT policy#>>'{monthly_packages,BASE,price}' FROM flex_commercial_policy_versions WHERE version=1"),"5000")
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_commercial_policy_versions"),3)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+            finally:await con.close()
+        asyncio.run(verify_history())
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)
