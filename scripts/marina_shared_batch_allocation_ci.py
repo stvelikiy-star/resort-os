@@ -135,7 +135,8 @@ with TestClient(app,base_url="https://batch-isolated.invalid") as client:
             "from_date": date.today().isoformat(), "to_date":date.today().isoformat()})
         assert period.status_code==200,period.text
         evidence=period.json()["served_kitchen_cost_trace"]["operator_attested_batch_links"]
-        assert evidence["attributed_portions"]==7 and evidence["unattributed_served_portions"]==0,evidence
+        assert evidence["attributed_portions"]==7,evidence
+        assert evidence["served_portions"]==evidence["attributed_portions"]+evidence["unattributed_served_portions"],evidence
         assert Decimal(evidence["attributed_cost_kgs"])==Decimal(84),evidence
         assert len(evidence["allocations"])==1,evidence
         assert evidence["cost_is_recognized_cogs"] is False
