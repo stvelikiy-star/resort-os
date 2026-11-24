@@ -27,7 +27,7 @@ NEW_MIGRATIONS = {
     "zz126_marina_owner_accounting_journal_proposals_20261116": "1368d2ebba7902f1197c6151e97ccc1e7a4ed6d32070b0b6e6dffef1a1d13f42",
     "zz127_marina_served_batch_allocation_20261124": "95bac1119041a5eb816977c4824eea719dbb5a95da99c6e5615b5ca1dd771df3",
     "zz128_marina_owner_accounting_decision_evidence_20261124": "a2b611bdc28bee0e56c0db084f469fe0ef9a23f3960ed8ca995fcbf9f0735ec6",
-    "zz129_marina_owner_accounting_postings_20261125": "de9f0b2b13cd8c155639d81e5f0a37d3c2af65ae13d839250591f8f7f756a86b"
+    "zz129_marina_owner_accounting_postings_20261125": "02d5b81d7644fce7b470d069ac323fa2404dabc630042a7011f9e6b37e07a6ce"
 }
 # Reviewed tightening: summary is trimmed and whitespace-only reports are rejected.
 # Keep the historical RC3 manifest immutable; pin this additive source exactly.
@@ -69,9 +69,9 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "scripts/marina_owner_accounting_decision_ci.py": "4b84740d89e497f976accaa6da3da082129e349e",
     "services/api/app/owner_accounting_journal.py": "fcb45a4a75f7935e12d6793dcdd95062a5d7c8d6",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
-    "services/api/app/owner_ledger_policy.py": "c0a42b1b2c0d9a1f88a6a1bba30e982d7b39cb3e",
-    "services/api/app/owner_accounting_postings.py": "52f385df8812f56169064771c052d9753032d364",
-    "scripts/test_owner_ledger_policy.py": "ef82e4ced2f577b6b92831251a4e9cd40283f3ad",
+    "services/api/app/owner_ledger_policy.py": "4dc0694917e9bb9d7a80786a265a87d7480beead",
+    "services/api/app/owner_accounting_postings.py": "7d99a50f440731dbfaca9140aafd21bdfc58255e",
+    "scripts/test_owner_ledger_policy.py": "cbf493b03dafafc33b6a035df674736cd3978be9",
     "scripts/marina_owner_posting_api_ci.py": "b493d85669ca903d63e5a49a2314b38bdcb6c117",
     "scripts/test_owner_recognition_policy.py": "7a856095b84319c654c9b536f763e1d763cf790a",
     ".github/workflows/marina-owner-recognition-policy-ci.yml": "7965e38127aaf6a9ffe73f0c0ce755425d36d6e1",
