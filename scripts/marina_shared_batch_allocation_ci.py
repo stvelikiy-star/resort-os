@@ -101,10 +101,19 @@ with TestClient(app,base_url="https://batch-isolated.invalid") as client:
         good={"id":str(uuid4()),"order_item_id":str(own["item"]),
               "production_target_id":str(own["target"]),"portions":7}
         login(hotel,"WAITER")
+        assert client.get(path).status_code==403
+        checks+=1
         assert client.post(path,json=good).status_code==403
         checks+=1
         client.post("/api/v1/auth/logout")
         login(hotel,"COOK")
+        targets=client.get("/api/v1/kitchen/production-targets")
+        assert targets.status_code==200,targets.text
+        assert any(str(t["id"])==str(own["target"]) for t in targets.json()["items"])
+        checks+=2
+        foreign_read=client.get(f'/api/v1/kitchen/orders/{far["order"]}/batch-allocations')
+        assert foreign_read.status_code==404,foreign_read.text
+        checks+=1
         foreign=client.post(
             f'/api/v1/kitchen/orders/{far["order"]}/batch-allocations',
             json={"id":str(uuid4()),"order_item_id":str(far["item"]),
@@ -119,7 +128,12 @@ with TestClient(app,base_url="https://batch-isolated.invalid") as client:
         assert created.status_code==201,created.text
         assert created.json()["cost_kgs"]=="84.0000",created.text
         assert created.json()["recognized_profit_posted"] is False
-        checks+=3
+        readback=client.get(path)
+        assert readback.status_code==200,readback.text
+        assert len(readback.json()["items"])==1,readback.text
+        assert readback.json()["items"][0]["portions"]==7
+        assert Decimal(readback.json()["items"][0]["cost_kgs"])==Decimal(84)
+        checks+=7
         repeated=client.post(path,json=good)
         assert repeated.status_code==201 and repeated.json()["already_processed"] is True
         checks+=1
