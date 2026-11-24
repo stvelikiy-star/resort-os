@@ -51,6 +51,8 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "scripts/test_owner_served_kitchen_cost_trace.py": "c30f2859bd5769228c7cbcd1a1c6159797369abf",
     "scripts/marina_shared_served_cost_trace_ci.py": "0d8a608004d04fd6b4ad01f548da34fc59627385",
     "apps/admin/components/HotelFinanceBoard.tsx": "20cdda5d8839fa3c3b9a59bfd686c52a69ae14ab",
+    "apps/staff/components/CookBatchAssignments.tsx": "884a3290e678f8777167999e5aceaa60d470902b",
+    "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",
     # MARINA-specific 52nd migration, exact batch-to-served item ledger.
     "scripts/release_contract.py": "30a001c5fc1eed727ff600f24d6c22bf2a5d0756",
     "scripts/release_contract_test.py": "99455c81fd8c275ba1a1d24e86e1008490e05ce6",
@@ -58,10 +60,10 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "scripts/marina_disposable_upgrade_acceptance_ci.py": "8fe78f31a4d3ca74baafc6129c6c368dd73d871f",
     ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "fadfe76cd59a2db944b82f72f5c8abf0dda89b5c",
     "services/api/app/app_entry.py": "088b69374b5b0e5ee3b86eab6cd59a8cf8f6642f",
-    "services/api/app/shared_auth_preview.py": "efb78195889db902fffc70df422f915fe6178409",
-    "services/api/app/kitchen_batch_allocation.py": "cfccc3b3b159b012bc1aab6cd89e3a8ce336d588",
+    "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
+    "services/api/app/kitchen_batch_allocation.py": "21f71b7bd7d7a6c4aa2b044b4617a4547a16be47",
     "services/api/app/owner_served_kitchen_cost_trace.py": "d051cd2f1962fb4540434b026dec75e8c2afc6a7",
-    "scripts/marina_shared_batch_allocation_ci.py": "5c3689cb810200467cdb8bf4d0d396a4520f59f9",
+    "scripts/marina_shared_batch_allocation_ci.py": "8dd036381b538afa375c73dc2033ecda9175360f",
     ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "24e9586d68e90e4292bb5f53f44d7fddeead7849",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
