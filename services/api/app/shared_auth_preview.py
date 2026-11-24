@@ -20,6 +20,13 @@ class SharedAuthPreviewBoundary:
             ('GET', '/api/v1/admin/dashboard'),
             # Read-only hotel-local finance summary; no payment collection/refund.
             ('GET', '/api/v1/admin/finance/summary'),
+            # OWNER-only hotel financial facts: the original handlers enforce
+            # role=OWNER (module grants cannot promote Staff) and session-derived
+            # property ID. Expense obligations do not create Payment records.
+            ('GET', '/api/v1/admin/finance/owner/expenses'),
+            ('POST', '/api/v1/admin/finance/owner/expenses'),
+            ('GET', '/api/v1/admin/finance/owner/accrual-readiness'),
+            ('GET', '/api/v1/admin/finance/owner/recorded-cash-movements'),
             ('GET', '/api/v1/pms/grid'),
             # Reviewed role-limited operations; no room-state override in shared mode.
             ('GET', '/api/v1/ops/tasks'), ('POST', '/api/v1/ops/tasks'),
@@ -100,7 +107,8 @@ class SharedAuthPreviewBoundary:
                                (method == 'OPTIONS' or
                                 (method == 'POST' and (path.endswith('/claim') or path.endswith('/complete-report'))) or
                                 (method == 'PATCH' and (path.endswith('/status') or path.endswith('/assignee')))))
-            # Exact UUID-only Staff mutations. Unreviewed finance, procurement,
+            # Exact UUID-only Staff mutations. Unreviewed financial posting,
+            # procurement,
             # menu publication, and guest routes remain fail-closed.
             kitchen_status = (scope['type'] == 'http' and method in {'PATCH', 'OPTIONS'} and
                               isinstance(path, str) and re.fullmatch(
@@ -114,13 +122,20 @@ class SharedAuthPreviewBoundary:
                                          isinstance(path, str) and re.fullmatch(
                                              r'/api/v1/dining/table-reservations/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}',
                                              path) is not None)
+            # OWNER expense settlement/void: exact UUID and endpoint method.
+            # Reviewed owner_expenses.py locks records, guards idempotency and
+            # derives property from session; no arbitrary money transfer.
+            owner_expense_mutation = (scope['type'] == 'http' and
+                isinstance(path, str) and re.fullmatch(
+                    r'/api/v1/admin/finance/owner/expenses/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/(?:settlements|void)',
+                    path) is not None and method in {'POST', 'OPTIONS'})
             ops_history = (scope['type'] == 'http' and method in {'GET', 'OPTIONS'} and
                            isinstance(path, str) and re.fullmatch(
                                r'/api/v1/ops/tasks/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/history',
                                path) is not None)
-            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history or kitchen_status or waiter_assignment or dining_reservation_status
+            valid = (method, path) in allowed or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history or kitchen_status or waiter_assignment or dining_reservation_status or owner_expense_mutation
             if method == 'OPTIONS':
-                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history or kitchen_status or waiter_assignment or dining_reservation_status
+                valid = path in {p for _, p in allowed} or staff_patch or pms_cancel or hold_item or schedule_change or schedule_read or internal_payment or stay_transition or reception_detail or ops_task_action or ops_history or kitchen_status or waiter_assignment or dining_reservation_status or owner_expense_mutation
             if not valid:
                 raise HTTPException(503, detail='Only authentication is available in the shared staging preview')
         except HTTPException as error:
