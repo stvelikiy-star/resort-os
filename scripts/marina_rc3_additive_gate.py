@@ -34,12 +34,15 @@ WORKFLOW_PATH = ".github/workflows/marina-shared-rc3-source-ci.yml"
 # Approved current-release P0 (PR #592) is additive to immutable RC3.
 # No historical manifest, RC3 gate, or original SQL hash is rewritten.
 REVIEWED_SHARED_STAFF_P0_BLOBS = {
-    "services/api/app/shared_auth_preview.py": "def6ae43b34ab7946ab903f71ac207adf375fce8",
-    "scripts/test_marina_shared_auth.py": "866325b1ef4f0d14f98798fec9d3364ebe7b00a7",
+    "services/api/app/shared_auth_preview.py": "cb4acbe3083a5981f550f6f614d67bc4f2acb436",
+    "scripts/test_marina_shared_auth.py": "61e7e68db81c4414436abb7f36f7d344e4ea3134",
     "apps/staff/components/StaffRoleGateway.tsx": "957821d21a17350529f9fcef442527772a42e0c9",
     "apps/staff/components/StoreStaffStock.tsx": "82b87098c1ab1355562551ec76cd8b4eb7b5478c",
     "scripts/marina_shared_owner_finance_p0_ci.py": "71cabedce521c0019a3fd900d075830d51891a13",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "9cfef5e35c189f792cedf768aaab595b18b23fdb",
+    # Reviewed evidence-only full refund: no external transfer, no partial refund.
+    "services/api/app/reservation_payments.py": "fe9e0afb085f8343e073a4ba55c3d2b64efc070e",
+    "scripts/marina_shared_manual_refund_evidence_ci.py": "6af069651da5bf9e0623cc886ff3c54deec3faff",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "7edafcdff327fc84e56b47725449385204f5b5cc",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
@@ -50,6 +53,7 @@ ALLOWED_LEGACY_ERRORS = frozenset({
     "reviewed critical source changed: services/api/app/section_permissions.py",
     "reviewed critical source changed: scripts/test_marina_shared_auth.py",
     "reviewed critical source changed: services/api/app/shared_auth_preview.py",
+    "reviewed critical source changed: services/api/app/reservation_payments.py",
 })
 
 def validate_additive() -> list[str]:
