@@ -49,6 +49,9 @@ APPROVED_P0_BLOBS = {
     "services/api/app/stays.py": "16f5a87445a9eaf9315b9b43e25d54c069bd69ce",
     "scripts/test_marina_pms_schedule_property_boundary.py": "701b21a7f74d4b1c210b6e89f65a95dfdd8d8771",
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
+    # The additive RC3 gate is also pinned: immutable historical evidence
+    # remains unchanged, only reviewed current-release additions are accepted.
+    "scripts/marina_rc3_additive_gate.py": "9a77b2f1e33dbd54f4b56abb346983c7ed894d05",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "38c7a4992a7a4a7a822ca58159e49ccb16037953",
