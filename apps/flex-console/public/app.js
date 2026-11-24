@@ -381,6 +381,26 @@ function applyPackageProposal(form){
  }else if(kind!=='CUSTOM' && !title.value.trim())title.value=kind;
  // Preserve explicitly entered custom names when switching package kind.
 }
+async function commercialHotelOfferForm(){
+ const r=await api('/v1/platform/commercial-policy'), p=r.policy;
+ const labels={ru:{title:'Коммерческий тариф',note:'Предложение без активации подписки',extras:'Дополнительные модули'},kg:{title:'Коммерциялык тариф',note:'Жазылууну активдештирбеген сунуш',extras:'Кошумча модулдар'},en:{title:'Commercial tariff',note:'Offer without subscription activation',extras:'Additional modules'}};
+ const l=labels[state.lang]||labels.ru;
+ return '<section class="panel gold"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+
+ '<form id="hotel-commercial-offer" class="admin-form"><input type="hidden" name="policy_version" value="'+safe(r.version)+'"><label>'+safe(t('packageType'))+'<select name="package_kind">'+Object.entries(p.monthly_packages).map(([k,v])=>'<option value="'+safe(k)+'">'+safe(k)+' · '+money(v.price??v.base_price,p.currency)+'</option>').join('')+'</select></label>'+
+ '<label>'+safe(t('periodStart'))+'<input type="date" name="period_start" required value="'+safe(dateValue(2))+'"></label>'+
+ '<fieldset><legend>'+safe(l.extras)+'</legend>'+Object.entries(p.module_monthly_prices).map(([k,v])=>'<label class="check-row"><input type="checkbox" name="extras" value="'+safe(k)+'"><span>'+safe(k)+' · '+money(v,p.currency)+'</span></label>').join('')+'</fieldset>'+
+ '<label>'+safe(t('packageDiscount'))+'<input name="discount_pct" type="number" min="0" max="100" step="0.01" value="0" required></label>'+
+ '<button class="primary" type="submit">'+safe(t('packageSave'))+'</button><div role="status" aria-live="polite"></div></form></section>';
+}
+async function saveCommercialHotelOffer(form){
+ const d=new FormData(form),button=form.querySelector('button[type=submit]'),status=form.querySelector('[role=status]');
+ button.disabled=true;
+ try{
+ const kind=String(d.get('package_kind'));
+ await saveQaCatalogAction('tariff-packages',{hotel_id:state.hotelId,package_kind:kind,title:kind,period_start:String(d.get('period_start')),skus:d.getAll('extras'),discount_pct:String(d.get('discount_pct')),trial_days:5,custom_monthly_price:null,commercial_policy_version:Number(d.get('policy_version'))});
+ await render();
+ }catch(e){status.textContent=e.message;button.disabled=false;}
+}
 async function subscriptionDraftForm(){
  if(state.me?.role!=='SUPER_ADMIN'||!state.status?.qa_catalog_admin_enabled)
    return heading(t('configurationDraft'))+info(t('operationBlocked'));
@@ -669,7 +689,7 @@ async function hotelDetail(){
    '</span></td><td>'+money(i.total,i.currency)+'</td><td>'+safe(date(i.due_at))+'</td></tr>')):
    empty(t('noInvoices')))+'</section>';
  if(state.hotelTab==='finance')return metadata+invoicesInfo+info(t('warning'),'info');
- if(state.hotelTab==='subscription')return metadata+summary+subscriptionInfo+draftHistory+info(t('draftOnly'),'info');
+ if(state.hotelTab==='subscription')return metadata+summary+subscriptionInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await commercialHotelOfferForm().catch(e=>info(e.message,'error')):'')+draftHistory+info(t('draftOnly'),'info');
  return metadata+await hotelNameForm(id)+summary+subscriptionInfo+info(t('warning'),'info');
 }
 
@@ -799,6 +819,7 @@ async function submitCommercialPrice(form){
  catch(err){status.textContent=err.message;button.disabled=false;}
 }
 main.addEventListener('submit',e=>{
+ if(e.target.id==='hotel-commercial-offer'){e.preventDefault();saveCommercialHotelOffer(e.target);return;}
  if(e.target.id==='commercial-price-form'){e.preventDefault();submitCommercialPrice(e.target);return;}
  if(['profile-email','profile-password'].includes(e.target.id)){e.preventDefault();saveAccountSettings(e.target);return;}
  if(e.target.id==='flex-profile-form'){e.preventDefault();saveProfile(e.target);return;}
