@@ -27,7 +27,7 @@ NEW_MIGRATIONS = {
     "zz126_marina_owner_accounting_journal_proposals_20261116": "1368d2ebba7902f1197c6151e97ccc1e7a4ed6d32070b0b6e6dffef1a1d13f42",
     "zz127_marina_served_batch_allocation_20261124": "95bac1119041a5eb816977c4824eea719dbb5a95da99c6e5615b5ca1dd771df3",
     "zz128_marina_owner_accounting_decision_evidence_20261124": "a2b611bdc28bee0e56c0db084f469fe0ef9a23f3960ed8ca995fcbf9f0735ec6",
-    "zz129_marina_owner_posted_journal_20261125": "0035ebe4e28e9a599fae26b98aaef88168a0a994f07ef48f541841b82ce78324"
+    "zz129_marina_owner_posted_journal_20261125": "f4ba44f9c79d91e0c339a2e98b18984b826402e2effd404e366df3fc2e5f5028"
 }
 # Reviewed tightening: summary is trimmed and whitespace-only reports are rejected.
 # Keep the historical RC3 manifest immutable; pin this additive source exactly.
@@ -67,14 +67,15 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/owner_served_kitchen_cost_trace.py": "d051cd2f1962fb4540434b026dec75e8c2afc6a7",
     "scripts/marina_shared_batch_allocation_ci.py": "ba9ce140bb72bfdb7954cb7081ea4f312bb4a168",
     "scripts/marina_owner_accounting_decision_ci.py": "60b1ecc2cd1d77537cd92621087bf26a8972fe1c",
-    "services/api/app/owner_accounting_journal.py": "fcb45a4a75f7935e12d6793dcdd95062a5d7c8d6",
+    "services/api/app/owner_accounting_journal.py": "10b2f11736e410c90f8786f4897bd87957af1f1f",
     "services/api/app/owner_posted_journal.py": "671ce09ac64df7cb80fdcdbcfa09855f6021b4d1",
     "scripts/test_owner_posted_journal.py": "9a596a815aa3017bb5798770d0406e71026d10dc",
+    "scripts/marina_owner_gl_expense_cogs_ci.py": "b0bcb0efb831718057597cd93a200acfd7b63f84",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
     "scripts/test_owner_recognition_policy.py": "7a856095b84319c654c9b536f763e1d763cf790a",
     ".github/workflows/marina-owner-recognition-policy-ci.yml": "7965e38127aaf6a9ffe73f0c0ce755425d36d6e1",
     "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "8802d39ba4d652d845939e0a34fd3a57f9fc0339",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "1983b0a1baf9337a6883563728db7c38decbac57",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
