@@ -83,7 +83,7 @@ APPROVED_P0_BLOBS = {
     ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "fadfe76cd59a2db944b82f72f5c8abf0dda89b5c",
     "services/api/app/app_entry.py": "088b69374b5b0e5ee3b86eab6cd59a8cf8f6642f",
     "services/api/app/kitchen_batch_allocation.py": "21f71b7bd7d7a6c4aa2b044b4617a4547a16be47",
-    "scripts/marina_shared_batch_allocation_ci.py": "8dd036381b538afa375c73dc2033ecda9175360f",
+    "scripts/marina_shared_batch_allocation_ci.py": "ba9ce140bb72bfdb7954cb7081ea4f312bb4a168",
     "packages/database/prisma/migrations/zz127_marina_served_batch_allocation_20261124/migration.sql": "36ccf6d1b520389c45f532a0e5477ce2021a6fc2",
     ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "24e9586d68e90e4292bb5f53f44d7fddeead7849",
     "apps/staff/components/WaiterEntry.module.css": "7218c412d73930418c4d703267bf83e5f8153c0e",
