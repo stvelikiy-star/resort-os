@@ -174,3 +174,134 @@ async def list_proposals(request: Request, from_date: date = Query(),
             results.append(representation(row, lines))
         return {"items": results, "status": "PROPOSED_ONLY",
                 "recognized_profit_kgs": None, "accounting_posted": False}
+
+
+# Evidence-only approval workflow. It never posts a ledger or supplies
+# recognized P&L; the accounting policy and completeness release gates remain
+# deliberately separate. Disabled by default and forbidden in shared preview.
+class JournalDecision(BaseModel):
+    id: uuid.UUID
+    action: Literal["APPROVE", "REVERSE"]
+    reason: str = Field(min_length=8, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_decision_reason(cls, value):
+        result = " ".join(value.split())
+        if len(result) < 8:
+            raise ValueError("Reason must explain the decision")
+        return result
+
+
+def _decision_preview_guard():
+    import os
+    if (os.getenv("APP_ENV") != "staging"
+            or os.getenv("MARINA_SHARED_AUTH_PREVIEW_ENABLED", "false").lower() == "true"
+            or os.getenv("MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED", "false").lower() != "true"):
+        raise HTTPException(503, detail={"code": "ACCOUNTING_DECISIONS_DISABLED"})
+
+
+async def _source_still_verified(conn, pid, proposal):
+    if proposal["sourceType"] == "REVENUE_SOURCE":
+        return await conn.fetchval(
+            """SELECT EXISTS(
+                 SELECT 1 FROM owner_revenue_source_events e
+                 WHERE e.id=$2 AND e."propertyId"=$1 AND e.action='APPROVE_SOURCE'
+                   AND NOT EXISTS(
+                     SELECT 1 FROM owner_revenue_source_events rev
+                     WHERE rev."propertyId"=$1 AND rev."reversesId"=e.id))""",
+            pid, proposal["sourceId"])
+    if proposal["sourceType"] == "REVENUE_CORRECTION":
+        return await conn.fetchval(
+            """SELECT EXISTS(
+                 SELECT 1 FROM owner_revenue_correction_events e
+                 JOIN owner_revenue_evidence_documents d
+                   ON d.id=e."evidenceDocumentId" AND d."propertyId"=e."propertyId"
+                 WHERE e.id=$2 AND e."propertyId"=$1 AND e.action='RECORD'
+                   AND NOT EXISTS(
+                     SELECT 1 FROM owner_revenue_correction_events rev
+                     WHERE rev."propertyId"=$1 AND rev."reversesId"=e.id))""",
+            pid, proposal["sourceId"])
+    return False
+
+
+@router.post("/proposals/{proposal_id}/decisions", status_code=201)
+async def record_decision(proposal_id: uuid.UUID, body: JournalDecision,
+                          request: Request, user=Depends(owner_only)):
+    _decision_preview_guard()
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid = await trusted_property_id(conn, user)
+            actor = uuid.UUID(str(user["id"]))
+            await lock_keys(conn, "accounting-journal-decision:" + str(pid) + ":" + str(proposal_id))
+            proposal = await conn.fetchrow(
+                'SELECT * FROM owner_accounting_journal_proposals WHERE id=$1 AND "propertyId"=$2',
+                proposal_id, pid)
+            if not proposal:
+                raise HTTPException(404, detail={"code": "ACCOUNTING_PROPOSAL_NOT_FOUND"})
+            if proposal["createdById"] == actor:
+                raise HTTPException(403, detail={"code": "ACCOUNTING_SELF_APPROVAL_FORBIDDEN"})
+            old = await conn.fetchrow(
+                """SELECT * FROM owner_accounting_journal_decisions
+                   WHERE "propertyId"=$1 AND "proposalId"=$2 AND action=$3""",
+                pid, proposal_id, body.action)
+            if old:
+                if old["id"] != body.id or old["actorId"] != actor or old["reason"] != body.reason:
+                    raise HTTPException(409, detail={"code": "ACCOUNTING_DECISION_CONFLICT"})
+                return {"id": str(old["id"]), "action": old["action"], "already_processed": True,
+                        "accounting_posted": False, "recognized_profit_kgs": None}
+            approval_id = None
+            if body.action == "APPROVE":
+                if not await _source_still_verified(conn, pid, proposal):
+                    raise HTTPException(409, detail={"code": "ACCOUNTING_SOURCE_UNVERIFIED_OR_REVERSED"})
+            else:
+                approval_id = await conn.fetchval(
+                    """SELECT id FROM owner_accounting_journal_decisions
+                       WHERE "propertyId"=$1 AND "proposalId"=$2 AND action='APPROVE'""",
+                    pid, proposal_id)
+                if approval_id is None:
+                    raise HTTPException(409, detail={"code": "ACCOUNTING_APPROVAL_REQUIRED"})
+            await conn.execute(
+                """INSERT INTO owner_accounting_journal_decisions
+                   (id,"propertyId","proposalId",action,"approvalId","actorId",reason)
+                   VALUES($1,$2,$3,$4,$5,$6,$7)""",
+                body.id, pid, proposal_id, body.action, approval_id, actor, body.reason)
+            await conn.execute(
+                """INSERT INTO audit_logs
+                   (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"createdAt")
+                   VALUES($1,$2,'STAFF',$3,$4,'AccountingJournalProposal',$5,'WEB_ADMIN','SUCCESS',now())""",
+                uuid.uuid4(), pid, str(actor), "ACCOUNTING_EVIDENCE_" + body.action,
+                str(proposal_id))
+            return {"id": str(body.id), "action": body.action, "already_processed": False,
+                    "accounting_posted": False, "recognized_profit_kgs": None}
+
+
+@router.get("/proposals/{proposal_id}/decisions")
+async def list_decisions(proposal_id: uuid.UUID, request: Request, user=Depends(owner_only)):
+    _decision_preview_guard()
+    async with request.app.state.db.acquire() as conn:
+        pid = await trusted_property_id(conn, user)
+        exists = await conn.fetchval(
+            'SELECT 1 FROM owner_accounting_journal_proposals WHERE id=$1 AND "propertyId"=$2',
+            proposal_id, pid)
+        if not exists:
+            raise HTTPException(404, detail={"code": "ACCOUNTING_PROPOSAL_NOT_FOUND"})
+        rows = await conn.fetch(
+            """SELECT id,action,"actorId",reason,"createdAt","approvalId"
+               FROM owner_accounting_journal_decisions
+               WHERE "propertyId"=$1 AND "proposalId"=$2 ORDER BY "createdAt",id""",
+            pid, proposal_id)
+        actions = {r["action"] for r in rows}
+        state = ("EVIDENCE_REVERSED" if "REVERSE" in actions else
+                 "EVIDENCE_APPROVED" if "APPROVE" in actions else
+                 "PENDING_ACCOUNTANT_APPROVAL")
+        return {
+            "proposal_id": str(proposal_id), "evidence_status": state,
+            "decisions": [
+                {"id": str(row["id"]), "action": row["action"],
+                 "actor_id": str(row["actorId"]), "reason": row["reason"],
+                 "approval_id": str(row["approvalId"]) if row["approvalId"] else None,
+                 "created_at": row["createdAt"].isoformat()}
+                for row in rows],
+            "accounting_posted": False, "recognized_profit_kgs": None,
+        }

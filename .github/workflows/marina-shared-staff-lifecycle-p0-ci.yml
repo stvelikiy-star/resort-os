@@ -16,6 +16,10 @@ on:
       - 'scripts/test_owner_served_kitchen_cost_trace.py'
       - 'scripts/marina_shared_served_cost_trace_ci.py'
       - 'scripts/marina_shared_batch_allocation_ci.py'
+      - 'scripts/marina_owner_accounting_decision_ci.py'
+      - 'scripts/test_owner_accounting_decision_evidence.py'
+      - 'services/api/app/owner_accounting_journal.py'
+      - 'packages/database/prisma/migrations/zz128_marina_owner_accounting_decision_evidence_20261124/migration.sql'
       - 'services/api/app/kitchen_batch_allocation.py'
       - 'services/api/app/owner_served_kitchen_cost_trace.py'
       - 'packages/database/prisma/migrations/zz127_marina_served_batch_allocation_20261124/migration.sql'
@@ -113,3 +117,11 @@ jobs:
         env:
           MARINA_BATCH_ALLOCATION_CI_CONFIRM: ISOLATED_BATCH_ALLOCATION_ONLY
         run: python scripts/marina_shared_batch_allocation_ci.py
+      - name: Verify accounting approval feature is fail-closed by default
+        run: python -m unittest scripts.test_owner_accounting_decision_evidence -v
+      - name: Verify independent OWNER accounting decisions without posting P&L
+        env:
+          MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'false'
+          PROPERTY_CODE: HOTEL_A
+          MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED: 'true'
+        run: python scripts/marina_owner_accounting_decision_ci.py
