@@ -53,6 +53,7 @@ DECLARE
  authorised_decision record;
  worker record;
  reversed_post record;
+ source_proof record;
 BEGIN
  SELECT * INTO original_proposal FROM owner_accounting_journal_proposals
  WHERE id=NEW."proposalId" AND "propertyId"=NEW."propertyId";
@@ -77,6 +78,32 @@ BEGIN
            WHERE rev."propertyId"=NEW."propertyId"
              AND rev."proposalId"=NEW."proposalId" AND rev.action='REVERSE') THEN
       RAISE EXCEPTION 'ACCOUNTING_POSTING_APPROVAL_INVALID' USING ERRCODE='23514';
+   END IF;
+   -- These checks also apply to direct SQL writers, not just the API.
+   -- Current policy only allows verified, uncorrected delivered source revenue.
+   IF original_proposal."sourceType" <> 'REVENUE_SOURCE' THEN
+      RAISE EXCEPTION 'ACCOUNTING_POSTING_SOURCE_POLICY_UNSUPPORTED' USING ERRCODE='23514';
+   END IF;
+   SELECT e."faceValueKgs",e."sourceType",e."sourceSnapshot" INTO source_proof
+     FROM owner_revenue_source_events e
+    WHERE e."propertyId"=NEW."propertyId" AND e.id=original_proposal."sourceId"
+      AND e.action='APPROVE_SOURCE'
+      AND NOT EXISTS(SELECT 1 FROM owner_revenue_source_events r
+          WHERE r."propertyId"=e."propertyId" AND r."reversesId"=e.id);
+   IF NOT FOUND OR
+      (source_proof."sourceType"='ROOM_NIGHT'
+         AND source_proof."sourceSnapshot"->>'rate_and_tax_accounting_approved' IS DISTINCT FROM 'true')
+      OR (source_proof."sourceType"='DINING_ORDER'
+         AND source_proof."sourceSnapshot"->>'tax_discount_refund_accounting_approved' IS DISTINCT FROM 'true')
+      OR source_proof."sourceType" NOT IN ('ROOM_NIGHT','DINING_ORDER')
+      OR EXISTS(SELECT 1 FROM owner_revenue_correction_events c
+           WHERE c."propertyId"=NEW."propertyId"
+             AND c."approvalId"=original_proposal."sourceId"
+             AND c.action='RECORD'
+             AND NOT EXISTS (SELECT 1 FROM owner_revenue_correction_events r
+               WHERE r."propertyId"=c."propertyId" AND r."reversesId"=c.id)) THEN
+      RAISE EXCEPTION 'ACCOUNTING_POSTING_SOURCE_COMPLETENESS_NOT_VERIFIED'
+        USING ERRCODE='23514';
    END IF;
  ELSE
    SELECT * INTO reversed_post FROM owner_accounting_postings
@@ -117,6 +144,30 @@ BEGIN
    RAISE EXCEPTION 'ACCOUNTING_POSTING_UNBALANCED' USING ERRCODE='23514';
  END IF;
  IF p.action='POST' THEN
+   -- Revenue posting: debit receivable for the source's exact face value;
+   -- credit an approved revenue account and optional tax payable only.
+   SELECT e."faceValueKgs" INTO debit_total
+     FROM owner_accounting_journal_proposals pr
+     JOIN owner_revenue_source_events e ON e.id=pr."sourceId"
+       AND e."propertyId"=pr."propertyId"
+    WHERE pr.id=p."proposalId" AND pr."propertyId"=p."propertyId";
+   IF NOT EXISTS (
+       SELECT 1 FROM owner_accounting_posting_lines l
+       WHERE l."postingId"=p.id AND l."accountCode"='1100'
+         AND l.side='DEBIT' AND l."amountKgs"=debit_total)
+       OR NOT EXISTS (
+       SELECT 1 FROM owner_accounting_posting_lines l
+       WHERE l."postingId"=p.id AND l.side='CREDIT'
+         AND l."accountCode" IN ('4100','4200','4300'))
+       OR EXISTS (
+       SELECT 1 FROM owner_accounting_posting_lines l
+       WHERE l."postingId"=p.id AND NOT (
+         (l.side='DEBIT' AND l."accountCode"='1100')
+         OR (l.side='CREDIT' AND l."accountCode" IN ('4100','4200','4300','2100'))))
+   THEN
+       RAISE EXCEPTION 'ACCOUNTING_POSTING_REVENUE_ACCOUNT_POLICY_INVALID'
+         USING ERRCODE='23514';
+   END IF;
    SELECT count(*)::integer INTO mismatch_count FROM (
      (SELECT "lineNo","accountCode",side,"amountKgs"
       FROM owner_accounting_journal_proposal_lines
