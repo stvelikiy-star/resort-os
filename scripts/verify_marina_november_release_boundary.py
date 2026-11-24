@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "b7203247f5f520a6c10c3501baf3b63497e5a26e",
+    "scripts/marina_rc3_additive_gate.py": "6a4ce067570c4d4bcd7829d1bac70bcb41ad0b76",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "efb78195889db902fffc70df422f915fe6178409",
@@ -75,6 +75,7 @@ APPROVED_P0_BLOBS = {
     "apps/admin/components/HotelFinanceBoard.tsx": "20cdda5d8839fa3c3b9a59bfd686c52a69ae14ab",
     # MARINA batch provenance: reviewed additive migration, API and executable test.
     "scripts/release_contract.py": "30a001c5fc1eed727ff600f24d6c22bf2a5d0756",
+    "scripts/release_contract_test.py": "99455c81fd8c275ba1a1d24e86e1008490e05ce6",
     "services/api/app/app_entry.py": "088b69374b5b0e5ee3b86eab6cd59a8cf8f6642f",
     "services/api/app/kitchen_batch_allocation.py": "b02b46e4adffc29020fb3f9e60e89843bfbac346",
     "scripts/marina_shared_batch_allocation_ci.py": "4b1330ff2c6470f01b282715f6750bac6311826a",
