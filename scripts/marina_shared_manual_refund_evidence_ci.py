@@ -65,6 +65,9 @@ with TestClient(app, base_url="https://synthetic-staging.invalid") as client:
         check(client.post(path, json=payload).status_code, 403, "reception cannot refund")
         client.post("/api/v1/auth/logout")
         login(hotel, "OWNER")
+        cancellation_path = f"/api/v1/admin/pms/reservations/{reservations[hotel]}/cancel"
+        check(client.post(cancellation_path).status_code, 409,
+              "received payment must not cancel before full refund evidence")
         foreign_path = (f"/api/v1/admin/booking/reservations/{reservations[other]}"
                         f"/payments/{payments[other]}/confirm-manual-refund")
         check(client.post(foreign_path, json=payload).status_code, 404, "foreign payment")
@@ -86,5 +89,13 @@ with TestClient(app, base_url="https://synthetic-staging.invalid") as client:
               "no double count refunded payment")
         check(finance.json()["refunded_snapshot_all_time"]["amount_kgs"], 1000,
               "all-time refund snapshot")
+        cancelled = client.post(cancellation_path)
+        check(cancelled.status_code, 200, "cancel after independently recorded full refund")
+        check(cancelled.json()["status"], "CANCELLED", "hotel reservation cancelled")
+        check(cancelled.json()["payment_refunded"], True, "refund evidence preserved")
+        check(cancelled.json()["refund_executed_by_platform"], False, "still no bank transfer")
+        check(cancelled.json()["released_blocks"], 1, "room availability released")
+        check(client.post(cancellation_path).status_code, 409,
+              "cancelled booking cannot be cancelled again")
         client.post("/api/v1/auth/logout")
 print("MARINA_TWO_HOTEL_MANUAL_FULL_REFUND_EVIDENCE_PASS", passed)
