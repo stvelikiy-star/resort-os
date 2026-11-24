@@ -65,7 +65,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
     "services/api/app/kitchen_batch_allocation.py": "21f71b7bd7d7a6c4aa2b044b4617a4547a16be47",
     "services/api/app/owner_served_kitchen_cost_trace.py": "d051cd2f1962fb4540434b026dec75e8c2afc6a7",
-    "scripts/marina_shared_batch_allocation_ci.py": "ba9ce140bb72bfdb7954cb7081ea4f312bb4a168",
+    "scripts/marina_shared_batch_allocation_ci.py": "9db3435b5ac282ba058b49ecd15ee5f0d8a51752",
     "scripts/marina_owner_accounting_decision_ci.py": "4b84740d89e497f976accaa6da3da082129e349e",
     "services/api/app/owner_accounting_journal.py": "fcb45a4a75f7935e12d6793dcdd95062a5d7c8d6",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
