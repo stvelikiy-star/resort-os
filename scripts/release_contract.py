@@ -61,6 +61,7 @@ EXPECTED_MIGRATIONS = (
     "zz124_marina_owner_revenue_corrections_20261116",
     "zz125_marina_owner_revenue_evidence_bytes_20261116",
     "zz126_marina_owner_accounting_journal_proposals_20261116",
+    "zz127_marina_served_batch_allocation_20261124",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make
@@ -119,6 +120,10 @@ CRITICAL_CONSTRAINTS = frozenset(
         "kitchen_stock_movement_cost_check",
         "kitchen_stock_movement_context_check",
         "kitchen_stock_progress_quantity_check",
+        "kitchen_served_allocation_portions_check",
+        "kitchen_served_allocation_unit_cost_check",
+        "kitchen_served_allocation_total_cost_check",
+        "kitchen_served_allocation_source_check",
         "kitchen_table_reservations_party_check",
         "kitchen_table_reservations_time_check",
         "kitchen_table_reservations_status_check",
