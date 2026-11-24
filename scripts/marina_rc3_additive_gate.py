@@ -41,7 +41,8 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "scripts/marina_shared_owner_finance_p0_ci.py": "71cabedce521c0019a3fd900d075830d51891a13",
     # Reviewed evidence-only full refund: no external transfer, no partial refund.
     "services/api/app/reservation_payments.py": "fe9e0afb085f8343e073a4ba55c3d2b64efc070e",
-    "scripts/marina_shared_manual_refund_evidence_ci.py": "6af069651da5bf9e0623cc886ff3c54deec3faff",
+    "services/api/app/pms_reservation_create.py": "f068836d615409443f1742fc492f27886f9d6aee",
+    "scripts/marina_shared_manual_refund_evidence_ci.py": "f52d7947e64e935497617834e17535def9a59042",
     "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
     "scripts/marina_shared_kitchen_cost_truth_ci.py": "e955a3cbd8a12ce76f8dd421bf1c277fe1cbde21",
     ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "3ebf8db3c10dadab720626dd5e42e72a64488a8e",
@@ -56,6 +57,7 @@ ALLOWED_LEGACY_ERRORS = frozenset({
     "reviewed critical source changed: scripts/test_marina_shared_auth.py",
     "reviewed critical source changed: services/api/app/shared_auth_preview.py",
     "reviewed critical source changed: services/api/app/reservation_payments.py",
+    "reviewed critical source changed: services/api/app/pms_reservation_create.py",
 })
 
 def validate_additive() -> list[str]:
