@@ -43,6 +43,25 @@ def posting_guard():
 
 async def qualified_posting_source(conn,pid,proposal):
     """Only unmodified, verified delivered-source evidence; never client amounts."""
+    if proposal["sourceType"]=="OPERATING_EXPENSE":
+        row=await conn.fetchrow(
+            """SELECT e."amountKgs" AS "faceValueKgs",
+                      'OPERATING_EXPENSE'::text AS "sourceType"
+               FROM owner_expenses e
+               WHERE e.id=$1 AND e."propertyId"=$2
+                 AND e.status='POSTED' AND e."expenseDate"=$3
+                 AND e.category IN
+                   ('UTILITIES','PAYROLL','MAINTENANCE','RENT','MARKETING')
+                 AND e."supplierName" IS NOT NULL
+                 AND e."documentReference" IS NOT NULL
+                 AND NOT EXISTS (SELECT 1 FROM kitchen_supplier_documents d
+                   WHERE d."propertyId"=e."propertyId"
+                     AND d."supplierName"=e."supplierName"
+                     AND d."documentReference"=e."documentReference")""",
+            proposal["sourceId"],pid,proposal["accountingDate"])
+        if not row:
+            raise HTTPException(409,detail={"code":"ACCOUNTING_EXPENSE_UNVERIFIED_OR_STOCK_OVERLAP"})
+        return row
     if proposal["sourceType"]!="REVENUE_SOURCE":
         raise HTTPException(409,detail={"code":"ACCOUNTING_POSTING_SOURCE_TYPE_NOT_SUPPORTED"})
     row=await conn.fetchrow(
