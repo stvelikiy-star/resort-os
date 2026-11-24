@@ -69,6 +69,10 @@ async function getHandler() {
   })();
   return handlerPromise;
 }
+export async function currentIdentitySession(cookie) {
+  const {auth} = await getHandler();
+  return auth.api.getSession({headers:new Headers({cookie:cookie || ''}), query:{disableCookieCache:true}});
+}
 export async function handleEnabledIdentity(req,res,issueSessionCookie) {
   const {database,handler,auth}=await getHandler();
   if(new URL(req.url,'http://localhost').pathname==='/api/identity/first-invite'){

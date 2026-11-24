@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {identityReadiness,handleFlexIdentity} from '../auth/identity-gate.mjs';
 test('no identity access without explicit QA gates',()=>{
@@ -84,10 +85,16 @@ test('identity sign-in UI uses Better Auth TOTP but does not grant platform role
 
 test('password-only QA never loops a verified identity back to a second password form',()=>{
   const src=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
-  assert.match(src,/if\(state\.identitySession\?\.user\)return '<section class="panel gold">/);
-  assert.match(src,/data-identity-logout="yes"/);
-  const panel=src.split("function identityPanel(){",2)[1].split("\nconst state=",1)[0];
-  assert.doesNotMatch(panel,/state\.identitySession\?\.user && !state\.status\?\.password_login/);
+  const begin=src.indexOf('function identityPanel(){');
+  const end=src.indexOf('\nconst state=',begin);
+  const state={status:{password_login:true},identityStep:'email',identitySession:{user:{id:'qa-user'}}};
+  const panel=vm.runInNewContext('('+src.slice(begin,end)+')', {
+    state,identityText:key=>key,recoveryText:key=>key,safe:String
+  });
+  assert.match(panel(),/data-identity-logout="yes"/);
+  assert.doesNotMatch(panel(),/type="password"/);
+  state.identitySession=null;
+  assert.match(panel(),/type="password"/);
   assert.match(src,/if\(state\.me\)/);
   assert.doesNotMatch(src,/state\.me\s*=\s*state\.identitySession/);
 });

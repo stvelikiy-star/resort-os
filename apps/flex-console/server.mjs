@@ -64,6 +64,17 @@ function unseal(value) {
     return Number.isFinite(o.exp) && o.exp > Date.now() ? o : null;
   } catch { return null; }
 }
+async function commercialSession(req) {
+  const session = unseal(cookiesFrom(req)[cookies.session]);
+  if (!session?.identityBinding) return session;
+  if (!bridgeConfigured) return null;
+  const {currentIdentitySession, passwordMode} = await import('./auth/identity-enabled.mjs');
+  if (session.method === 'password' && !passwordMode()) return null;
+  const identity = await currentIdentitySession(req.headers.cookie);
+  if (!identity?.user?.emailVerified || identity.user.id !== session.subject ||
+      !identity.session?.token || !fixedEqual(sha256(identity.session.token), session.identityBinding)) return null;
+  return {...mfaSigner(session.subject, session.method), csrf:session.csrf};
+}
 function fixedEqual(a,b) { const x=Buffer.from(String(a)), y=Buffer.from(String(b)); return x.length===y.length && timingSafeEqual(x,y); }
 function b64u(b) { return Buffer.from(b).toString('base64url'); }
 function sha256(text) { return b64u(createHash('sha256').update(text).digest()); }
@@ -143,7 +154,7 @@ async function registration(req,res) {
   if(!configured || !qaOnboarding)return json(res,503,{error:'QA_ONBOARDING_NOT_ENABLED'});
   if(!isSameOrigin(req))return json(res,403,{error:'ORIGIN_NOT_ALLOWED'});
   if(!String(req.headers['content-type']||'').startsWith('application/json'))return json(res,415,{error:'JSON_REQUIRED'});
-  const session=unseal(cookiesFrom(req)[cookies.session]);
+  const session=await commercialSession(req);
   if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
   if(!session.csrf || !fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
   const idem=req.headers['idempotency-key'];
@@ -204,7 +215,7 @@ async function trustedLinkAction(req,res,url) {
   if(!isSameOrigin(req))return json(res,403,{error:'ORIGIN_NOT_ALLOWED'});
   if(!/^application\/json(?:\s*;|$)/i.test(String(req.headers['content-type']||'')))
     return json(res,415,{error:'JSON_REQUIRED'});
-  const session=unseal(cookiesFrom(req)[cookies.session]);
+  const session=await commercialSession(req);
   if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
   if(!session.csrf||!fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
   const hotelMatch=url.pathname.match(linkHotelRoute);
@@ -331,7 +342,7 @@ async function catalogAdminPost(req,res,url) {
   if(!isSameOrigin(req))return json(res,403,{error:'ORIGIN_NOT_ALLOWED'});
   if(!/^application\/json(?:\s*;|$)/i.test(String(req.headers['content-type']||'')))
     return json(res,415,{error:'JSON_REQUIRED'});
-  const session=unseal(cookiesFrom(req)[cookies.session]);
+  const session=await commercialSession(req);
   if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
   if(!session.csrf||!fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
   const priceMatch=url.pathname.match(catalogPriceAction);
@@ -394,7 +405,7 @@ function routeAllowed(path, search) {
 }
 async function proxy(req,res,url) {
   if(!configured) return json(res,503,{error:'QA_BACKEND_NOT_CONFIGURED'});
-  const session=unseal(cookiesFrom(req)[cookies.session]);
+  const session=await commercialSession(req);
   if(!session) return json(res,401,{error:'LOGIN_REQUIRED'});
   const path=url.pathname.replace(/^\/api\/data/,'');
   const target=routeAllowed(path,url.searchParams);
@@ -424,13 +435,15 @@ async function staticFile(res, pathname) {
 export async function handler(req,res) {
   try {
     const url=new URL(req.url,'http://localhost');
-    if(url.pathname==='/api/identity' || url.pathname.startsWith('/api/identity/')) return await handleFlexIdentity(req,res,bridgeConfigured?(subject,method)=>{
-      const session={...mfaSigner(subject,method),csrf:b64u(randomBytes(32))};
-      return cookie(cookies.session,seal(session),300);
+    if(url.pathname==='/api/identity' || url.pathname.startsWith('/api/identity/')) return await handleFlexIdentity(req,res,bridgeConfigured?(subject,method,identityToken)=>{
+      const lifetimeSeconds = 3600;
+      const session = {subject, method, identityBinding:sha256(identityToken), csrf:b64u(randomBytes(32)),
+        exp:Date.now() + lifetimeSeconds * 1000};
+      return cookie(cookies.session,seal(session),lifetimeSeconds);
     }:null);
     if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
     if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,password_login:bridgeConfigured && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true',identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
-    if(url.pathname==='/api/session') { const s=unseal(cookiesFrom(req)[cookies.session]);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
+    if(url.pathname==='/api/session') { const s=await commercialSession(req);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
     if(req.method==='POST'&&(linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))return await trustedLinkAction(req,res,url);
     if(req.method==='POST'&&(catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath))return await catalogAdminPost(req,res,url);

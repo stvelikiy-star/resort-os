@@ -32,7 +32,7 @@ export async function verifiedLogin(auth,request,origin,issueSessionCookie,passw
   const result=await response.clone().json();
   if(result.user?.emailVerified!==true || typeof result.token!=='string' || !result.token)return response;
   const headers=new Headers(response.headers);
-  headers.append('Set-Cookie',issueSessionCookie(result.user.id,passwordLogin?'password':'totp'));
+  headers.append('Set-Cookie',issueSessionCookie(result.user.id,passwordLogin?'password':'totp',result.token));
   headers.delete('content-length');
   return Response.json({verified:true,platform_session:true},{headers});
 }
