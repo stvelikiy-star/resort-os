@@ -58,6 +58,9 @@ DECLARE
   poster record;
   original record;
   source_ok boolean;
+  source_amount numeric(20,4);
+  source_kind text;
+  valid_revenue_line_count integer;
   corrections_exist boolean;
   debit_total numeric(20,4);
   credit_total numeric(20,4);
@@ -97,6 +100,10 @@ BEGIN
         RAISE EXCEPTION 'ACCOUNTING_APPROVAL_REVERSED' USING ERRCODE='23514';
       END IF;
       IF proposal."sourceType"='REVENUE_SOURCE' THEN
+        SELECT s."faceValueKgs",s."sourceType" INTO source_amount,source_kind
+          FROM owner_revenue_source_events s
+         WHERE s.id=proposal."sourceId" AND s."propertyId"=NEW."propertyId"
+           AND s.action='APPROVE_SOURCE';
         SELECT EXISTS (SELECT 1 FROM owner_revenue_source_events s
           WHERE s.id=proposal."sourceId" AND s."propertyId"=NEW."propertyId"
             AND s.action='APPROVE_SOURCE'
@@ -113,6 +120,23 @@ BEGIN
           INTO corrections_exist;
         IF source_ok IS DISTINCT FROM true OR corrections_exist IS TRUE THEN
           RAISE EXCEPTION 'ACCOUNTING_REVENUE_SOURCE_UNRECONCILED'
+            USING ERRCODE='23514';
+        END IF;
+        -- No arbitrary proposal amount / manual chart may become revenue.
+        -- Only exactly one receivable and one matching source-type revenue.
+        SELECT COUNT(*) INTO valid_revenue_line_count
+        FROM owner_accounting_journal_proposal_lines l
+        WHERE l."proposalId"=proposal.id
+          AND l."amountKgs"=source_amount
+          AND ((l."accountCode"='1100' AND l.side='DEBIT')
+            OR (l."accountCode"=CASE source_kind
+                 WHEN 'ROOM_NIGHT' THEN '4000'
+                 WHEN 'DINING_ORDER' THEN '4100' ELSE '~INVALID~' END
+                AND l.side='CREDIT'));
+        IF source_amount<=0 OR valid_revenue_line_count<>2
+           OR (SELECT COUNT(*) FROM owner_accounting_journal_proposal_lines
+               WHERE "proposalId"=proposal.id)<>2 THEN
+          RAISE EXCEPTION 'ACCOUNTING_REVENUE_ACCOUNT_OR_AMOUNT_INVALID'
             USING ERRCODE='23514';
         END IF;
       ELSE
