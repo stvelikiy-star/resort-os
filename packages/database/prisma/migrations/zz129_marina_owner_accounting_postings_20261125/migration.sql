@@ -20,7 +20,7 @@ CREATE TABLE owner_accounting_postings (
    REFERENCES owner_accounting_journal_decisions(id) ON DELETE RESTRICT,
  CONSTRAINT owner_accounting_postings_reverse_fk FOREIGN KEY("propertyId","reversesId")
    REFERENCES owner_accounting_postings("propertyId",id) ON DELETE RESTRICT,
- CONSTRAINT owner_accounting_postings_action_check CHECK(
+ CONSTRAINT owner_accounting_postings_reverse_shape_check CHECK(
    (action='POST' AND "reversesId" IS NULL) OR
    (action='REVERSE' AND "reversesId" IS NOT NULL)),
  CONSTRAINT owner_accounting_postings_once UNIQUE("propertyId","proposalId",action)
