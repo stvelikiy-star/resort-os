@@ -166,3 +166,60 @@ def quote_month(
         currency="KGS", lines=tuple(lines), subtotal=total,
         renewal_monthly=renewal, quote_fingerprint=fingerprint,
     )
+
+
+@dataclass(frozen=True)
+class PackageTermQuote:
+    package_kind: str
+    included_modules: tuple[str, ...]
+    extra_modules: tuple[str, ...]
+    monthly_total: Decimal
+    months: int
+    discount_pct: Decimal
+    subscription_total: Decimal
+    one_time_total: Decimal
+    payable_total: Decimal
+
+
+def quote_package_term(
+    *,
+    package_kind: str,
+    package_monthly_price: Decimal,
+    included_modules: tuple[str, ...],
+    addon_monthly_prices: dict[str, Decimal],
+    selected_addons: tuple[str, ...],
+    months: int,
+    discount_pct: Decimal,
+    one_time_total: Decimal = Decimal("0"),
+) -> PackageTermQuote:
+    """Quote a term from trusted versioned commercial policy or agreement.
+
+    Package price includes BASE/PMS and the contracted module set. Only extra
+    modules are charged separately. One-time services are never discounted.
+    Caller resolves policy, eligibility, availability and overrides before use.
+    No payment, entitlement or invoice is created here.
+    """
+    if package_kind not in {"BASE", "BUSINESS", "PREMIUM", "CUSTOM"}:
+        raise ValueError("Unknown package")
+    if type(months) is not int or months not in {1, 3, 6, 12}:
+        raise ValueError("Unsupported subscription term")
+    if len(set(included_modules)) != len(included_modules) or len(set(selected_addons)) != len(selected_addons):
+        raise ValueError("Duplicate module")
+    if "MULTI_HOTEL" in included_modules or (package_kind in {"BASE", "CUSTOM"} and included_modules):
+        raise ValueError("Invalid included modules for package")
+    if any(not SKU_PATTERN.fullmatch(sku) or sku in {"BASE", "PMS"} for sku in (*included_modules, *selected_addons)):
+        raise ValueError("Invalid additional module SKU")
+    if any(sku not in addon_monthly_prices for sku in (*included_modules, *selected_addons)):
+        raise ValueError("Unknown module")
+    if not isinstance(discount_pct, Decimal) or not discount_pct.is_finite() or not Decimal(0) <= discount_pct <= Decimal(100):
+        raise ValueError("Invalid term discount")
+    extra = tuple(sorted(set(selected_addons) - set(included_modules)))
+    monthly = _safe_money(_safe_money(package_monthly_price) + sum(
+        (_safe_money(addon_monthly_prices[sku]) for sku in extra), Decimal(0)))
+    subtotal = _safe_money(monthly * months * (Decimal(100) - discount_pct) / Decimal(100))
+    one_time = _safe_money(one_time_total)
+    return PackageTermQuote(
+        package_kind=package_kind, included_modules=tuple(sorted(included_modules)),
+        extra_modules=extra, monthly_total=monthly, months=months,
+        discount_pct=discount_pct, subscription_total=subtotal,
+        one_time_total=one_time, payable_total=_safe_money(subtotal + one_time))
