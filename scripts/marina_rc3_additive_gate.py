@@ -48,6 +48,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/owner_served_kitchen_cost_trace.py": "848956bbe269623462b8979381baad86555b2f36",
     "services/api/app/owner_accrual_readiness.py": "4d018cea0e9ffd3724594995dab4e91a76b5464f",
     "scripts/test_owner_served_kitchen_cost_trace.py": "c30f2859bd5769228c7cbcd1a1c6159797369abf",
+    "apps/admin/components/HotelFinanceBoard.tsx": "48472078d48cb3a707355f1fac36b46d02b80734",
     ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "cc995a8c56ca45a70e9086459bbe9526bcd3d283",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
