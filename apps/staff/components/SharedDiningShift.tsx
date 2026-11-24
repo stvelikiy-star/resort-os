@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import CookBatchAssignments from "./CookBatchAssignments";
 
 type User = {
   id: string; role: "COOK" | "WAITER"; property_code: string;
@@ -116,6 +117,7 @@ export default function SharedDiningShift({ user, onEnd }: {
     {error && <p role="alert">{error}</p>}
     {!loading && !error && <>
       {user.role === "WAITER" && <p>Столов зала: {tables.length}. Заказы своей гостиницы.</p>}
+      {user.role === "COOK" && <CookBatchAssignments onEnd={onEnd} />}
       <section aria-label={user.role === "COOK" ? "Заказы кухни" : "Заказы зала"}>
         {orders.length === 0 && <p>Активных заказов пока нет.</p>}
         {orders.map(order => <article key={order.id} className="shift-card">
