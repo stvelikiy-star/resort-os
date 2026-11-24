@@ -153,6 +153,21 @@ type FinanceResponse = {
         unallocated_production_cost_candidate_kgs:string;batch_match_verified:false;
       }>;
       limitations:string;
+      operator_attested_batch_links?:{
+        status:"OPERATOR_RECORDED_NOT_ACCOUNTING_POSTED";
+        cost_is_recognized_cogs:false;
+        attribution_source:string;
+        order_items:number;
+        fully_attributed_order_items:number;
+        served_portions:number;
+        attributed_portions:number;
+        unattributed_served_portions:number;
+        attributed_cost_kgs:string;
+        allocations:Array<{
+          id:string;order_id:string;order_item_id:string;
+          production_target_id:string;portions:number;cost_kgs:string;source:string;
+        }>;
+      };
     };
     revenue_source_candidates:{
       served_dining_face_value_kgs:string;
@@ -378,7 +393,7 @@ export default function HotelFinanceBoard() {
                 <div data-testid="owner-served-kitchen-cost-candidate">
                   <span>Расчётная себестоимость поданных блюд</span>
                   <strong>{exactSom(data.owner_accrual_readiness_snapshot.served_kitchen_cost_trace.totals.proportional_served_cost_candidate_kgs)}</strong>
-                  <small>По блюду и дате; партия к заказу не подтверждена. Не бухгалтерская себестоимость.</small>
+                  <small>Пропорциональная оценка по блюду и дате. Не бухгалтерская себестоимость.</small>
                 </div>
                 <div><span>Не распределённая себестоимость приготовления</span>
                   <strong>{exactSom(data.owner_accrual_readiness_snapshot.served_kitchen_cost_trace.totals.unallocated_production_cost_candidate_kgs)}</strong>
@@ -388,6 +403,18 @@ export default function HotelFinanceBoard() {
                   <strong>{data.owner_accrual_readiness_snapshot.served_kitchen_cost_trace.totals.served_without_same_day_production_portions}</strong>
                   <small>Требуется проверить другие даты приготовления и склад.</small>
                 </div>
+                {data.owner_accrual_readiness_snapshot.served_kitchen_cost_trace.operator_attested_batch_links && <>
+                  <div data-testid="owner-operator-batch-attributed-cost">
+                    <span>Стоимость порций, привязанных к партии</span>
+                    <strong>{exactSom(data.owner_accrual_readiness_snapshot.served_kitchen_cost_trace.operator_attested_batch_links.attributed_cost_kgs)}</strong>
+                    <small>Партии указаны сотрудником; не бухгалтерская проводка прибыли.</small>
+                  </div>
+                  <div>
+                    <span>Порции без привязки к партии</span>
+                    <strong>{data.owner_accrual_readiness_snapshot.served_kitchen_cost_trace.operator_attested_batch_links.unattributed_served_portions}</strong>
+                    <small>Для полного учёта требуется распределить все поданные порции.</small>
+                  </div>
+                </>}
               </>}
               <div><span>Обслуженные заказы (не выручка)</span>
                 <strong>{exactSom(data.owner_accrual_readiness_snapshot.revenue_source_candidates.served_dining_face_value_kgs)}</strong></div>
