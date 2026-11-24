@@ -128,11 +128,15 @@ def qa_dsn() -> str:
     if not dsn:
         raise ValueError("FLEX QA database is not configured")
     parts = urlsplit(dsn)
+    disposable_loopback = (
+        os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("CI") == "true"
+        and parts.hostname == "127.0.0.1" and parse_qs(parts.query).get("sslmode") == ["verify-full"]
+    )
     if (
         parts.scheme not in {"postgres", "postgresql"}
         or parts.username != "flex_qa_read_runtime"
         or parts.path != "/flex_qa"
-        or not (parts.hostname or "").endswith(".neon.tech")
+        or not ((parts.hostname or "").endswith(".neon.tech") or disposable_loopback)
         or parse_qs(parts.query).get("sslmode", [""])[0]
         not in {"require", "verify-ca", "verify-full"}
     ):
@@ -164,7 +168,7 @@ async def health() -> dict:
         return {
             "status": "ok",
             "mode": "QA_MANAGEMENT_READ_ONLY" if not (_ENABLE_ONBOARDING or _ENABLE_CATALOG) else "QA_MANAGEMENT_DRAFTS",
-            "database": "isolated_neon",
+            "database": "disposable_postgresql" if urlsplit(dsn).hostname == "127.0.0.1" else "isolated_neon",
             "least_privilege": True,
             "payments_enabled": False,
             "payouts_enabled": False,

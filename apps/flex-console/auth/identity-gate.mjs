@@ -1,10 +1,12 @@
 // MARINA SMART FLEX only; disabled until audited Neon auth schema and MFA.
-function validDatabase(value) {
+function validDatabase(value, env) {
   try {
     const u=new URL(value);
+    const disposableLoopback = env.GITHUB_ACTIONS==='true' && env.CI==='true' &&
+      u.hostname==='127.0.0.1' && u.searchParams.get('sslmode')==='verify-full';
     return ['postgres:','postgresql:'].includes(u.protocol) &&
       u.username==='flex_auth_runtime' && u.pathname==='/flex_qa' &&
-      u.hostname.endsWith('.neon.tech') && Boolean(u.password) &&
+      (u.hostname.endsWith('.neon.tech') || disposableLoopback) && Boolean(u.password) &&
       ['require','verify-ca','verify-full'].includes(u.searchParams.get('sslmode'));
   } catch { return false; }
 }
@@ -17,7 +19,7 @@ export function identityReadiness(env=process.env) {
   } catch { return {ready:false,reason:'INVALID_ORIGIN'}; }
   if(typeof env.BETTER_AUTH_SECRET!=='string'||env.BETTER_AUTH_SECRET.length<43)
     return {ready:false,reason:'MISSING_SECRET'};
-  if(!validDatabase(env.FLEX_AUTH_DATABASE_URL))
+  if(!validDatabase(env.FLEX_AUTH_DATABASE_URL, env))
     return {ready:false,reason:'INVALID_AUTH_DATABASE'};
   return {ready:true,reason:'STAGING_ONLY'};
 }

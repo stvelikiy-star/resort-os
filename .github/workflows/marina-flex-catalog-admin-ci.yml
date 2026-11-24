@@ -115,3 +115,23 @@ jobs:
                 'flex_confirmed_payments','INSERT')
               THEN 'PASS' ELSE 'FAIL' END
           " | grep -qx PASS
+
+  connected-console-api-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Console, API and Chromium test dependencies
+        run: |
+          npm ci --prefix apps/flex-console --ignore-scripts --no-fund --no-audit
+          pip install -r services/api/requirements-flex-control.txt uvicorn==0.35.0 playwright==1.58.0
+      - name: Real SUPER ADMIN login and two hotel offers through Console, API and PostgreSQL
+        run: bash scripts/marina_flex_tariff_live_qa.sh
