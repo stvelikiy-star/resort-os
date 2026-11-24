@@ -105,3 +105,18 @@ SELECT 1 / CASE WHEN NOT EXISTS (
   SELECT 1 FROM pg_tables WHERE schemaname='public'
     AND tablename IN ('properties','reservations','guests','folio','staff_users')
 ) THEN 1 ELSE 0 END AS pms_isolation_restored;
+
+-- Approved commercial policy must survive independent restore unchanged.
+BEGIN;
+SET LOCAL ROLE flex_catalog_draft_writer;
+SELECT 1 / CASE WHEN EXISTS (
+  SELECT 1 FROM flex_commercial_policy_versions WHERE version=1
+  AND policy#>>'{monthly_packages,BASE,price}'='5000'
+  AND policy#>>'{monthly_packages,BUSINESS,price}'='15000'
+  AND policy#>>'{monthly_packages,PREMIUM,price}'='25000'
+  AND policy#>>'{launch_offer,first_hotels}'='50'
+  AND policy#>>'{trial,calendar_days}'='5'
+  AND policy->>'implementation_fee'='25000'
+  AND (SELECT count(*) FROM jsonb_object_keys(policy->'module_monthly_prices'))=14
+) THEN 1 ELSE 0 END AS approved_policy_restored;
+ROLLBACK;
