@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "af3fbb7ceb4815884dd3fea8c098547742bed098",
+    "scripts/marina_rc3_additive_gate.py": "5db2956e33e70f28d1b7e0c226751da7028b1be6",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -66,7 +66,7 @@ APPROVED_P0_BLOBS = {
     "services/api/app/pms_reservation_create.py": "f068836d615409443f1742fc492f27886f9d6aee",
     "scripts/marina_shared_manual_refund_evidence_ci.py": "f52d7947e64e935497617834e17535def9a59042",
     "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
-    "scripts/marina_shared_kitchen_cost_truth_ci.py": "e955a3cbd8a12ce76f8dd421bf1c277fe1cbde21",
+    "scripts/marina_shared_kitchen_cost_truth_ci.py": "da7a8f7dc0719fad59482b3312c22aeef22a60f0",
     # Read-only production-to-served dish cost reconciliation, NOT booked COGS.
     "services/api/app/owner_served_kitchen_cost_trace.py": "d051cd2f1962fb4540434b026dec75e8c2afc6a7",
     "services/api/app/owner_accrual_readiness.py": "a6484821beaae10aa3f3de3bbf5011e38389872f",
