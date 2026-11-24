@@ -10,6 +10,7 @@ const main=document.getElementById('content'), nav=document.getElementById('nav'
 /* Separate Better Auth identity sign-in. This never authorizes FLEX API,
  * assigns a role, produces a JWT or marks MFA complete based on browser state.
  */
+for(const [locale,copy] of Object.entries({"ru":{"qaDemo":"Тестовая среда","qaReadonly":"Только чтение","footerBrand":"MARINA SMART FLEX · Коммерческое управление","footerFrozen":"Платежи, QR и выплаты отключены","theme":"Переключить тему","loading":"Загрузка","navigation":"Навигация","controlPlane":"Центр коммерческого управления","authRequired":"Требуется вход","noLiveData":"Тестовая среда не подключена"},"kg":{"qaDemo":"Сыноо чөйрөсү","qaReadonly":"Окуу гана","footerBrand":"MARINA SMART FLEX · Коммерциялык башкаруу","footerFrozen":"Төлөмдөр, QR жана которуулар өчүрүлгөн","theme":"Теманы алмаштыруу","loading":"Жүктөлүүдө","navigation":"Навигация","controlPlane":"Коммерциялык башкаруу борбору","authRequired":"Кирүү талап кылынат","noLiveData":"Сыноо чөйрөсү туташкан эмес"},"en":{"qaDemo":"Test environment","qaReadonly":"Read only","footerBrand":"MARINA SMART FLEX · Commercial management","footerFrozen":"Payments, QR and payouts disabled","theme":"Switch theme","loading":"Loading","navigation":"Navigation","controlPlane":"Commercial management center","authRequired":"Sign-in required","noLiveData":"Test environment not connected"}})) Object.assign(translations[locale],copy);
 const identityCopy={
  ru:{heading:'Вход в MARINA SMART FLEX',email:'Электронная почта',password:'Пароль',signIn:'Продолжить',mfa:'Код из приложения-аутентификатора',verify:'Подтвердить код',onlyIdentity:'Вход в учётную запись не предоставляет доступ SUPER ADMIN. Права откроются только после проверенного MFA и серверного подтверждения роли.',signedIn:'Почта подтверждена, но доступ к кабинету ещё не выдан сервером. Выйдите и войдите снова, если сессия устарела.',signOut:'Выйти из учётной записи',failed:'Не удалось подтвердить учётную запись',disabled:'Вход ещё не настроен',totpHint:'Введите шесть цифр из приложения-аутентификатора.'},
  kg:{heading:'MARINA SMART FLEX системасына кирүү',email:'Электрондук почта',password:'Сырсөз',signIn:'Улантуу',mfa:'Аутентификатор колдонмосундагы код',verify:'Кодду ырастоо',onlyIdentity:'Каттоо эсебине кирүү SUPER ADMIN укугун бербейт. Укук MFA жана серверде роль текшерилгенден кийин гана берилет.',signedIn:'Каттоо эсебиңиз ырасталды, бирок кабинетке кирүүгө сервер али уруксат берген жок. Сессия эскирсе, чыгып кайра кириңиз.',signOut:'Каттоо эсебинен чыгуу',failed:'Каттоо эсеби ырасталган жок',disabled:'Кирүү али жөндөлө элек',totpHint:'Аутентификатор колдонмосундагы алты орундуу кодду киргизиңиз.'},
@@ -67,15 +68,15 @@ function identityPanel(){
  const note=state.status?.password_login?'':'<p class="muted">'+safe(text('onlyIdentity'))+'</p>';
  // A verified identity cookie is not a platform session. Never show another
  // password form over an existing identity session: offer a safe sign-out.
- if(state.identitySession?.user)return '<section class="panel gold"><h2>'+safe(text('heading'))+'</h2>'+
+ if(state.identitySession?.user)return '<section class="panel gold identity-card"><h2>'+safe(text('heading'))+'</h2>'+
    '<p>'+safe(text('signedIn'))+'</p>'+note+
    '<button type="button" class="outline" data-identity-logout="yes">'+safe(text('signOut'))+'</button></section>';
- if(state.identityStep==='totp')return '<section class="panel gold"><h2>'+safe(text('mfa'))+'</h2>'+
+ if(state.identityStep==='totp')return '<section class="panel gold identity-card"><h2>'+safe(text('mfa'))+'</h2>'+
    '<p class="muted">'+safe(text('totpHint'))+'</p><form id="flex-identity-totp">'+
    '<label>'+safe(text('mfa'))+'<input name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" required></label>'+
    '<button class="primary" type="submit">'+safe(text('verify'))+'</button></form>'+
    (state.identityError?'<p role="alert">'+safe(state.identityError)+'</p>':'')+note+'</section>';
- return '<section class="panel gold"><h2>'+safe(text('heading'))+'</h2><form id="flex-identity-signin">'+
+ return '<section class="panel gold identity-card"><h2>'+safe(text('heading'))+'</h2><form id="flex-identity-signin">'+
    '<label>'+safe(text('email'))+'<input name="email" type="email" autocomplete="username" required maxlength="254"></label>'+
    '<label>'+safe(text('password'))+'<input name="password" type="password" autocomplete="current-password" required minlength="12"></label>'+
    '<button class="primary" type="submit">'+safe(text('signIn'))+'</button></form>'+
@@ -466,6 +467,7 @@ function renderNav(){
  nav.innerHTML=choices.map(([id,label,icon])=>'<button type="button" data-view="'+id+'" class="'+(state.view===id?'active':'')+'"><span>'+icon+'</span>'+safe(t(label))+'</button>').join('');
  document.getElementById('session-button').textContent=t(state.me?'logout':'login');
  document.querySelectorAll('[data-i18n]').forEach(x=>x.textContent=t(x.dataset.i18n));
+ const themeButton=document.getElementById('theme');themeButton.title=t('theme');themeButton.setAttribute('aria-label',t('theme'));document.getElementById('lang').setAttribute('aria-label',t('lang'));nav.setAttribute('aria-label',t('navigation'));document.title=t('footerBrand');
 }
 function showLogin(){
  nav.innerHTML='';
@@ -478,9 +480,9 @@ function showLogin(){
    return;
  }
  main.innerHTML=heading(configured?t('loginPrompt'):t('notConfigured'))+
- '<div class="panel gold"><h2>MARINA FLEX · CONTROL PLANE</h2><p class="muted">'+safe(configured?t('loginPrompt'):t('configHelp'))+'</p>'+
+ '<div class="panel gold"><h2>'+safe(t('controlPlane'))+'</h2><p class="muted">'+safe(configured?t('loginPrompt'):t('configHelp'))+'</p>'+
  (configured?'<button class="primary" type="button" data-login="yes">'+safe(t('login'))+'</button>':'')+'</div>'+
- info('DATA STATUS: '+(configured?'AUTH REQUIRED':'NO QA ISSUER / NO LIVE DATA'),'info');
+ info(t(configured?'authRequired':'noLiveData'),'info');
 }
 function periodButtons(){return '<div class="period" role="group" aria-label="'+safe(t('period'))+'">'+[['day','periodDay'],['week','periodWeek'],['month','periodMonth']].map(([p,k])=>'<button type="button" data-period="'+p+'" class="'+(state.period===p?'active':'')+'">'+safe(t(k))+'</button>').join('')+'</div>'}
 function errorPage(err){const msg=err?.status===403?t('accessDenied'):t('error');main.innerHTML=heading(msg)+info(err.message||msg,'error')+'<button class="outline" type="button" data-retry="1">'+safe(t('retry'))+'</button>';}
@@ -623,7 +625,7 @@ async function render(){
  const serial=++state.serial;
  renderNav();
  if(!state.me){showLogin();return;}
- main.innerHTML='<div class="skeleton" aria-label="Loading"></div>';
+ main.innerHTML='<div class="skeleton" aria-label="'+safe(t('loading'))+'"></div>';
  try{const views={overview,'billing-hold':billingHold,hotels:hotelList,catalog,'catalog-new':skuForm,'catalog-price':futurePriceForm,'catalog-versions':versionsPage,'subscription-draft':subscriptionDraftForm,obligations,hotel:hotelDetail,'hotel-new':registrationForm,'hotel-link':linkWizard,subscription,earnings};const html=await (views[state.view]||overview)();if(serial!==state.serial)return;main.innerHTML=html;}
  catch(err){if(serial===state.serial)errorPage(err);}
 }
