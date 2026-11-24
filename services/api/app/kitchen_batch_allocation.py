@@ -89,6 +89,16 @@ async def record_served_batch(
                             "cost_kgs":str(existing["totalCostKgs"]),
                             "source":"OPERATOR_ATTESTED","recognized_profit_posted":False}
                 raise HTTPException(409, detail={"code": "BATCH_ALLOCATION_ID_REUSED"})
+            # One immutable assertion per (order item, production batch).
+            # Distinct IDs on an existing pair must report 409, not DB error.
+            pair = await conn.fetchval(
+                '''SELECT id FROM kitchen_served_batch_allocations
+                   WHERE "propertyId"=$1 AND "orderItemId"=$2
+                     AND "productionTargetId"=$3''',
+                pid,item["id"],target["id"],
+            )
+            if pair:
+                raise HTTPException(409, detail={"code": "BATCH_ITEM_PAIR_ALREADY_ALLOCATED"})
             already_item = await conn.fetchval(
                 '''SELECT COALESCE(SUM(portions),0)::int
                    FROM kitchen_served_batch_allocations
