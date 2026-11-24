@@ -36,7 +36,7 @@ WORKFLOW_PATH = ".github/workflows/marina-shared-rc3-source-ci.yml"
 # No historical manifest, RC3 gate, or original SQL hash is rewritten.
 REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/shared_auth_preview.py": "cb4acbe3083a5981f550f6f614d67bc4f2acb436",
-    "scripts/test_marina_shared_auth.py": "cd8aaf6792cf0c4820030408f73524e499aa9631",
+    "scripts/test_marina_shared_auth.py": "edb42395111dbd19fe2e3e3facaa9ff4d4cfe39e",
     "apps/staff/components/StaffRoleGateway.tsx": "957821d21a17350529f9fcef442527772a42e0c9",
     "apps/staff/components/StoreStaffStock.tsx": "82b87098c1ab1355562551ec76cd8b4eb7b5478c",
     "scripts/marina_shared_owner_finance_p0_ci.py": "71cabedce521c0019a3fd900d075830d51891a13",
