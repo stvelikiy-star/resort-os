@@ -48,6 +48,7 @@ class SharedAuthPreviewBoundary:
             # Endpoint role checks still apply (COOK/WAITER/STORE_STAFF).
             ('GET', '/api/v1/kitchen/menu'),
             ('GET', '/api/v1/kitchen/orders'),
+            ('GET', '/api/v1/kitchen/production-targets'),
             ('POST', '/api/v1/kitchen/orders'),
             ('GET', '/api/v1/kitchen/stock'),
             ('GET', '/api/v1/kitchen/stock/losses'),
@@ -110,7 +111,7 @@ class SharedAuthPreviewBoundary:
             # Exact UUID-only Staff mutations. Unreviewed financial posting,
             # procurement,
             # menu publication, and guest routes remain fail-closed.
-            batch_assignment = (scope['type'] == 'http' and method in {'POST', 'OPTIONS'} and
+            batch_assignment = (scope['type'] == 'http' and method in {'GET', 'POST', 'OPTIONS'} and
                                 isinstance(path, str) and re.fullmatch(
                                     r'/api/v1/kitchen/orders/[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}/batch-allocations',
                                     path) is not None)
