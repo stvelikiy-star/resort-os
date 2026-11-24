@@ -274,3 +274,34 @@ async def record_decision(proposal_id: uuid.UUID, body: JournalDecision,
                 str(proposal_id))
             return {"id": str(body.id), "action": body.action, "already_processed": False,
                     "accounting_posted": False, "recognized_profit_kgs": None}
+
+
+@router.get("/proposals/{proposal_id}/decisions")
+async def list_decisions(proposal_id: uuid.UUID, request: Request, user=Depends(owner_only)):
+    _decision_preview_guard()
+    async with request.app.state.db.acquire() as conn:
+        pid = await trusted_property_id(conn, user)
+        exists = await conn.fetchval(
+            'SELECT 1 FROM owner_accounting_journal_proposals WHERE id=$1 AND "propertyId"=$2',
+            proposal_id, pid)
+        if not exists:
+            raise HTTPException(404, detail={"code": "ACCOUNTING_PROPOSAL_NOT_FOUND"})
+        rows = await conn.fetch(
+            """SELECT id,action,"actorId",reason,"createdAt","approvalId"
+               FROM owner_accounting_journal_decisions
+               WHERE "propertyId"=$1 AND "proposalId"=$2 ORDER BY "createdAt",id""",
+            pid, proposal_id)
+        actions = {r["action"] for r in rows}
+        state = ("EVIDENCE_REVERSED" if "REVERSE" in actions else
+                 "EVIDENCE_APPROVED" if "APPROVE" in actions else
+                 "PENDING_ACCOUNTANT_APPROVAL")
+        return {
+            "proposal_id": str(proposal_id), "evidence_status": state,
+            "decisions": [
+                {"id": str(row["id"]), "action": row["action"],
+                 "actor_id": str(row["actorId"]), "reason": row["reason"],
+                 "approval_id": str(row["approvalId"]) if row["approvalId"] else None,
+                 "created_at": row["createdAt"].isoformat()}
+                for row in rows],
+            "accounting_posted": False, "recognized_profit_kgs": None,
+        }
