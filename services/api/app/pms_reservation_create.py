@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import secrets
 import uuid
@@ -748,9 +749,43 @@ async def cancel_grid_reservation(
             )
             if source != "PMS":
                 raise HTTPException(status_code=409, detail={"code": "CANCELLATION_REQUIRES_SOURCE_WORKFLOW"})
-            payment_count = await conn.fetchval(
-                'SELECT count(*) FROM payments WHERE "reservationId"=$1', reservation_id,
+            # Allow cancellation AFTER an externally completed full refund
+            # only in the reviewed tenant-isolated staging slice. Historical
+            # single-property and paid-booking behaviour stays unchanged.
+            payment_rows = await conn.fetch(
+                '''SELECT id,status::text AS status,provider,"amountKgs",metadata
+                   FROM payments WHERE "reservationId"=$1 FOR UPDATE''',
+                reservation_id,
             )
+            verified_full_refunds = False
+            if (payment_rows and auth_module.MARINA_SHARED_AUTH_PREVIEW_ENABLED
+                    and os.environ.get("APP_ENV") == "staging"):
+                verified_full_refunds = True
+                for payment in payment_rows:
+                    meta = payment["metadata"] or {}
+                    if isinstance(meta, str):
+                        meta = json.loads(meta)
+                    proof = meta.get("manual_full_refund_evidence")
+                    if (payment["status"] != "REFUNDED"
+                            or payment["provider"] != "MANAGER_MANUAL"
+                            or not isinstance(proof, dict)
+                            or proof.get("origin") != "EXTERNAL_ALREADY_COMPLETED"
+                            or proof.get("funds_sent_by_platform") is not False
+                            or str(proof.get("amount_kgs")) != str(payment["amountKgs"])
+                            or not proof.get("reference")):
+                        verified_full_refunds = False
+                        break
+                    audited = await conn.fetchval(
+                        '''SELECT EXISTS(SELECT 1 FROM audit_logs
+                           WHERE "propertyId"=$1
+                             AND action='CONFIRM_MANUAL_FULL_REFUND'
+                             AND "resourceId"=$2
+                             AND "afterJson"->>'evidence_reference'=$3)''',
+                        prop["id"], str(payment["id"]), proof["reference"],
+                    )
+                    if not audited:
+                        verified_full_refunds = False
+                        break
             stay_count = await conn.fetchval(
                 'SELECT count(*) FROM stays WHERE "reservationId"=$1', reservation_id,
             )
@@ -760,7 +795,7 @@ async def cancel_grid_reservation(
                      AND status NOT IN ('WAIVED','VOID')""",
                 prop["id"], reservation_id,
             )
-            if payment_count or stay_count or open_charge_count:
+            if (payment_rows and not verified_full_refunds) or stay_count or open_charge_count:
                 raise HTTPException(status_code=409, detail={"code": "CANCELLATION_REQUIRES_FINANCE_OR_STAY_REVIEW"})
             await conn.execute(
                 """UPDATE reservations SET status='CANCELLED',"updatedAt"=now()
@@ -783,15 +818,22 @@ async def cancel_grid_reservation(
                 """INSERT INTO audit_logs
                    (id,"propertyId","actorType","actorId",action,resource,"resourceId",
                     source,result,"afterJson","createdAt")
-                   VALUES ($1,$2,'STAFF',$3,'MANAGER_CANCEL_UNPAID_PMS_RESERVATION',
+                   VALUES ($1,$2,'STAFF',$3,$7,
                            'Reservation',$4,'PMS_OWNER_GRID','SUCCESS',
-                           jsonb_build_object('booking_number',$5::text,'released_blocks',$6::int),now())""",
+                           jsonb_build_object('booking_number',$5::text,'released_blocks',$6::int,
+                             'externally_refunded_payments_verified',$8::int,
+                             'refund_executed_by_platform',false),now())""",
                 uuid.uuid4(), prop["id"], user["id"], str(reservation_id),
                 row["bookingNumber"], released,
+                ("MANAGER_CANCEL_AFTER_MANUAL_FULL_REFUNDS" if verified_full_refunds
+                 else "MANAGER_CANCEL_UNPAID_PMS_RESERVATION"),
+                len(payment_rows) if verified_full_refunds else 0,
             )
     return {
         "reservation_id": str(reservation_id),
         "status": "CANCELLED",
         "released_blocks": released,
-        "payment_refunded": False,
+        "payment_refunded": bool(verified_full_refunds),
+        "refund_executed_by_platform": False,
+        "refund_confirmed_by_operator_evidence": bool(verified_full_refunds),
     }
