@@ -185,5 +185,51 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         asyncio.run(verify_tables())
 
 
+    def test_04_tariff_package_versions_are_immutable_off_only(self):
+        path="/v1/platform/tariff-packages"
+        start=datetime.now(ZoneInfo('Asia/Bishkek')).date()+timedelta(days=4)
+        data={"hotel_id":HOTEL_A,"package_kind":"BUSINESS",
+              "title":"QA Business bundle","period_start":start.isoformat(),
+              "skus":["AI_ASSISTANT"],"discount_pct":"10.00",
+              "trial_days":14}
+        self.assertEqual(self.post(path,data,"owner-a").status_code,403)
+        self.assertEqual(self.post(path,data,mfa=False).status_code,403)
+        for forbidden in [{"paid":True},{"state":"ACTIVE"},{"enforcement":"ENFORCE"}]:
+            self.assertEqual(self.post(path,{**data,**forbidden}).status_code,422)
+        first=self.post(path,data)
+        self.assertEqual(first.status_code,201,first.text)
+        row=first.json()
+        self.assertEqual(row["state"],"DRAFT")
+        self.assertEqual(row["enforcement"],"OFF")
+        self.assertFalse(row["subscription_activated"])
+        self.assertFalse(row["payments_enabled"])
+        self.assertEqual(row["version"],1)
+        self.assertEqual(row["list_monthly_total"],"4000.00")
+        self.assertEqual(row["proposed_monthly_total"],"3600.00")
+        self.assertEqual(row["trial_days"],14)
+        again=self.post(path,{**data,"title":"QA Business v2","trial_days":7})
+        self.assertEqual(again.status_code,201,again.text)
+        self.assertEqual(again.json()["version"],2)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A).status_code,200)
+        self.assertEqual(len(self.get(path+"?hotel_id="+HOTEL_A).json()),2)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_B).json(),[])
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A,who="owner-a").status_code,403)
+        custom=self.post(path,{**data,"package_kind":"CUSTOM","title":"QA custom",
+                          "discount_pct":"0","custom_monthly_price":"2999.00"})
+        self.assertEqual(custom.status_code,201,custom.text)
+        self.assertEqual(custom.json()["proposed_monthly_total"],"2999.00")
+        self.assertEqual(self.post(path,{**data,"package_kind":"CUSTOM","custom_monthly_price":"2999.00"}).status_code,422)
+        async def verify_unchanged():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_tariff_package_versions"),3)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_payment_intents"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscription_configuration_drafts"),1)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscriptions"),2)
+            finally:await con.close()
+        asyncio.run(verify_unchanged())
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)

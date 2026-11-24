@@ -13,7 +13,8 @@ from pydantic import ValidationError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services" / "api"))
 from app.flex_catalog_admin import (  # noqa: E402
-    NewSku, FuturePrice, NewConfigurationDraft, require_admin, ensure_draft_period,
+    NewSku, FuturePrice, NewConfigurationDraft, NewTariffPackageProposal,
+    require_admin, ensure_draft_period, ensure_package_proposal,
 )
 from app.flex_foundation import PlatformPrincipal  # noqa: E402
 
@@ -87,6 +88,37 @@ class CatalogAdminP0(unittest.TestCase):
         with self.assertRaises(HTTPException) as e:
             ensure_draft_period(invalid)
         self.assertEqual(e.exception.status_code, 422)
+
+
+    def test_package_is_qa_proposal_with_strict_discounts_and_custom_price(self):
+        base=dict(hotel_id=uuid.uuid4(),package_kind="BUSINESS",
+                  title="QA Business",period_start=date.today()+timedelta(days=4),
+                  skus=["AI_ASSISTANT"],discount_pct="10.00",trial_days=14)
+        p=NewTariffPackageProposal(**base)
+        self.assertEqual(p.discount_pct,"10.00")
+        self.assertIsNone(ensure_package_proposal(p))
+        for extra in [
+            {"package_kind":"OTHER"},
+            {"skus":["AI_ASSISTANT","AI_ASSISTANT"]},
+            {"discount_pct":"100.01"},
+            {"discount_pct":"-1"},
+            {"trial_days":91},
+            {"state":"ACTIVE"},
+            {"enforcement":"ENFORCE"},
+            {"payment_received":True}
+        ]:
+            with self.subTest(extra=extra),self.assertRaises(ValidationError):
+                NewTariffPackageProposal(**{**base,**extra})
+        for extra in [
+            {"custom_monthly_price":"999.00"},
+            {"package_kind":"CUSTOM","discount_pct":"10.00","custom_monthly_price":"999.00"}
+        ]:
+            with self.subTest(extra=extra),self.assertRaises(HTTPException):
+                ensure_package_proposal(NewTariffPackageProposal(**{**base,**extra}))
+        self.assertIsNone(ensure_package_proposal(NewTariffPackageProposal(
+            **{**base,"package_kind":"CUSTOM","discount_pct":"0",
+               "custom_monthly_price":"999.00"}
+        )))
 
 
 if __name__ == "__main__":
