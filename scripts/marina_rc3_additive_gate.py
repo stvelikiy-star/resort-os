@@ -137,4 +137,4 @@ if __name__ == "__main__":
         for message in problems:
             print("MARINA_RC3_ADDITIVE_FAIL:", message)
         raise SystemExit(1)
-    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz127, total=51, original source gate preserved, NO-GO")
+    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz127, total=52, original source gate preserved, NO-GO")
