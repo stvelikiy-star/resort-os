@@ -89,6 +89,17 @@ def make_app(db):
     @app.get('/api/v1/admin/dashboard')
     async def protected_dashboard(user=Depends(auth.current_user)):
         return {'property_code': user['property_code']}
+    # The minimal test routes prove shared middleware admission AND tenant
+    # session binding. Production handlers still enforce their own role access.
+    @app.get('/api/v1/kitchen/orders')
+    async def kitchen_orders(user=Depends(auth.current_user)):
+        return {'property_code': user['property_code']}
+    @app.get('/api/v1/dining/floor')
+    async def dining_floor(user=Depends(auth.current_user)):
+        return {'property_code': user['property_code']}
+    @app.get('/api/v1/kitchen/stock')
+    async def kitchen_stock(user=Depends(auth.current_user)):
+        return {'property_code': user['property_code']}
     return app
 
 
@@ -132,16 +143,17 @@ class SharedAuthTests(unittest.TestCase):
     def test_allowed_snapshot_401_and_unreviewed_503_are_distinct(self):
         # Shared boundary admission is NOT equivalent to authorization.
         # An expired/revoked session gets 401 on admitted management reads.
-        # Unreviewed shared inbox, kitchen, dining and assistant routes must
-        # remain hard 503 even when the owner has a valid session.
+        # Unreviewed shared inbox, kitchen publication, procurement and AI
+        # routes remain hard 503 even when the owner has a valid session.
         route = '/api/v1/admin/dashboard'
         self.assertEqual(self.client.get(route).status_code, 401)
         self.assertEqual(self.login('HOTEL_A').status_code, 200)
         self.assertEqual(self.client.get(route).json(), {'property_code': 'HOTEL_A'})
         forbidden_shared = (
             ('GET', '/api/v1/admin/inbox/conversations'),
-            ('GET', '/api/v1/kitchen/orders'),
-            ('GET', '/api/v1/dining/floor'),
+            ('POST', '/api/v1/kitchen/menu/bootstrap-draft'),
+            ('POST', '/api/v1/kitchen/stock/items'),
+            ('POST', '/api/v1/dining/menu-day/publish'),
             ('GET', '/api/v1/assistant/capabilities'),
             ('PATCH', '/api/v1/ops/rooms/11111111-1111-4111-8111-111111111111/state'),
         )
@@ -154,6 +166,30 @@ class SharedAuthTests(unittest.TestCase):
                          '503 middleware must reject requests before DB access')
         self.assertEqual(self.client.post('/api/v1/auth/logout').status_code, 204)
         self.assertEqual(self.client.get(route).status_code, 401)
+
+    def test_operational_staff_routes_are_hotel_scoped_and_unreviewed_stay_closed(self):
+        # This is a boundary regression, not proof of all five full Staff UIs.
+        read_routes = ('/api/v1/kitchen/orders', '/api/v1/dining/floor',
+                       '/api/v1/kitchen/stock')
+        for route in read_routes:
+            self.assertEqual(self.client.get(route).status_code, 401, route)
+        for code in ('HOTEL_A', 'HOTEL_B'):
+            self.assertEqual(self.login(code).status_code, 200)
+            for route in read_routes:
+                response = self.client.get(route)
+                self.assertEqual(response.status_code, 200, route)
+                self.assertEqual(response.json(), {'property_code': code})
+            self.assertEqual(self.client.post('/api/v1/auth/logout').status_code, 204)
+        # Route boundary is HTTP-method and UUID specific. A route without a
+        # test-only handler returns 404 (admitted), not middleware 503.
+        valid = '11111111-1111-4111-8111-111111111111'
+        self.assertEqual(self.client.patch('/api/v1/kitchen/orders/'+valid+'/status').status_code, 404)
+        self.assertEqual(self.client.patch('/api/v1/dining/orders/'+valid+'/waiter').status_code, 404)
+        self.assertEqual(self.client.patch('/api/v1/dining/table-reservations/'+valid).status_code, 404)
+        for path in ('/api/v1/kitchen/orders/not-a-uuid/status',
+                     '/api/v1/kitchen/menu/bootstrap-draft',
+                     '/api/v1/kitchen/stock/items'):
+            self.assertEqual(self.client.post(path).status_code, 503, path)
 
     def test_shared_dashboard_never_falls_back_to_previous_hotel(self):
         route = '/api/v1/admin/dashboard'

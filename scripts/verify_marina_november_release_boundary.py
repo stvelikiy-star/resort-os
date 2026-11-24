@@ -49,7 +49,15 @@ APPROVED_P0_BLOBS = {
     "services/api/app/stays.py": "16f5a87445a9eaf9315b9b43e25d54c069bd69ce",
     "scripts/test_marina_pms_schedule_property_boundary.py": "701b21a7f74d4b1c210b6e89f65a95dfdd8d8771",
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
-    "apps/staff/components/StaffRoleGateway.tsx": "ad307039fcee05324c5e1e2cd6a34cc732680f2a",
+    # The additive RC3 gate is also pinned: immutable historical evidence
+    # remains unchanged, only reviewed current-release additions are accepted.
+    "scripts/marina_rc3_additive_gate.py": "9a77b2f1e33dbd54f4b56abb346983c7ed894d05",
+    # PR #592: reviewed staging-only shared Staff operational routes and
+    # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
+    "services/api/app/shared_auth_preview.py": "38c7a4992a7a4a7a822ca58159e49ccb16037953",
+    "scripts/test_marina_shared_auth.py": "6786e5b4681248bbf7432167bbb5a255395d3201",
+    "apps/staff/components/StoreStaffStock.tsx": "82b87098c1ab1355562551ec76cd8b4eb7b5478c",
+    "apps/staff/components/StaffRoleGateway.tsx": "957821d21a17350529f9fcef442527772a42e0c9",
     "apps/staff/components/WaiterEntry.module.css": "7218c412d73930418c4d703267bf83e5f8153c0e",
     "scripts/test_marina_staff_legacy_dining_preservation.py": "15fb8274b823c5dcb0842aa6be4ca585b85d05a5",
 }
