@@ -16,6 +16,26 @@ const identityCopy={
  kg:{heading:'MARINA SMART FLEX системасына кирүү',email:'Электрондук почта',password:'Сырсөз',signIn:'Улантуу',mfa:'Аутентификатор колдонмосундагы код',verify:'Кодду ырастоо',onlyIdentity:'Каттоо эсебине кирүү SUPER ADMIN укугун бербейт. Укук MFA жана серверде роль текшерилгенден кийин гана берилет.',signedIn:'Каттоо эсебиңиз ырасталды, бирок кабинетке кирүүгө сервер али уруксат берген жок. Сессия эскирсе, чыгып кайра кириңиз.',signOut:'Каттоо эсебинен чыгуу',failed:'Каттоо эсеби ырасталган жок',disabled:'Кирүү али жөндөлө элек',totpHint:'Аутентификатор колдонмосундагы алты орундуу кодду киргизиңиз.'},
  en:{heading:'Sign in to MARINA SMART FLEX',email:'Email',password:'Password',signIn:'Continue',mfa:'Authenticator code',verify:'Verify code',onlyIdentity:'Signing in does not grant SUPER ADMIN access. Commercial permissions require verified MFA and a server-authorized role.',signedIn:'Identity verified, but the server has not granted dashboard access. Sign out and sign in again if the session is stale.',signOut:'Sign out of identity',failed:'Unable to verify identity',disabled:'Identity sign-in is not configured yet',totpHint:'Enter the six-digit code from your authenticator app.'}
 };
+const recoveryCopy={"ru":{"forgot":"Забыли пароль?","resetTitle":"Восстановление пароля","send":"Отправить ссылку","sent":"Если аккаунт существует, письмо с инструкцией будет отправлено.","back":"Вернуться ко входу","newPassword":"Новый пароль","confirm":"Повторите пароль","save":"Сохранить пароль","done":"Пароль изменён. Войдите снова.","mismatch":"Пароли не совпадают.","error":"Не удалось выполнить операцию. Повторите попытку или обратитесь в поддержку."},"kg":{"forgot":"Сырсөздү унуттуңузбу?","resetTitle":"Сырсөздү калыбына келтирүү","send":"Шилтемени жөнөтүү","sent":"Каттоо эсеби бар болсо, нускама электрондук почтага жөнөтүлөт.","back":"Кирүү бетине кайтуу","newPassword":"Жаңы сырсөз","confirm":"Сырсөздү кайталаңыз","save":"Сырсөздү сактоо","done":"Сырсөз өзгөртүлдү. Кайра кириңиз.","mismatch":"Сырсөздөр дал келбейт.","error":"Аракет аткарылган жок. Кайра аракет кылыңыз же колдоо кызматына кайрылыңыз."},"en":{"forgot":"Forgot password?","resetTitle":"Reset password","send":"Send reset link","sent":"If the account exists, recovery instructions will be sent.","back":"Back to sign in","newPassword":"New password","confirm":"Confirm password","save":"Save password","done":"Password changed. Please sign in again.","mismatch":"Passwords do not match.","error":"Unable to complete the request. Try again or contact support."}};
+const recoveryText=k=>(recoveryCopy[state.lang]||recoveryCopy.ru)[k];
+let recoveryToken=new URLSearchParams(location.hash.slice(1)).get('reset');
+if(recoveryToken)history.replaceState(null,'',location.pathname+location.search);
+function recoveryPanel(){
+ const t=recoveryText;
+ const resetting=state.identityStep==='reset';
+ const field=(name,label,type,attrs='')=>'<label>'+safe(label)+'<input name="'+name+'" type="'+type+'" '+attrs+' required></label>';
+ return '<section class="panel gold identity-card"><h2>'+safe(t('resetTitle'))+'</h2><form id="flex-recovery-form">'+(resetting?field('password',t('newPassword'),'password','minlength="12" maxlength="128" autocomplete="new-password"')+field('confirm',t('confirm'),'password','minlength="12" maxlength="128" autocomplete="new-password"'):field('email',identityText('email'),'email','maxlength="254" autocomplete="email"'))+'<button class="primary" type="submit">'+safe(t(resetting?'save':'send'))+'</button></form>'+(state.recoveryMessage?'<p role="status">'+safe(t(state.recoveryMessage))+'</p>':'')+'<button class="subtle" type="button" data-recovery-back="1">'+safe(t('back'))+'</button></section>';
+}
+async function submitRecovery(form){
+ const btn=form.querySelector('button[type=submit]');btn.disabled=true;
+ try{
+  if(state.identityStep==='reset'){
+   if(form.elements.password.value!==form.elements.confirm.value){state.recoveryMessage='mismatch';render();return;}
+   await identityRequest('reset-password',{token:recoveryToken,newPassword:form.elements.password.value});
+   recoveryToken=null;state.identityStep='email';state.recoveryMessage='done';
+  }else{await identityRequest('request-password-reset',{email:form.elements.email.value.trim(),redirectTo:location.origin+'/'});state.recoveryMessage='sent';}
+ }catch{state.recoveryMessage='error';}finally{btn.disabled=false;render();}
+}
 function identityText(key){return (identityCopy[state.lang]||identityCopy.ru)[key];}
 async function identityRequest(endpoint,body){
  const response=await fetch('/api/identity/'+endpoint,{
@@ -64,6 +84,7 @@ async function submitIdentityForm(form){
  }
 }
 function identityPanel(){
+ if(state.identityStep==='forgot'||state.identityStep==='reset')return recoveryPanel();
  const text=identityText;
  const note=state.status?.password_login?'':'<p class="muted">'+safe(text('onlyIdentity'))+'</p>';
  // A verified identity cookie is not a platform session. Never show another
@@ -79,11 +100,11 @@ function identityPanel(){
  return '<section class="panel gold identity-card"><h2>'+safe(text('heading'))+'</h2><form id="flex-identity-signin">'+
    '<label>'+safe(text('email'))+'<input name="email" type="email" autocomplete="username" required maxlength="254"></label>'+
    '<label>'+safe(text('password'))+'<input name="password" type="password" autocomplete="current-password" required minlength="12"></label>'+
-   '<button class="primary" type="submit">'+safe(text('signIn'))+'</button></form>'+
+   '<button class="primary" type="submit">'+safe(text('signIn'))+'</button></form><button class="subtle" type="button" data-recovery-open="1">'+safe(recoveryText('forgot'))+'</button>'+(state.recoveryMessage?'<p role="status">'+safe(recoveryText(state.recoveryMessage))+'</p>':'')+
    (state.identityError?'<p role="alert">'+safe(state.identityError)+'</p>':'')+note+'</section>';
 }
 
-const state={lang:localStorage.getItem('flex_lang')||'ru',theme:localStorage.getItem('flex_theme')||'dark',view:'overview',period:'month',me:null,status:null,hotelId:null,search:'',serial:0,hotelStatus:'',lastCreated:null,registerKey:null,registerName:null,linkChallenge:null,linkSuccess:false,catalogItems:[],priceSku:null,identityStep:'email',identityError:'',identitySession:null,hotelTab:'overview',draftPriceRows:[]};
+const state={lang:localStorage.getItem('flex_lang')||'ru',theme:localStorage.getItem('flex_theme')||'dark',view:'overview',period:'month',me:null,status:null,hotelId:null,search:'',serial:0,hotelStatus:'',lastCreated:null,registerKey:null,registerName:null,linkChallenge:null,linkSuccess:false,catalogItems:[],priceSku:null,identityStep:recoveryToken?'reset':'email',recoveryMessage:'',identityError:'',identitySession:null,hotelTab:'overview',draftPriceRows:[]};
 const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=k=>(translations[state.lang]||translations.ru)[k]||translations.ru[k]||k;
 const fmt=v=>v===null||v===undefined?'—':new Intl.NumberFormat(state.lang==='kg'?'ky-KG':state.lang==='en'?'en-US':'ru-RU',{maximumFractionDigits:2}).format(Number(v));
@@ -659,6 +680,8 @@ main.addEventListener('click',e=>{
  if(b.dataset.retry)render();
  if(b.dataset.refresh)render();
  if(b.dataset.export){b.disabled=true;exportVisible().catch(err=>{main.insertAdjacentHTML('afterbegin',info(t('error')+': '+err.message,'error'))}).finally(()=>{b.disabled=false})}
+ if(b.dataset.recoveryOpen){state.identityStep='forgot';state.recoveryMessage='';render();return;}
+ if(b.dataset.recoveryBack){recoveryToken=null;state.identityStep='email';state.recoveryMessage='';render();return;}
  if(b.dataset.login)location.assign('/api/auth/login');
  if(b.dataset.identityLogout){
    identityRequest('sign-out',{}).then(()=>{
@@ -687,6 +710,7 @@ main.addEventListener('change',e=>{
  }
 });
 main.addEventListener('submit',e=>{
+ if(e.target.id==='flex-recovery-form'){e.preventDefault();submitRecovery(e.target);return;}
  if(e.target.id==='flex-identity-signin'||e.target.id==='flex-identity-totp'){e.preventDefault();submitIdentityForm(e.target)}
  if(e.target.id==='hotel-registration'){e.preventDefault();submitRegistration(e.target)}
  if(e.target.id==='link-challenge-form'){e.preventDefault();handleLinkForm(e.target,'challenge')}
