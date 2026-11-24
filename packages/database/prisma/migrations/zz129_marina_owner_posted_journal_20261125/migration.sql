@@ -87,7 +87,7 @@ BEGIN
     IF proposal.id IS NULL OR reviewer.id IS NULL
        OR poster."propertyId" IS DISTINCT FROM NEW."propertyId"
        OR poster.role IS DISTINCT FROM 'OWNER' OR poster.active IS DISTINCT FROM true
-       OR NEW."postedById" IN (proposal."createdById", reviewer."actorId")
+       OR NEW."postedById"=proposal."createdById"
        OR NEW."accountingDate" IS DISTINCT FROM proposal."accountingDate"
        OR NEW."policyVersion" IS DISTINCT FROM proposal."policyVersion" THEN
        RAISE EXCEPTION 'ACCOUNTING_POSTING_UNAUTHORIZED_OR_UNMATCHED'
