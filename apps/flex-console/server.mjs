@@ -417,7 +417,7 @@ function routeAllowed(path, search) {
   if(search.has('hotel_id')&&!['/v1/platform/subscription-drafts','/v1/platform/tariff-packages'].includes(path))return null;
   if(search.has('period')&&!['/v1/partner/me/earnings','/v1/platform/partner-earnings-summary'].includes(path))return null;
   if(['/v1/me','/v1/hotels','/v1/catalog'].includes(path) && !search.size) return 'core';
-  if((path==='/v1/platform/catalog'||path==='/v1/platform/tariff-templates'||catalogVersionsRead.test(path))&&!search.size)return 'catalog_admin';
+  if((path==='/v1/platform/catalog'||path==='/v1/platform/commercial-policy'||path==='/v1/platform/tariff-templates'||catalogVersionsRead.test(path))&&!search.size)return 'catalog_admin';
   if(path==='/v1/platform/tariff-packages'&&search.size===1&&
      flexUuidRe.test(search.get('hotel_id')||''))return 'catalog_admin';
   if(path==='/v1/platform/subscription-drafts'&&
