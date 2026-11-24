@@ -15,8 +15,8 @@ def main() -> int:
     assert not migration_names_match_exactly([*EXPECTED_MIGRATIONS, "unexpected_migration"])
     assert not migration_names_match_exactly(list(reversed(EXPECTED_MIGRATIONS)))
 
-    assert len(EXPECTED_MIGRATIONS) == 51
-    assert EXPECTED_MIGRATIONS[-31:] == (
+    assert len(EXPECTED_MIGRATIONS) == 52
+    assert EXPECTED_MIGRATIONS[-32:] == (
         "z19_dining_table_status_guard_20260905",
         "z20_dining_active_table_unique_20260906",
         "z21_dining_production_snapshots_20260906",
@@ -48,14 +48,19 @@ def main() -> int:
         "zz124_marina_owner_revenue_corrections_20261116",
         "zz125_marina_owner_revenue_evidence_bytes_20261116",
         "zz126_marina_owner_accounting_journal_proposals_20261116",
+        "zz127_marina_served_batch_allocation_20261124",
     )
-    assert len(CRITICAL_CONSTRAINTS) == 115
+    assert len(CRITICAL_CONSTRAINTS) == 119
     assert {
         "service_points_category_check",
         "service_point_qrs_revocation_check",
         "operational_tasks_service_point_context_check",
         "kitchen_menu_availability_meal_check",
         "kitchen_menu_recipe_shape",
+        "kitchen_served_allocation_portions_check",
+        "kitchen_served_allocation_unit_cost_check",
+        "kitchen_served_allocation_total_cost_check",
+        "kitchen_served_allocation_source_check",
         "kitchen_table_reservations_party_check",
         "kitchen_table_reservations_time_check",
         "kitchen_table_reservations_status_check",
