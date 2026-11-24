@@ -63,7 +63,7 @@ SQL
 export FLEX_ENVIRONMENT=qa FLEX_AUTH_ENABLED=true FLEX_AUTH_SCHEMA_READY=true FLEX_MFA_BRIDGE_ENABLED=true
 export FLEX_ENABLE_QA_CATALOG_DRAFTS=true FLEX_MFA_KEY_ID=ci-local FLEX_API_AUDIENCE=flex-local
 export FLEX_PUBLIC_ORIGIN=https://127.0.0.1:3443 BETTER_AUTH_URL=https://127.0.0.1:3443
-export FLEX_AUTH_ISSUER="$FLEX_PUBLIC_ORIGIN" FLEX_API_ORIGIN=https://127.0.0.1:8443
+export FLEX_AUTH_AUDIENCE="$FLEX_API_AUDIENCE" FLEX_AUTH_ISSUER="$FLEX_PUBLIC_ORIGIN" FLEX_API_ORIGIN=https://127.0.0.1:8443
 export FLEX_CATALOG_ADMIN_API_ORIGIN="$FLEX_API_ORIGIN"
 export FLEX_DATABASE_URL="postgresql://flex_qa_read_runtime:$api_password@127.0.0.1:5457/flex_qa?sslmode=verify-full"
 export FLEX_AUTH_DATABASE_URL="postgresql://flex_auth_runtime:$auth_password@127.0.0.1:5457/flex_qa?sslmode=verify-full"
