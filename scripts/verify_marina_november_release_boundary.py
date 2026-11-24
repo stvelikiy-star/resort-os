@@ -51,13 +51,17 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "9a77b2f1e33dbd54f4b56abb346983c7ed894d05",
+    "scripts/marina_rc3_additive_gate.py": "f6eeaa3be2044711674719b025f8608b391808ee",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
-    "services/api/app/shared_auth_preview.py": "38c7a4992a7a4a7a822ca58159e49ccb16037953",
-    "scripts/test_marina_shared_auth.py": "6786e5b4681248bbf7432167bbb5a255395d3201",
+    "services/api/app/shared_auth_preview.py": "def6ae43b34ab7946ab903f71ac207adf375fce8",
+    "scripts/test_marina_shared_auth.py": "866325b1ef4f0d14f98798fec9d3364ebe7b00a7",
     "apps/staff/components/StoreStaffStock.tsx": "82b87098c1ab1355562551ec76cd8b4eb7b5478c",
     "apps/staff/components/StaffRoleGateway.tsx": "957821d21a17350529f9fcef442527772a42e0c9",
+    # Reviewed P0 two-hotel OWNER financial facts, exact method-scoped routes,
+    # and test-only workflow. No production shared-auth promotion.
+    "scripts/marina_shared_owner_finance_p0_ci.py": "71cabedce521c0019a3fd900d075830d51891a13",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "9cfef5e35c189f792cedf768aaab595b18b23fdb",
     "apps/staff/components/WaiterEntry.module.css": "7218c412d73930418c4d703267bf83e5f8153c0e",
     "scripts/test_marina_staff_legacy_dining_preservation.py": "15fb8274b823c5dcb0842aa6be4ca585b85d05a5",
 }
