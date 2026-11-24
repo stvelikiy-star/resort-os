@@ -335,5 +335,29 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         self.assertEqual(Decimal(history[0]["proposed_monthly_total"]),Decimal("18000"))
 
 
+
+    def test_08_commercial_term_and_implementation_snapshot(self):
+        path="/v1/platform/tariff-packages"
+        start=(datetime.now(ZoneInfo("Asia/Bishkek")).date()+timedelta(days=4)).isoformat()
+        data={"hotel_id":HOTEL_B,"package_kind":"BUSINESS","title":"Business annual",
+              "period_start":start,"skus":[],"commercial_policy_version":3,
+              "discount_pct":"0","trial_days":5,"custom_monthly_price":None,
+              "term_months":12,"standard_term_discount":True,"include_implementation":True}
+        made=self.post(path,data)
+        self.assertEqual(made.status_code,201,made.text)
+        row=made.json()
+        self.assertEqual(row["term_months"],12)
+        self.assertEqual(Decimal(row["discount_pct"]),Decimal("30"))
+        self.assertEqual(Decimal(row["subscription_term_total"]),Decimal("126000"))
+        self.assertEqual(Decimal(row["implementation_total"]),Decimal("25000"))
+        self.assertEqual(row["period_start"],start)
+        self.assertFalse(row["subscription_activated"])
+        saved=next(x for x in self.get(path+"?hotel_id="+HOTEL_B).json() if x["id"]==row["id"])
+        self.assertEqual(saved["subscription_term_total"],row["subscription_term_total"])
+        self.assertEqual(saved["commercial_policy_version"],3)
+        self.assertEqual(self.post(path,{**data,"term_months":2}).status_code,422)
+        self.assertEqual(self.post(path,{**data,"discount_pct":"10"}).status_code,422)
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)
