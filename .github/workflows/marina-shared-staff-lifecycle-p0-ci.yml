@@ -24,6 +24,7 @@ on:
       - 'scripts/test_owner_ledger_policy.py'
       - 'scripts/marina_owner_posting_api_ci.py'
       - 'scripts/marina_owner_expense_posting_ci.py'
+      - 'scripts/marina_owner_served_cogs_posting_ci.py'
       - 'packages/database/prisma/migrations/zz129_marina_owner_accounting_postings_20261125/migration.sql'
       - 'packages/database/prisma/migrations/zz128_marina_owner_accounting_decision_evidence_20261124/migration.sql'
       - 'services/api/app/kitchen_batch_allocation.py'
@@ -147,3 +148,10 @@ jobs:
           MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED: 'true'
           MARINA_ACCOUNTING_POSTING_ENABLED: 'true'
         run: python scripts/marina_owner_expense_posting_ci.py
+      - name: Verify exact served COGS requires matched folio and fully allocated batches
+        env:
+          MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'false'
+          PROPERTY_CODE: HOTEL_A
+          MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED: 'true'
+          MARINA_ACCOUNTING_POSTING_ENABLED: 'true'
+        run: python scripts/marina_owner_served_cogs_posting_ci.py
