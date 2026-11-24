@@ -42,6 +42,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     # Reviewed evidence-only full refund: no external transfer, no partial refund.
     "services/api/app/reservation_payments.py": "fe9e0afb085f8343e073a4ba55c3d2b64efc070e",
     "scripts/marina_shared_manual_refund_evidence_ci.py": "6af069651da5bf9e0623cc886ff3c54deec3faff",
+    "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
     ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "7edafcdff327fc84e56b47725449385204f5b5cc",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
