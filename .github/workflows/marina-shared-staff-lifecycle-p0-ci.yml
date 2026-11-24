@@ -8,6 +8,8 @@ on:
       - 'services/api/app/auth.py'
       - 'services/api/app/shared_auth_preview.py'
       - 'scripts/marina_shared_owner_finance_p0_ci.py'
+      - 'services/api/app/reservation_payments.py'
+      - 'scripts/marina_shared_manual_refund_evidence_ci.py'
       - 'services/api/app/section_permissions.py'
       - '.github/workflows/marina-shared-staff-lifecycle-p0-ci.yml'
   workflow_dispatch:
@@ -82,3 +84,9 @@ jobs:
         env:
           MARINA_SHARED_FINANCE_P0_CI_CONFIRM: ISOLATED_OWNER_FINANCE_CI_ONLY
         run: python scripts/marina_shared_owner_finance_p0_ci.py
+      - name: Verify OWNER-only refund evidence without external money movement
+        env:
+          MARINA_REFUND_EVIDENCE_CI_CONFIRM: ISOLATED_REFUND_EVIDENCE_ONLY
+          MARINA_SHARED_RECEPTION_CASH_P0_ENABLED: 'true'
+          MARINA_SHARED_RECEPTION_CASH_P0_CONFIRM: REVIEWED_RECEPTION_CASH_STAGING_ONLY
+        run: python scripts/marina_shared_manual_refund_evidence_ci.py
