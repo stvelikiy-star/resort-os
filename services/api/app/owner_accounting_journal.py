@@ -30,7 +30,7 @@ class JournalLine(BaseModel):
 
 class JournalProposal(BaseModel):
     id: uuid.UUID
-    source_type: Literal["REVENUE_SOURCE", "REVENUE_CORRECTION"]
+    source_type: Literal["REVENUE_SOURCE", "REVENUE_CORRECTION", "OPERATING_EXPENSE"]
     source_id: uuid.UUID
     accounting_date: date
     policy_version: str = Field(min_length=3, max_length=80)
@@ -69,6 +69,20 @@ async def validate_source(conn, pid, body: JournalProposal):
                  AND NOT EXISTS (SELECT 1 FROM owner_revenue_source_events rev
                     WHERE rev."propertyId"=$1 AND rev."reversesId"=$2)''',
             pid, body.source_id)
+    elif body.source_type == "OPERATING_EXPENSE":
+        source = await conn.fetchrow(
+            """SELECT e.id FROM owner_expenses e
+               WHERE e."propertyId"=$1 AND e.id=$2
+                 AND e."expenseDate"=$3
+                 AND e.status='POSTED' AND e.category IN
+                   ('UTILITIES','PAYROLL','MAINTENANCE','RENT','MARKETING')
+                 AND e."supplierName" IS NOT NULL
+                 AND e."documentReference" IS NOT NULL
+                 AND NOT EXISTS(SELECT 1 FROM kitchen_supplier_documents d
+                    WHERE d."propertyId"=e."propertyId"
+                      AND d."supplierName"=e."supplierName"
+                      AND d."documentReference"=e."documentReference")""",
+            pid, body.source_id, body.accounting_date)
     else:
         source = await conn.fetchrow(
             '''SELECT c.id FROM owner_revenue_correction_events c
@@ -222,6 +236,20 @@ async def _source_still_verified(conn, pid, proposal):
                      SELECT 1 FROM owner_revenue_correction_events rev
                      WHERE rev."propertyId"=$1 AND rev."reversesId"=e.id))""",
             pid, proposal["sourceId"])
+    if proposal["sourceType"] == "OPERATING_EXPENSE":
+        return await conn.fetchval(
+            """SELECT EXISTS(SELECT 1 FROM owner_expenses e
+               WHERE e."propertyId"=$1 AND e.id=$2
+                 AND e."expenseDate"=$3
+                 AND e.status='POSTED' AND e.category IN
+                   ('UTILITIES','PAYROLL','MAINTENANCE','RENT','MARKETING')
+                 AND e."supplierName" IS NOT NULL
+                 AND e."documentReference" IS NOT NULL
+                 AND NOT EXISTS(SELECT 1 FROM kitchen_supplier_documents d
+                    WHERE d."propertyId"=e."propertyId"
+                      AND d."supplierName"=e."supplierName"
+                      AND d."documentReference"=e."documentReference"))""",
+            pid, proposal["sourceId"],proposal["accountingDate"])
     return False
 
 
