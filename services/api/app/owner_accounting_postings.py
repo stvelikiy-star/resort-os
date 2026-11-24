@@ -124,7 +124,8 @@ async def post_approved_proposal(proposal_id:uuid.UUID,body:PostingAction,
             try:
                 validate_posting(lines,source_type=proposal["sourceType"],
                                  evidence_complete=True,
-                                 source_amount=source["faceValueKgs"])
+                                 source_amount=source["faceValueKgs"],
+                                 revenue_service_type=source["sourceType"])
             except ValueError as exc:
                 raise HTTPException(409,detail={"code":"ACCOUNTING_POSTING_POLICY_REJECTED",
                                                 "reason":str(exc)}) from exc
