@@ -130,6 +130,18 @@ with TestClient(app,base_url="https://batch-isolated.invalid") as client:
         assert reused.status_code==409
         checks+=1
         client.post("/api/v1/auth/logout")
+        login(hotel,"OWNER")
+        period=client.get("/api/v1/admin/finance/owner/accrual-readiness",params={
+            "from_date": "2026-11-01", "to_date":"2027-11-30"})
+        assert period.status_code==200,period.text
+        evidence=period.json()["served_kitchen_cost_trace"]["operator_attested_batch_links"]
+        assert evidence["attributed_portions"]==7 and evidence["unattributed_served_portions"]==0,evidence
+        assert Decimal(evidence["attributed_cost_kgs"])==Decimal(84),evidence
+        assert len(evidence["allocations"])==1,evidence
+        assert evidence["cost_is_recognized_cogs"] is False
+        assert period.json()["recognition"]["recognized_profit_kgs"] is None
+        checks+=5
+        client.post("/api/v1/auth/logout")
 
 async def verify():
     conn=await asyncpg.connect(os.environ["DATABASE_URL"].split("?")[0])
