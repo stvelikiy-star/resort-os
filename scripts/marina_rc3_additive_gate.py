@@ -68,7 +68,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "scripts/marina_owner_accounting_decision_ci.py": "4b84740d89e497f976accaa6da3da082129e349e",
     "services/api/app/owner_accounting_journal.py": "fcb45a4a75f7935e12d6793dcdd95062a5d7c8d6",
     "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "93f23cc1698d41169920ca05fe96bbc2d95ad883",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "402ab2ad026fd31f2b43910c1675a8d9ec23f8f8",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
