@@ -673,11 +673,25 @@ async function hotelDetail(){
  return metadata+await hotelNameForm(id)+summary+subscriptionInfo+info(t('warning'),'info');
 }
 
+
+async function commercialPolicyPanel(){
+ const labels={ru:{title:'Утверждённые тарифы',note:'Коммерческие цены. Техническая доступность модулей проверяется отдельно.',setup:'Внедрение',trial:'Пробный период (дней)',term:'Месяцев',discount:'Скидка'},kg:{title:'Бекитилген тарифтер',note:'Коммерциялык баалар. Модулдардын техникалык жеткиликтүүлүгү өзүнчө текшерилет.',setup:'Орнотуу',trial:'Сыноо мезгили (күн)',term:'Ай',discount:'Арзандатуу'},en:{title:'Approved tariffs',note:'Commercial prices. Technical module availability is verified separately.',setup:'Implementation',trial:'Trial (days)',term:'Months',discount:'Discount'}};
+ const l=labels[state.lang]||labels.ru;
+ try{
+  const r=await api('/v1/platform/commercial-policy'),p=r.policy;
+  return '<section class="panel spacing-top"><h2>'+safe(l.title)+' · v'+safe(r.version)+'</h2>'+
+   table([t('packageType'),t('price')],Object.entries(p.monthly_packages).map(([k,v])=>'<tr><td>'+safe(k)+'</td><td>'+money(v.price??v.base_price,p.currency)+'</td></tr>'))+
+   '<h3>'+safe(t('features'))+'</h3>'+table([t('sku'),t('price')],Object.entries(p.module_monthly_prices).map(([k,v])=>'<tr><td>'+safe(k)+'</td><td>'+money(v,p.currency)+'</td></tr>'))+
+   table([l.term,l.discount],Object.entries(p.term_discounts_pct).map(([k,v])=>'<tr><td>'+safe(k)+'</td><td>'+safe(v)+'%</td></tr>'))+
+   '<div class="grid two">'+kv(l.setup,money(p.implementation_fee,p.currency))+kv(l.trial,p.trial.calendar_days)+'</div>'+info(l.note,'info')+'</section>';
+ }catch(e){return '<section class="panel">'+info(t('error')+': '+e.message,'error')+'</section>';}
+}
+
 async function catalog(){
  if(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled){
   const items=await api('/v1/platform/catalog');
   state.catalogItems=items;
-  return heading(t('adminCatalog'),t('helpQa'))+toolbar()+adminCatalogButtons()+
+  return heading(t('adminCatalog'),t('helpQa'))+toolbar()+adminCatalogButtons()+await commercialPolicyPanel()+
     '<div class="grid three">'+metric(t('activeSku'),items.length,'cyan-text')+
     metric(t('currency'),'KGS')+metric(t('readOnly'),'QA')+'</div>'+
     '<section class="panel">'+(items.length?table([t('sku'),t('skuTitle'),t('status'),t('price'),t('actions')],
