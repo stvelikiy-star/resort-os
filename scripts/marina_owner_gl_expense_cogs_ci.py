@@ -39,6 +39,12 @@ async def seed():
         owner=await conn.fetchval('SELECT id FROM staff_users WHERE "propertyId"=$1 AND username=\'owner\'',a)
         assert a and b and a!=b and owner
         expense=uuid4()
+        bad_expense=uuid4()
+        await conn.execute(
+            """INSERT INTO owner_expenses
+               (id,"propertyId","expenseDate",category,title,"amountKgs","createdById")
+               VALUES($1,$2,$3,'UTILITIES','QA mismatched source amount',250,$4)""",
+            bad_expense,a,date.today(),owner)
         await conn.execute(
             '''INSERT INTO owner_expenses
                (id,"propertyId","expenseDate",category,title,"amountKgs","createdById")
@@ -53,11 +59,11 @@ async def seed():
                WHERE a."propertyId"=$1 AND o.status='SERVED'
                  AND a."totalCostKgs">0 ORDER BY a.id LIMIT 1''',a)
         assert batch,"Served batch evidence required"
-        return a,b,expense,batch,await conn.fetchval("SELECT count(*) FROM payments")
+        return a,b,expense,bad_expense,batch,await conn.fetchval("SELECT count(*) FROM payments")
     finally:
         await conn.close()
 
-a,b,expense,batch,payments_before=asyncio.run(seed())
+a,b,expense,bad_expense,batch,payments_before=asyncio.run(seed())
 with TestClient(app,base_url="https://owner-gl-disposable.invalid") as client:
     def login(username):
         client.post("/api/v1/auth/logout")
@@ -99,6 +105,32 @@ with TestClient(app,base_url="https://owner-gl-disposable.invalid") as client:
         return proposal_id
 
     p_expense=scenario("OPERATING_EXPENSE",expense,date.today(),250,"6000","2100")
+    # Source amount still needs SQL validation after independent approval.
+    login("owner")
+    bad_proposal=str(uuid4())
+    root="/api/v1/admin/finance/owner/accounting-journal/proposals"
+    r=client.post(root,json={
+        "id":bad_proposal,"source_type":"OPERATING_EXPENSE","source_id":str(bad_expense),
+        "accounting_date":date.today().isoformat(),"policy_version":"CI-GL-POLICY",
+        "reason":"QA intentionally incorrect source amount",
+        "lines":[
+            {"account_code":"6000","side":"DEBIT","amount_kgs":"251.0000"},
+            {"account_code":"2100","side":"CREDIT","amount_kgs":"251.0000"}]
+    })
+    verify(r.status_code,201,"draft amount mismatch is not recognized")
+    login("accounting_reviewer")
+    check_url=root+"/"+bad_proposal
+    verify(client.post(check_url+"/decisions",json={
+        "id":str(uuid4()),"action":"APPROVE",
+        "reason":"QA reviewer verified primary source existence"
+    }).status_code,201,"source existence approved")
+    denied=client.post(check_url+"/postings",json={
+        "id":str(uuid4()),"action":"POST",
+        "reason":"QA deliberately overstated accounting amount"
+    })
+    verify(denied.status_code,409,"incorrect source amount denied")
+    verify(client.get(check_url+"/postings").json()["items"],[],
+           "rejected entry absent from GL")
     p_cost=scenario("STOCK_CONSUMPTION",batch["id"],batch["day"],
                     batch["cost"],"5000","1200")
     bad="/api/v1/admin/finance/owner/accounting-journal/proposals/"+str(uuid4())+"/postings"
