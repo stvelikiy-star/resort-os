@@ -231,6 +231,25 @@ async def _source_still_verified(conn, pid, proposal):
                      SELECT 1 FROM owner_revenue_source_events rev
                      WHERE rev."propertyId"=$1 AND rev."reversesId"=e.id))""",
             pid, proposal["sourceId"])
+    if proposal["sourceType"] == "OPERATING_EXPENSE":
+        return await conn.fetchval(
+            """SELECT EXISTS(SELECT 1 FROM owner_expenses e
+               WHERE e.id=$2 AND e."propertyId"=$1 AND e.status='POSTED'
+                 AND e.category IN ('UTILITIES','PAYROLL','MAINTENANCE','RENT','MARKETING')
+                 AND NOT EXISTS (SELECT 1 FROM kitchen_supplier_documents d
+                   WHERE d."propertyId"=e."propertyId"
+                     AND d."supplierName"=e."supplierName"
+                     AND d."documentReference"=e."documentReference"))""",
+            pid,proposal["sourceId"])
+    if proposal["sourceType"] == "STOCK_CONSUMPTION":
+        return await conn.fetchval(
+            """SELECT EXISTS(SELECT 1 FROM kitchen_served_batch_allocations a
+               JOIN kitchen_orders o ON o.id=a."orderId"
+                 AND o."propertyId"=a."propertyId" AND o.status='SERVED'
+               JOIN kitchen_order_items i ON i.id=a."orderItemId"
+                 AND i."orderId"=o.id AND i.status='SERVED'
+               WHERE a."propertyId"=$1 AND a.id=$2 AND a."totalCostKgs">0)""",
+            pid,proposal["sourceId"])
     if proposal["sourceType"] == "REVENUE_CORRECTION":
         return await conn.fetchval(
             """SELECT EXISTS(
