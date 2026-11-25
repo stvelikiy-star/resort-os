@@ -123,6 +123,11 @@ class ScopedCommercialParticipants(unittest.TestCase):
         self.assertEqual(rows["INVESTOR"]["net_accrued_kg"],"74.00")
         self.assertFalse(summary.json()["payouts_enabled"])
 
+    def test_partner_proposal_endpoint_denies_other_roles(self):
+        for subject in ("sales-1","investor-1","owner-a","administrator"):
+            self.assertEqual(self.get("/v1/partner/me/proposals",subject,mfa=True).status_code,403)
+        self.assertEqual(self.client.get("/v1/partner/me/proposals").status_code,401)
+
     def test_read_only_and_period_validation(self):
         self.assertEqual(self.get("/v1/partner/me/earnings?period=year",
                                   "sales-1").status_code,422)
