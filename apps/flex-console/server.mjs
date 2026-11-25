@@ -296,7 +296,7 @@ const catalogSkuAction=/^\/api\/actions\/catalog\/skus$/;
 const catalogPriceAction=/^\/api\/actions\/catalog\/skus\/([A-Z][A-Z0-9_]{1,79})\/prices$/;
 const configurationDraftAction=/^\/api\/actions\/subscription-drafts$/;
 const tariffPackageAction=/^\/api\/actions\/tariff-packages$/;
-const customerActions=new Map([['/api/actions/customer-profile','customer-profile'],['/api/actions/agreement-drafts','agreement-drafts'],['/api/actions/invoice-previews','invoice-previews'],['/api/actions/agreement-internal-approvals','agreement-internal-approvals'],['/api/actions/customer-agreement-acceptances','customer-agreement-acceptances'],['/api/actions/finance-simulation','finance-simulation'],['/api/actions/synthetic-cash-journal','synthetic-cash-journal'],['/api/actions/agent-assignments','agent-assignments']]);
+const customerActions=new Map([['/api/actions/customer-profile','customer-profile'],['/api/actions/agreement-drafts','agreement-drafts'],['/api/actions/invoice-previews','invoice-previews'],['/api/actions/agreement-internal-approvals','agreement-internal-approvals'],['/api/actions/customer-agreement-acceptances','customer-agreement-acceptances'],['/api/actions/finance-simulation','finance-simulation'],['/api/actions/synthetic-cash-journal','synthetic-cash-journal'],['/api/actions/agent-assignments','agent-assignments'],['/api/actions/agent-employment','agent-employment']]);
 const installationTrialPath='/api/actions/installation-trial';
 const commercialPolicyPath='/api/actions/commercial-policy';
 const tariffTemplatePath='/api/actions/tariff-templates';
@@ -307,6 +307,7 @@ function validateCatalogAdminAction(kind,body) {
   if(!body || typeof body!=='object'||Array.isArray(body))return null;
   const keys=Object.keys(body);
   const exact=allowed=>keys.length===allowed.length && allowed.every(k=>keys.includes(k));
+  if(kind==='agent-employment')return exact(['agent_id','expected_revision','action'])&&typeof body.agent_id==='string'&&flexUuidRe.test(body.agent_id)&&Number.isInteger(body.expected_revision)&&body.expected_revision>=0&&body.expected_revision<=2147483646&&['START','STOP'].includes(body.action)?body:null;
   if(kind==='agent-assignments')return exact(['hotel_id','agent_id','expected_revision','action'])&&[body.hotel_id,body.agent_id].every(v=>typeof v==='string'&&flexUuidRe.test(v))&&Number.isInteger(body.expected_revision)&&body.expected_revision>=0&&body.expected_revision<=2147483646&&['ASSIGN','RELEASE'].includes(body.action)?body:null;
   if(kind==='synthetic-cash-journal'){
     const e=body.event,key=/^[a-zA-Z0-9_-]{1,64}$/;
@@ -432,6 +433,7 @@ async function catalogAdminPost(req,res,url) {
   try{result=JSON.parse(response)}catch{return json(res,502,{error:'UPSTREAM_INVALID_JSON'})}
   if(!upstream.ok)return json(res,upstream.status,{error:'FLEX_QA_ADMIN_REJECTED',detail:
     typeof result.detail==='string'?result.detail:'Backend rejected the request'});
+  if(kind==='agent-employment' && !(result.agent_id===payload.agent_id&&result.revision===payload.expected_revision+1&&result.action===payload.action&&result.payouts_enabled===false))return json(res,502,{error:'UNEXPECTED_EMPLOYMENT_STATE'});
   if(kind==='agent-assignments' && !(result.hotel_id===payload.hotel_id&&result.agent_id===payload.agent_id&&result.revision===payload.expected_revision+1&&result.action===payload.action&&result.payments_enabled===false&&result.payouts_enabled===false))return json(res,502,{error:'UNEXPECTED_ASSIGNMENT_STATE'});
   if(kind==='synthetic-cash-journal' && !(result.hotel_id===payload.hotel_id&&result.agreement_id===payload.agreement_id&&result.journal==='SYNTHETIC_QA_ONLY'&&result.persisted===true&&result.payments_enabled===false&&result.subscription_activated===false&&result.launch_offer_finalized===false&&result.events?.some(e=>e.event_id===payload.event.event_id)))return json(res,502,{error:'UNEXPECTED_JOURNAL_STATE'});
   if(kind==='finance-simulation' && !(result.hotel_id===payload.hotel_id&&result.agreement_id===payload.agreement_id&&result.mode==='SYNTHETIC_ONLY'&&result.persisted===false&&result.payments_enabled===false&&result.subscription_activated===false&&result.launch_offer_finalized===false))return json(res,502,{error:'UNEXPECTED_SIMULATION_STATE'});
@@ -455,6 +457,7 @@ async function catalogAdminPost(req,res,url) {
 }
 
 function routeAllowed(path, search) {
+  if(path==='/v1/platform/agent-employment')return !search.size?'catalog_admin':null;
   if(path==='/v1/platform/agent-assignments')return search.size===1&&flexUuidRe.test(search.get('hotel_id')||'')?'catalog_admin':null;
   if(path==='/v1/platform/synthetic-cash-journal')return search.size===2&&flexUuidRe.test(search.get('hotel_id')||'')&&flexUuidRe.test(search.get('agreement_id')||'')?'catalog_admin':null;
   if(search && [...search.keys()].some(k=>!['period','hotel_id'].includes(k)))return null;
