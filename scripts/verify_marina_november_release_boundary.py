@@ -93,7 +93,7 @@ APPROVED_P0_BLOBS = {
     "apps/mobile/src/api/liveModules.ts": "3b953a3a9caafb85397fe2ea5d8425bc737e9b86",
     "apps/mobile/src/api/contractValidation.ts": "bb4b0325bac08c6a362181e6e58a4306fd4d7dfc",
     "apps/mobile/__tests__/owner-accrual-readiness.test.ts": "70f981613d914bf8b9c433ce2b2cbfd771d88059",
-    "apps/admin/components/HotelFinanceBoard.tsx": "04bf3e438fc379f23d11d8b1c01204c632bdd2f8",
+    "apps/admin/components/HotelFinanceBoard.tsx": "68da94a3b0f4b613195ff5905f73a0c7854e24ed",
     "apps/staff/components/CookBatchAssignments.tsx": "884a3290e678f8777167999e5aceaa60d470902b",
     "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",
     # MARINA batch provenance: reviewed additive migration, API and executable test.
