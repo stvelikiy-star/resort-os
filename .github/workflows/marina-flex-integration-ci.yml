@@ -100,16 +100,19 @@ jobs:
           psql --version
       - name: Refuse installation outside empty disposable PostgreSQL 16 database
         run: psql -X -v ON_ERROR_STOP=1 -d flex_ci -f scripts/marina_flex_qa_db_preflight.sql
-      - name: Install all eighteen independent FLEX preview migrations in exact order
+      - name: Install all nineteen independent FLEX preview migrations in exact order
         run: |
           set -euo pipefail
           test -f "docs/flex/sql/0010_flex_partner_earnings_preview.sql"
           test -f "docs/flex/sql/0011_flex_catalog_subscription_drafts_preview.sql"
           test -f "docs/flex/sql/0012_flex_tariff_package_versions_preview.sql"
-          for file in 0001_flex_control_plane_preview.sql 0002_flex_platform_identity_rls_preview.sql 0003_flex_price_version_guard_preview.sql 0004_flex_hotel_onboarding_preview.sql 0005_flex_deployment_attestation_preview.sql 0006_flex_agreements_subscription_preview.sql 0007_flex_invoice_ledger_preview.sql 0008_flex_refund_reconciliation_preview.sql 0009_flex_signed_qa_settlement_preview.sql 0010_flex_partner_earnings_preview.sql 0011_flex_catalog_subscription_drafts_preview.sql 0012_flex_tariff_package_versions_preview.sql 0013_flex_shared_tariff_templates_preview.sql 0014_flex_hotel_name_edit_preview.sql 0015_flex_commercial_policy_preview.sql 0016_flex_commercial_policy_edit.sql 0017_flex_package_term_snapshot.sql 0018_flex_installation_trial.sql; do
+          for file in 0001_flex_control_plane_preview.sql 0002_flex_platform_identity_rls_preview.sql 0003_flex_price_version_guard_preview.sql 0004_flex_hotel_onboarding_preview.sql 0005_flex_deployment_attestation_preview.sql 0006_flex_agreements_subscription_preview.sql 0007_flex_invoice_ledger_preview.sql 0008_flex_refund_reconciliation_preview.sql 0009_flex_signed_qa_settlement_preview.sql 0010_flex_partner_earnings_preview.sql 0011_flex_catalog_subscription_drafts_preview.sql 0012_flex_tariff_package_versions_preview.sql 0013_flex_shared_tariff_templates_preview.sql 0014_flex_hotel_name_edit_preview.sql 0015_flex_commercial_policy_preview.sql 0016_flex_commercial_policy_edit.sql 0017_flex_package_term_snapshot.sql 0018_flex_installation_trial.sql 0019_flex_force_financial_rls.sql; do
             psql -X -v ON_ERROR_STOP=1 -d flex_ci -f "docs/flex/sql/$file"
           done
           sha256sum docs/flex/sql/*.sql
+      - name: Verify forced financial RLS
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -d flex_ci -c "DO \$\$ BEGIN IF (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('flex_agent_attributions','flex_agent_commission_accruals','flex_allocation_reversals','flex_confirmed_payments','flex_investor_accruals','flex_investor_contract_versions','flex_payment_allocations','flex_payment_intents','flex_payment_reversals','flex_provider_event_attempts','flex_provider_events') AND c.relrowsecurity AND c.relforcerowsecurity) <> 11 THEN RAISE EXCEPTION 'FLEX_FORCE_RLS_REQUIRED'; END IF; END \$\$;"
       - name: Seed two synthetic hotels, no operational PMS records
         run: psql -X -v ON_ERROR_STOP=1 -d flex_ci -f scripts/marina_flex_rls_isolation_contract.sql
       - name: Verify source schema and data security before backup
