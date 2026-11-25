@@ -123,9 +123,14 @@ async def own_earnings(
                     min(a.attributed_at) AS attributed_at,count(DISTINCT a.sku) AS attributed_modules
                     FROM flex_agent_attributions a JOIN flex_hotels h ON h.id=a.hotel_id
                     WHERE a.agent_id=$1 GROUP BY h.id,h.display_name,h.status ORDER BY h.display_name,h.id""",party_uuid)
+                qa_assignments=await conn.fetch("""SELECT h.id AS hotel_id,h.display_name,h.status,q.created_at AS assigned_at
+                    FROM (SELECT DISTINCT ON(hotel_id) hotel_id,action,created_at
+                        FROM flex_qa_agent_assignments WHERE agent_id=$1 ORDER BY hotel_id,revision DESC) q
+                    JOIN flex_hotels h ON h.id=q.hotel_id WHERE q.action='ASSIGN' ORDER BY h.display_name,h.id""",party_uuid)
                 contracts=[]
             else:
                 details=[]
+                qa_assignments=[]
                 contracts=await conn.fetch("""SELECT id,contract_key,version,principal,share_bps,effective_from
                     FROM flex_investor_contract_versions WHERE investor_id=$1
                     ORDER BY contract_key,version DESC""",party_uuid)
@@ -142,6 +147,10 @@ async def own_earnings(
                 "history_truncated":row["events"]>len(history),
                 "history":[{**dict(h),"amount":f"{h['amount']:.2f}"} for h in history],
                 "assigned_hotels":[dict(h) for h in details],
+                "qa_assignments":[dict(h) for h in qa_assignments],
+                "agent_terms":({"currency":"KGS","connection_fee":"7000.00","monthly_addon_fee":"500.00",
+                    "monthly_salary":"10000.00","monthly_target":7,"employment_required":True,
+                    "paid_connections":None,"payable_amount":None} if principal.role=="SALES_AGENT" else None),
                 "contracts":[{**dict(c),"principal":f"{c['principal']:.2f}"} for c in contracts],
                 "outstanding_payable_kg":None,
                 "data_provenance":"QA_ONLY_NOT_BANK_RECONCILED",
