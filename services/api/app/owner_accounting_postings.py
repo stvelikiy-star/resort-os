@@ -580,6 +580,55 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
                      AND owner_revenue_certificate_current(cert))
              ) AS active_corrections""",pid,from_date,to_date,tz)
     counts.update(dict(coverage))
+    # Entitlements are rights to meals, not proof of delivered paid value.
+    # Do not let a period with unallocated package rights appear complete.
+    package=await conn.fetchrow(
+        """SELECT count(*)::int AS package_entitlement_count,
+                  COALESCE(sum(e."adultPortions"+e."childPortions"),0)::bigint AS package_portions_count
+           FROM dining_entitlements e
+           WHERE e."propertyId"=$1 AND e.status='ACTIVE'
+             AND e."serviceDate" BETWEEN $2 AND $3""",pid,from_date,to_date)
+    counts.update(dict(package))
+    # The canonical refund audit date is distinct from the service date.
+    # Missing audit dates are explicit unresolved facts, not estimated refunds.
+    refunds=await conn.fetchrow(
+        """WITH candidates AS (
+             SELECT pay.id,pay."amountKgs",
+               EXISTS(SELECT 1 FROM audit_logs a WHERE a."propertyId"=$1
+                 AND a."resourceId"=pay.id::text AND a.action='CONFIRM_MANUAL_FULL_REFUND'
+                 AND a.resource='Payment' AND a.source='PMS_MANUAL_REFUND' AND a.result='SUCCESS'
+                 AND ((a."createdAt" AT TIME ZONE 'UTC') AT TIME ZONE $4)::date BETWEEN $2 AND $3
+               ) AS in_period,
+               EXISTS(SELECT 1 FROM audit_logs a WHERE a."propertyId"=$1
+                 AND a."resourceId"=pay.id::text AND a.action='CONFIRM_MANUAL_FULL_REFUND'
+                 AND a.resource='Payment' AND a.source='PMS_MANUAL_REFUND' AND a.result='SUCCESS'
+               ) AS dated
+             FROM payments pay JOIN reservations r ON r.id=pay."reservationId"
+             WHERE r."propertyId"=$1 AND pay.status='REFUNDED'
+           ), evidence AS (
+             SELECT x.*,EXISTS(SELECT 1 FROM owner_revenue_refund_bindings b
+                JOIN owner_revenue_accounting_certifications c
+                  ON c."propertyId"=b."propertyId" AND c.id=b."certificateId"
+                WHERE b."propertyId"=$1 AND b."paymentId"=x.id
+                  AND owner_revenue_certificate_current(c)
+                  AND owner_revenue_has_active_posting(c."propertyId",c."sourceEventId")) AS verified
+             FROM candidates x
+           )
+           SELECT count(*) FILTER(WHERE in_period)::int AS refund_payment_expected,
+                  count(*) FILTER(WHERE in_period AND verified)::int AS refund_payment_verified,
+                  count(*) FILTER(WHERE NOT dated)::int AS refund_undated_count
+           FROM evidence""",pid,from_date,to_date,tz)
+    counts.update(dict(refunds))
+    amounts=await conn.fetchrow(
+        """SELECT count(*)::int AS posting_line_count,
+                  COALESCE(sum(CASE WHEN l.side='CREDIT' THEN l."amountKgs" ELSE -l."amountKgs" END)
+                   FILTER(WHERE l."accountCode" IN ('4100','4200','4300')),0) AS revenue,
+                  COALESCE(sum(CASE WHEN l.side='DEBIT' THEN l."amountKgs" ELSE -l."amountKgs" END)
+                   FILTER(WHERE l."accountCode" IN ('5100','5200')),0) AS expenses
+           FROM owner_accounting_postings p JOIN owner_accounting_posting_lines l
+             ON l."propertyId"=p."propertyId" AND l."postingId"=p.id
+           WHERE p."propertyId"=$1 AND p."accountingDate" BETWEEN $2 AND $3""",
+        pid,from_date,to_date)
     counts["cogs_expected"]=len(orders)
     counts["unmatched_approved_sources"]=len(set(by_key)-matched)
     blockers=[]
@@ -594,12 +643,23 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
         blockers.append("ACTIVE_CORRECTIONS_REQUIRE_ACCOUNTING_POLICY")
     if counts["other_service_expected"]!=counts["other_service_verified"] or dining["non_dining_undated_folio_count"]:
         blockers.append("OTHER_SERVICE_REVENUE_NOT_RECONCILED")
+    if counts["package_entitlement_count"]:
+        blockers.append("PACKAGE_DELIVERY_AND_VALUE_ALLOCATION_UNVERIFIED")
+    if counts["refund_payment_expected"]!=counts["refund_payment_verified"] or counts["refund_undated_count"]:
+        blockers.append("CASH_REFUND_RECONCILIATION_INCOMPLETE")
     # Even a perfect match of these supported source categories does not prove
     # legal document contents, completeness of all operations, or a sealed period.
     blockers.extend(["INDEPENDENT_DOCUMENT_CONTENT_REVIEW_REQUIRED",
                      "FULL_PERIOD_POLICY_AND_CLOSE_NOT_VERIFIED"])
     return {"scope":"PROPERTY_SCOPED_READ_ONLY_PERIOD_DIAGNOSTIC",
             "counts":counts,"blockers":blockers,
+            "period":{"from":from_date.isoformat(),"to":to_date.isoformat()},
+            "posted_ledger_subtotals":{
+                "posting_line_count":amounts["posting_line_count"],
+                "revenue_kgs":str(amounts["revenue"].quantize(Decimal("0.0001"))),
+                "expense_cogs_kgs":str(amounts["expenses"].quantize(Decimal("0.0001"))),
+                "contribution_kgs":str((amounts["revenue"]-amounts["expenses"]).quantize(Decimal("0.0001"))),
+            },
             "period_completeness_verified":False,"recognized_profit_kgs":None,
             "currency":"KGS"}
 

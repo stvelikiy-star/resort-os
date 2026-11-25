@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "82516792cf64a24440f2f22d61ad92688292eb09",
+    "scripts/marina_rc3_additive_gate.py": "80b17713f51b4fb56c5facb8b5db7b04e7a0b0e5",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -72,7 +72,8 @@ APPROVED_P0_BLOBS = {
     "services/api/app/owner_accrual_readiness.py": "a6484821beaae10aa3f3de3bbf5011e38389872f",
     "scripts/test_owner_served_kitchen_cost_trace.py": "c30f2859bd5769228c7cbcd1a1c6159797369abf",
     "scripts/marina_shared_served_cost_trace_ci.py": "0d8a608004d04fd6b4ad01f548da34fc59627385",
-    "apps/admin/components/HotelFinanceBoard.tsx": "20cdda5d8839fa3c3b9a59bfd686c52a69ae14ab",
+    "apps/admin/components/AdminExperienceRuntime.tsx": "aeecbcd54bd3479ba80e541e31f884cf7ba2870d",
+    "apps/admin/components/HotelFinanceBoard.tsx": "cb2443053a7c19bd7e8fd93eee8748e18741827a",
     "apps/staff/components/CookBatchAssignments.tsx": "884a3290e678f8777167999e5aceaa60d470902b",
     "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",
     # MARINA batch provenance: reviewed additive migration, API and executable test.
@@ -91,11 +92,11 @@ APPROVED_P0_BLOBS = {
     "services/api/app/owner_accounting_journal.py": "bfadba59080ec2badb554ee03ed39d964cb04c0e",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
     "services/api/app/owner_ledger_policy.py": "5489152a7cf19737932a4413c9e446afa62b69e4",
-    "services/api/app/owner_accounting_postings.py": "068c0a0ffdaba7819a5fd080ae7640d0d81a3b52",
+    "services/api/app/owner_accounting_postings.py": "8032b4a2bd320f5134fcd9080762cb1cd7bb28f4",
     "services/api/app/owner_revenue_corrections.py": "10f52e7f916598620c73fa2d3a61f08bed435aaa",
     "services/api/app/owner_delivered_revenue.py": "1e8881079cd4d4a64f96aaabbb51c1d21e59a035",
     "scripts/test_owner_ledger_policy.py": "c8de02aff23a49ac33c21c314353a386d3e73879",
-    "scripts/marina_owner_posting_api_ci.py": "0602ed82d51419f0cfc3b5db8ef7a2e4b98bbc78",
+    "scripts/marina_owner_posting_api_ci.py": "12de0d25db5c86f2607661226e7c289cc3fab6e6",
     "services/api/app/owner_revenue_source_journal.py": "a748840fcce9904dbb4e52fe20c9ff6163bd9375",
     "packages/database/prisma/migrations/zz131_marina_owner_source_reversal_integrity_20261125/migration.sql": "57e9a0ffea9fc8ef4c97407d6bb70e2a8f5fd85b",
     "packages/database/prisma/migrations/zz132_marina_owner_revenue_period_integrity_20261125/migration.sql": "49ea810033a63ff721e44dc9f2bb2da2c400373e",

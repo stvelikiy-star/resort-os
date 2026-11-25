@@ -236,6 +236,11 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
     check(coverage.status_code,200,"period coverage diagnostic")
     check(coverage.json()["period_completeness_verified"],False,"coverage cannot close period")
     check(coverage.json()["recognized_profit_kgs"],None,"coverage does not fabricate profit")
+    check(coverage.json()["period"],{"from":date.today().isoformat(),"to":date.today().isoformat()},"coverage date range")
+    for name in ("package_entitlement_count","package_portions_count","refund_payment_expected",
+                 "refund_payment_verified","refund_undated_count"):
+        check(isinstance(coverage.json()["counts"][name],int),True,"coverage counter "+name)
+    check(coverage.json()["posted_ledger_subtotals"]["posting_line_count"]>0,True,"posted totals and coverage share snapshot")
     check(coverage.json()["counts"]["unmatched_approved_sources"]>0,True,"synthetic approval not mistaken for delivered source")
     check("APPROVED_SOURCE_NOT_MATCHED_TO_DELIVERY" in coverage.json()["blockers"],True,"unmatched source blocker")
     reverse_decision=client.post(decision_url,json={

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type ReservationLedgerItem = {
   reservation_id: string;
@@ -262,27 +262,56 @@ const reservationStatusLabel: Record<string, string> = {
   CANCELLED: "CANCELLED",
 };
 
+type LedgerCoverage = {
+  scope: "PROPERTY_SCOPED_READ_ONLY_PERIOD_DIAGNOSTIC";
+  period: { from: string; to: string };
+  counts: Record<string, number>;
+  blockers: string[];
+  posted_ledger_subtotals: {
+    posting_line_count: number; revenue_kgs: string; expense_cogs_kgs: string; contribution_kgs: string;
+  };
+  period_completeness_verified: false;
+  recognized_profit_kgs: null;
+};
+
 export default function HotelFinanceBoard() {
   const now = useMemo(() => new Date(), []);
   const [fromDate, setFromDate] = useState(() => dateOnly(monthStart(now)));
   const [toDate, setToDate] = useState(() => dateOnly(now));
   const [data, setData] = useState<FinanceResponse | null>(null);
+  const [ledger, setLedger] = useState<LedgerCoverage | null>(null);
+  const loadSequence = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     setLoading(true);
     setError(null);
+    setLedger(null);
     try {
       const params = new URLSearchParams({ from_date: fromDate, to_date: toDate });
       const response = await fetch(`/core/api/v1/admin/finance/summary?${params}`, { cache: "no-store" });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось загрузить внутренние финансы");
-      setData(body as FinanceResponse);
+      if (sequence !== loadSequence.current) return;
+      const summary = body as FinanceResponse;
+      setData(summary);
+      if (summary.owner_accrual_readiness_snapshot) {
+        // Optional, guarded OWNER-only QA ledger. Never substitute zero when unavailable.
+        const ledgerResponse = await fetch(`/core/api/v1/admin/finance/owner/accounting-journal/period-coverage?${params}`, { cache: "no-store" }).catch(() => null);
+        if (ledgerResponse?.ok && sequence === loadSequence.current) {
+          const result = await ledgerResponse.json().catch(() => null) as LedgerCoverage | null;
+          if (sequence === loadSequence.current && result?.scope === "PROPERTY_SCOPED_READ_ONLY_PERIOD_DIAGNOSTIC"
+            && result.period?.from === summary.range.from && result.period?.to === summary.range.to
+            && result.period_completeness_verified === false && result.recognized_profit_kgs === null
+            && result.posted_ledger_subtotals && result.counts) setLedger(result);
+        }
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Ошибка загрузки внутренних финансов");
+      if (sequence === loadSequence.current) setError(cause instanceof Error ? cause.message : "Ошибка загрузки внутренних финансов");
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   }, [fromDate, toDate]);
 
@@ -318,6 +347,28 @@ export default function HotelFinanceBoard() {
         <article><span>Долг после выезда</span><strong>{money(data.receivables_snapshot.checked_out_kgs)}</strong><small>{data.receivables_snapshot.checked_out_count} CHECKED_OUT</small></article>
         <article><span>Стоимость активных броней</span><strong>{money(data.active_reservations_snapshot.booked_total_kgs)}</strong><small>{data.active_reservations_snapshot.reservation_count} GUARANTEED / CHECKED_IN</small></article>
       </section>
+
+      {ledger && data.owner_accrual_readiness_snapshot && ledger.period.from === data.range.from && ledger.period.to === data.range.to &&
+        <section className="finance-split-grid" data-testid="owner-ledger-period-coverage">
+          <article className="finance-section">
+            <div className="section-head"><h2>OWNER · бухгалтерский журнал</h2><span>Период не закрыт</span></div>
+            <div className="finance-state-grid">
+              <div><span>Проведённая выручка</span><strong>{exactSom(ledger.posted_ledger_subtotals.revenue_kgs)}</strong></div>
+              <div><span>Проведённые расходы и себестоимость</span><strong>{exactSom(ledger.posted_ledger_subtotals.expense_cogs_kgs)}</strong></div>
+              <div><span>Промежуточный результат журнала</span><strong>{exactSom(ledger.posted_ledger_subtotals.contribution_kgs)}</strong></div>
+              <div><span>Итоговая прибыль</span><strong>Требуется сверка</strong></div>
+            </div>
+          </article>
+          <article className="finance-section">
+            <div className="section-head"><h2>OWNER · сверка периода</h2><span>Проверенные / ожидаемые</span></div>
+            <div className="finance-state-grid">
+              {([["Проживание","lodging"],["Ресторан","dining"],["Дополнительные услуги","other_service"],["Расходы","expense"],["Себестоимость","cogs"],["Возвраты","refund_payment"]] as const).map(([label,key]) =>
+                <div key={key}><span>{label}</span><strong>{ledger.counts[key+"_verified"] ?? "—"} / {ledger.counts[key+"_expected"] ?? "—"}</strong></div>)}
+              <div><span>Права на включённое питание</span><strong>{ledger.counts.package_entitlement_count ?? "—"}</strong></div>
+              <div><span>Возвраты без подтверждённой даты</span><strong>{ledger.counts.refund_undated_count ?? "—"}</strong></div>
+            </div>
+          </article>
+        </section>}
 
       {data.owner_supplier_stock_snapshot &&
         data.owner_supplier_stock_snapshot.financial_truth.recognized_profit_kgs === null &&
