@@ -986,7 +986,7 @@ function investorPlanTable(plans,investors=[]){
 async function investorPlanAdminPanel(){
  const l=investorPlanLabels(),r=await api('/v1/platform/investor-plans'),active=r.investors.filter(i=>i.status==='ACTIVE');
  const form=active.length&&r.hotels.length?'<form id="investor-plan-form" class="admin-form"><label>'+safe(t('investor'))+'<select name="investor_id">'+active.map(i=>'<option value="'+safe(i.id)+'" data-revision="'+safe(Math.max(0,...r.plans.filter(p=>p.investor_id===i.id).map(p=>p.revision)))+'">'+safe(i.platform_subject_id)+'</option>').join('')+'</select></label><label>'+safe(l.capital)+'<select name="principal_kg">'+[[150000,25],[250000,35],[400000,50]].map(([v,share])=>'<option value="'+v+'">'+money(v,'KGS')+' · '+share+'%</option>').join('')+'</select></label><fieldset><legend>'+safe(l.hotels)+'</legend>'+r.hotels.map(h=>'<label class="check-row"><input type="checkbox" name="hotel_ids" value="'+safe(h.id)+'">'+safe(h.display_name)+'</label>').join('')+'</fieldset><button type="submit" class="primary">'+safe(l.create)+'</button><div role="status"></div></form>':'';
- return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+form+investorPlanTable(r.plans,r.investors)+'</section>';
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+form+investorPlanTable(r.plans,r.investors)+'</section>'+investmentProjectionPanel(r.plans,true);
 }
 async function saveInvestorPlan(form){
  const l=investorPlanLabels(),d=new FormData(form),b=form.querySelector('button'),status=form.querySelector('[role=status]'),hotel_ids=d.getAll('hotel_ids');
@@ -994,10 +994,27 @@ async function saveInvestorPlan(form){
  b.disabled=true;
  try{await saveQaCatalogAction('investor-plans',{investor_id:String(d.get('investor_id')),expected_revision:Number(form.elements.investor_id.selectedOptions[0].dataset.revision),principal_kg:Number(d.get('principal_kg')),hotel_ids});await render();}catch(e){status.textContent=e.message;b.disabled=false;}
 }
+function projectionLabels(){
+ return ({ru:{title:'Прогноз возврата инвестиции',note:'Сценарий: постоянная ежемесячная выручка закреплённых гостиниц без налогов и возвратов, выплаты в конце месяца. Не подтверждённые выплаты. Горизонт 120 месяцев.',revenue:'Подписочная выручка в месяц (сом)',start:'Месяц начала сценария',elapsed:'Месяцев прошло',calculate:'Рассчитать',monthly:'Доля в месяц',repaid:'Прогноз возврата',remaining:'Прогноз остатка вклада',bonus:'Прогноз бонусного дохода',total:'Всего по сценарию',date:'Предполагаемый возврат вклада',bonusPeriod:'Бонусный период (конец не включён)',RETURN:'Возврат вклада',BONUS:'Бонусный период',ENDED:'Сценарий завершён',unknown:'За пределами горизонта / не определено'},kg:{title:'Инвестицияны кайтаруу болжолу',note:'Сценарий: бекитилген мейманканалардын туруктуу айлык кирешеси, салыктарсыз жана кайтарууларсыз, айдын аягында төлөм. Ырасталган төлөм эмес. 120 ай.',revenue:'Айлык жазылуу кирешеси (сом)',start:'Сценарий башталган ай',elapsed:'Өткөн айлар',calculate:'Эсептөө',monthly:'Айлык үлүш',repaid:'Кайтаруу болжолу',remaining:'Салымдын калган суммасы',bonus:'Бонус кирешесинин болжолу',total:'Сценарий боюнча жалпы сумма',date:'Салым кайтарылуучу болжолдуу күн',bonusPeriod:'Бонус мөөнөтү (аягы кирбейт)',RETURN:'Салымды кайтаруу',BONUS:'Бонус мөөнөтү',ENDED:'Сценарий аяктады',unknown:'Мөөнөттөн тышкары / белгисиз'},en:{title:'Investment repayment forecast',note:'Scenario: constant monthly assigned-hotel subscription revenue excluding taxes and refunds, paid at month end. No verified payouts. 120-month horizon.',revenue:'Monthly subscription revenue (KGS)',start:'Scenario start month',elapsed:'Months elapsed',calculate:'Calculate',monthly:'Monthly share',repaid:'Projected principal repaid',remaining:'Projected principal remaining',bonus:'Projected bonus income',total:'Scenario total',date:'Estimated repayment date',bonusPeriod:'Bonus term (end exclusive)',RETURN:'Principal repayment',BONUS:'Bonus period',ENDED:'Scenario ended',unknown:'Outside horizon / unknown'}})[state.lang];
+}
+function investmentProjectionPanel(plans,admin=false){
+ if(!plans.length)return '';
+ const l=projectionLabels(),month=dateValue(0).slice(0,7);
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+'<form class="investment-projection-form admin-form" data-admin="'+(admin?'1':'0')+'"><label>'+safe(t('skuVersion'))+'<select name="plan_id">'+plans.map(p=>'<option value="'+safe(p.id)+'">'+safe(p.investor_id.slice(0,8))+' · v'+safe(p.revision)+' · '+money(p.principal,'KGS')+' · '+safe(p.share_bps/100)+'%</option>').join('')+'</select></label><label>'+safe(l.revenue)+'<input name="monthly_revenue" inputmode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" maxlength="15" value="0" required></label><label>'+safe(l.start)+'<input name="start_month" type="month" min="2000-01" max="2090-12" value="'+safe(month)+'" required></label><label>'+safe(l.elapsed)+'<input name="elapsed_months" type="number" min="0" max="120" step="1" value="0" required></label><button type="submit" class="primary">'+safe(l.calculate)+'</button><div role="status" aria-live="polite"></div></form></section>';
+}
+async function runInvestmentProjection(form){
+ const l=projectionLabels(),d=new FormData(form),b=form.querySelector('button'),out=form.querySelector('[role=status]');b.disabled=true;out.textContent='';
+ try{
+  const params=new URLSearchParams({plan_id:String(d.get('plan_id')),monthly_revenue:String(d.get('monthly_revenue')),start_month:String(d.get('start_month'))+'-01',elapsed_months:String(d.get('elapsed_months'))});
+  const r=await api((form.dataset.admin==='1'?'/v1/platform':'/v1/partner/me')+'/investment-projection?'+params.toString());
+  if(r.mode!=='FORECAST_ONLY'||r.payouts_enabled!==false||r.actual_principal_repaid!==null||r.plan_id!==d.get('plan_id'))throw Error(t('error'));
+  out.innerHTML='<div class="grid two">'+kv(t('status'),l[r.stage])+kv(l.monthly,money(r.monthly_share,'KGS'))+kv(l.repaid,money(r.projected_principal_repaid,'KGS'))+kv(l.remaining,money(r.projected_principal_remaining,'KGS'))+kv(l.bonus,money(r.projected_bonus_paid,'KGS'))+kv(l.total,money(r.projected_total_received,'KGS'))+kv(l.date,r.projected_repayment_date||l.unknown)+kv(l.bonusPeriod,r.bonus_start?r.bonus_start+' — '+r.bonus_end_exclusive:l.unknown)+'</div>';
+ }catch(e){out.textContent=e.message;}finally{b.disabled=false;}
+}
 function ownInvestorPlans(r){
  if(r.role!=='INVESTOR')return '';
  const l=investorPlanLabels();
- return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+investorPlanTable(r.investment_plans||[])+'<div class="grid two">'+kv(l.received,l.unknown)+kv(l.repaid,l.unknown)+'</div></section>';
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+investorPlanTable(r.investment_plans||[])+'<div class="grid two">'+kv(l.received,l.unknown)+kv(l.repaid,l.unknown)+'</div></section>'+investmentProjectionPanel(r.investment_plans||[]);
 }
 async function obligations(){const r=await api('/v1/platform/partner-earnings-summary?period='+state.period);return heading(t('obligations'),t('helpQa'))+toolbar()+periodButtons()+'<section class="panel spacing-top">'+earningsSummary(r)+'</section>'+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await agentEmploymentPanel().catch(e=>info(e.message,'error'))+await investorPlanAdminPanel().catch(e=>info(e.message,'error')):'')+info(t('notImplemented'))}
 function participantDetails(r){
@@ -1098,6 +1115,7 @@ async function submitCommercialPrice(form){
  catch(err){status.textContent=err.message;button.disabled=false;}
 }
 main.addEventListener('submit',e=>{
+ if(e.target.classList.contains('investment-projection-form')){e.preventDefault();runInvestmentProjection(e.target);return;}
  if(e.target.id==='investor-plan-form'){e.preventDefault();saveInvestorPlan(e.target);return;}
  if(e.target.id==='agent-forecast-form'){e.preventDefault();calculateAgentForecast(e.target);return;}
  if(e.target.classList.contains('agent-employment-form')){e.preventDefault();saveAgentEmployment(e.target);return;}
