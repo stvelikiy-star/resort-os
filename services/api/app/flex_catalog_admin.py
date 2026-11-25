@@ -1446,3 +1446,49 @@ async def admin_investment_projection(request: Request,plan_id: uuid.UUID=Query(
                 return {"plan_id":str(plan_id),**investment_projection(row["principal"],row["share_bps"],row["bonus_months"],Decimal(monthly_revenue),start_month,elapsed_months)}
             except (ValueError,ArithmeticError):
                 raise HTTPException(422,detail="Invalid forecast scenario") from None
+
+
+class PartnerProposalRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid",str_strip_whitespace=True)
+    partner_subject_id: str=Field(min_length=2,max_length=180)
+    hotel_id: uuid.UUID
+    expected_revision: int=Field(strict=True,ge=0,le=2147483646)
+    title: str=Field(min_length=2,max_length=120)
+    terms_text: str=Field(min_length=2,max_length=2000)
+
+
+@app.get("/v1/platform/partner-proposals")
+async def partner_proposals(request: Request,principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
+            await as_writer(conn,principal)
+            partners=await conn.fetch("SELECT subject_id,active FROM flex_platform_memberships WHERE role='PARTNER' ORDER BY subject_id")
+            hotels=await conn.fetch("SELECT id,display_name FROM flex_hotels WHERE status IN ('PENDING','ACTIVE') ORDER BY display_name,id")
+            proposals=await conn.fetch("SELECT * FROM flex_qa_partner_proposals ORDER BY partner_subject_id,hotel_id,revision DESC")
+            return {"partners":[dict(p) for p in partners],"hotels":[dict(h) for h in hotels],
+                "proposals":[dict(p) for p in proposals],"payouts_enabled":False}
+
+
+@app.post("/v1/platform/partner-proposals",status_code=201)
+async def create_partner_proposal(payload: PartnerProposalRequest,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await commercial_hotel_lock(conn,payload.hotel_id)
+            if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_platform_memberships WHERE subject_id=$1 AND role='PARTNER' AND active)",payload.partner_subject_id):
+                raise HTTPException(404,detail="Active partner unavailable")
+            hotel=await conn.fetchval("SELECT display_name FROM flex_hotels WHERE id=$1 AND status IN ('PENDING','ACTIVE')",payload.hotel_id)
+            if hotel is None:
+                raise HTTPException(404,detail="Hotel unavailable")
+            last=await conn.fetchrow("SELECT * FROM flex_qa_partner_proposals WHERE partner_subject_id=$1 AND hotel_id=$2 ORDER BY revision DESC LIMIT 1",payload.partner_subject_id,payload.hotel_id)
+            revision=last["revision"] if last else 0
+            if last and revision==payload.expected_revision+1 and last["title"]==payload.title and last["terms_text"]==payload.terms_text:
+                return {**dict(last),"payouts_enabled":False}
+            if revision!=payload.expected_revision:
+                raise HTTPException(409,detail="Proposal revision changed")
+            row=await conn.fetchrow("""INSERT INTO flex_qa_partner_proposals(partner_subject_id,hotel_id,revision,hotel_name_snapshot,title,terms_text,created_by)
+                VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *""",payload.partner_subject_id,payload.hotel_id,revision+1,hotel,payload.title,payload.terms_text,principal.subject_id)
+            return {**dict(row),"payouts_enabled":False}
