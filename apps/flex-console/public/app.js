@@ -832,6 +832,23 @@ function hotelCardTabs(){
    '<button type="button" data-hotel-tab="'+key+'" class="'+(state.hotelTab===key?'primary':'outline')+'" aria-current="'+(state.hotelTab===key?'page':'false')+'">'+safe(t(label))+'</button>').join('')+'</nav>';
 }
 
+function assignmentLabels(){
+ return ({ru:{title:'Закрепление агента',assign:'Закрепить агента',release:'Снять закрепление',none:'Агент не закреплён',history:'История закрепления',note:'Закрепление в QA не подтверждает продажу, комиссию или выплату.',salary:'Зарплата в месяц',connection:'За подключение гостиницы',addon:'За дополнительный модуль в месяц',target:'План гостиниц в месяц',terms:'Условия агента',assigned:'Текущие закрепления QA',eligible:'Начисления требуют подтверждённой оплаты и действующих трудовых условий.'},kg:{title:'Агентти бекитүү',assign:'Агентти бекитүү',release:'Бекитүүнү алып салуу',none:'Агент бекитилген эмес',history:'Бекитүү тарыхы',note:'QA бекитүүсү сатуу, комиссия же төлөмдү ырастабайт.',salary:'Айлык акы',connection:'Мейманкананы кошуу үчүн',addon:'Кошумча модуль үчүн айына',target:'Айлык мейманкана планы',terms:'Агенттин шарттары',assigned:'Учурдагы QA бекитүүлөрү',eligible:'Эсептөөлөр ырасталган төлөмдү жана жарактуу эмгек шарттарын талап кылат.'},en:{title:'Agent assignment',assign:'Assign agent',release:'Release assignment',none:'No assigned agent',history:'Assignment history',note:'QA assignment does not confirm a sale, commission or payout.',salary:'Monthly salary',connection:'Per hotel connection',addon:'Per additional module per month',target:'Monthly hotel target',terms:'Agent terms',assigned:'Current QA assignments',eligible:'Accruals require verified payments and valid employment terms.'}})[state.lang];
+}
+async function agentAssignmentPanel(){
+ const l=assignmentLabels(),r=await api('/v1/platform/agent-assignments?hotel_id='+state.hotelId),a=r.current;
+ const select=a?'<input type="hidden" name="agent_id" value="'+safe(a.agent_id)+'"><p>'+safe(r.agents.find(x=>x.id===a.agent_id)?.platform_subject_id||a.agent_id)+'</p>':'<select name="agent_id" required>'+r.agents.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.platform_subject_id)+'</option>').join('')+'</select>';
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+(!a?'<p>'+safe(l.none)+'</p>':'')+((a||r.agents.length)?'<form id="agent-assignment-form" class="admin-form"><input type="hidden" name="expected_revision" value="'+safe(r.revision)+'"><input type="hidden" name="action" value="'+(a?'RELEASE':'ASSIGN')+'">'+select+'<button class="primary" type="submit">'+safe(a?l.release:l.assign)+'</button><div role="status"></div></form>':'')+'<h3>'+safe(l.history)+'</h3>'+(r.history.length?table([t('skuVersion'),t('agent'),t('actions'),t('periodStart')],r.history.map(x=>'<tr><td>'+safe(x.revision)+'</td><td>'+safe(r.agents.find(a=>a.id===x.agent_id)?.platform_subject_id||x.agent_id)+'</td><td>'+safe(x.action==='ASSIGN'?l.assign:l.release)+'</td><td>'+safe(date(x.created_at))+'</td></tr>')):empty(t('noData')))+'</section>';
+}
+async function saveAgentAssignment(form){
+ const d=new FormData(form),b=form.querySelector('button'),status=form.querySelector('[role=status]');b.disabled=true;
+ try{await saveQaCatalogAction('agent-assignments',{hotel_id:state.hotelId,agent_id:String(d.get('agent_id')),expected_revision:Number(d.get('expected_revision')),action:String(d.get('action'))});await render();}catch(e){status.textContent=e.message;b.disabled=false;}
+}
+function agentTermsPanel(r){
+ const a=r.agent_terms,l=assignmentLabels(),h=r.qa_assignments||[];
+ if(!a)return '';
+ return '<section class="panel"><h2>'+safe(l.terms)+'</h2><div class="grid two">'+kv(l.salary,money(a.monthly_salary,'KGS'))+kv(l.connection,money(a.connection_fee,'KGS'))+kv(l.addon,money(a.monthly_addon_fee,'KGS'))+kv(l.target,a.monthly_target)+'</div>'+info(l.eligible,'info')+'</section><section class="panel"><h2>'+safe(l.assigned)+'</h2>'+(h.length?table([t('hotel'),t('status'),t('periodStart')],h.map(x=>'<tr><td>'+safe(x.display_name)+'</td><td>'+safe(x.status)+'</td><td>'+safe(date(x.assigned_at))+'</td></tr>')):empty(t('noData')))+'</section>';
+}
 async function hotelDetail(){
  const id=state.hotelId;
  if(!/^[0-9a-fA-F-]{36}$/.test(id||'')) return heading(t('noSelected'))+empty(t('noSelected'));
@@ -841,6 +858,7 @@ async function hotelDetail(){
   (state.me?.role==='SUPER_ADMIN'&&state.hotelTab==='overview'?'<button type="button" class="outline" data-link="'+safe(id)+'">'+safe(t('linkHotel'))+'</button>':'')+
   '<button type="button" class="subtle" data-view="'+(state.me?.role==='SUPER_ADMIN'?'hotels':'subscription')+'">← '+safe(t('openBack'))+'</button>';
  if(state.hotelTab==='history'&&state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled)return metadata+await customerProfilePanel(true).catch(e=>info(e.message,'error'))+await agreementPanel().catch(e=>info(e.message,'error'));
+ if(state.hotelTab==='relations'&&state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled)return metadata+await agentAssignmentPanel().catch(e=>info(e.message,'error'));
  if(['usage','relations','history'].includes(state.hotelTab)){
   return metadata+'<section class="panel spacing-top"><h2>'+
    safe(t(state.hotelTab==='usage'?'hotelTabUsage':state.hotelTab==='relations'?'hotelTabRelations':'hotelTabHistory'))+
@@ -936,7 +954,7 @@ async function earnings(){
  return heading(state.me.role==='INVESTOR'?t('investor'):t('agent'),t('helpQa'))+toolbar()+periodButtons()+'<div class="grid spacing-top">'+
  metric(t('gross'),money(r.accrued_gross_kg),'cyan-text')+metric(t('refunds'),money(r.reversed_kg))+
  metric(t('net'),money(r.net_accrued_kg),'gold-text')+metric(t('paid'),money(r.actual_paid_kg))+'</div>'+
- '<section class="panel"><h2>'+safe(t('earnings'))+'</h2><div class="grid two">'+kv(t('events'),r.events)+kv(t('role'),r.role)+'</div></section>'+participantDetails(r)+info(t('notImplemented'))+info(safe(r.data_provenance||'QA_ONLY'),'info');
+ '<section class="panel"><h2>'+safe(t('earnings'))+'</h2><div class="grid two">'+kv(t('events'),r.events)+kv(t('role'),r.role)+'</div></section>'+agentTermsPanel(r)+participantDetails(r)+info(t('notImplemented'))+info(safe(r.data_provenance||'QA_ONLY'),'info');
 }
 async function subscription(){
  const hotels=state.me?.hotels||[];
@@ -1023,6 +1041,7 @@ async function submitCommercialPrice(form){
  catch(err){status.textContent=err.message;button.disabled=false;}
 }
 main.addEventListener('submit',e=>{
+ if(e.target.id==='agent-assignment-form'){e.preventDefault();saveAgentAssignment(e.target);return;}
  if(e.target.id==='customer-profile-form'){e.preventDefault();submitCustomerOperation(e.target,'customer-profile');return;}
  if(e.target.id==='agreement-draft-form'){e.preventDefault();submitCustomerOperation(e.target,'agreement-drafts');return;}
  if(e.target.id==='synthetic-journal-open'){e.preventDefault();openSyntheticJournal(e.target);return;}
