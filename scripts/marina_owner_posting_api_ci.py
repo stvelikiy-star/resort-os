@@ -4,6 +4,7 @@ Synthetic source snapshots intentionally test the accounting state machine, not
 real-world tax certification, service delivery, or production accounting close.
 """
 import asyncio
+import hashlib
 import os
 import uuid
 from datetime import date
@@ -47,6 +48,15 @@ async def seed():
                WHERE "propertyId"=$1 LIMIT 1""",pb)
         assert foreign, "Earlier two-hotel accounting CI must run first"
         ev=uuid.uuid4()
+        document_id=uuid.uuid4()
+        document=b"%PDF-1.4\\n% Synthetic accounting source certification\\n%%EOF\\n"
+        await conn.execute(
+            """INSERT INTO owner_revenue_evidence_documents(
+               id,"propertyId","documentReference","documentDate",
+               "fileName","mediaType",sha256,content,"sizeBytes","uploadedById")
+               VALUES($1,$2,'CI-TAX-REVIEW-700',CURRENT_DATE,
+                      'synthetic-tax-ledger.pdf','application/pdf',$3,$4,$5,$6)""",
+            document_id,p,hashlib.sha256(document).hexdigest(),document,len(document),maker)
         await conn.execute(
             """INSERT INTO owner_revenue_source_events
                (id,"propertyId","sourceType","sourceId","serviceDate",action,
@@ -55,11 +65,11 @@ async def seed():
                       '{"tax_discount_refund_accounting_approved":true}'::jsonb,
                       'Synthetic two-hotel accounting posting QA',$5)""",
             ev,p,uuid.uuid4(),date.today(),maker)
-        return p,pb,ev,foreign
+        return p,pb,ev,foreign,document_id
     finally:
         await conn.close()
 
-p,pb,source,foreign=asyncio.run(seed())
+p,pb,source,foreign,document_id=asyncio.run(seed())
 proposal=uuid.uuid4()
 posting=uuid.uuid4()
 with TestClient(app,base_url="https://ledger-qa.invalid") as client:
@@ -93,6 +103,22 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
         "reason":"Reviewed synthetic service tax and liability split"})
     check(response.status_code,201,"independent approval")
     url=base+"/proposals/"+str(proposal)+"/post"
+    attempt_before=client.post(url,json={
+        "id":str(uuid.uuid4()),"reason":"Posting without independent document must fail"})
+    check(attempt_before.status_code,409,"unverified document blocks posting")
+    certificate={
+        "id":str(uuid.uuid4()),"source_event_id":str(source),
+        "evidence_document_id":str(document_id),
+        "tax_amount_kgs":"50.0000","policy_version":"CI-LEDGER-POLICY-1",
+        "reason":"Independent synthetic invoice tax verification"}
+    certified=client.post(base+"/revenue-certifications",json=certificate)
+    check(certified.status_code,201,"independent source certification")
+    check(certified.json()["accounting_posted"],False,"certificate not posting")
+    check(client.post(base+"/revenue-certifications",json=certificate).json()["already_processed"],
+          True,"certification idempotent")
+    bad_cert={**certificate,"id":str(uuid.uuid4())}
+    check(client.post(base+"/revenue-certifications",json=bad_cert).status_code,
+          409,"certification duplicate blocked")
     body={"id":str(posting),"reason":"Reviewed synthetic service evidence and tax split"}
     response=client.post(url,json=body)
     check(response.status_code,201,"approved posting")
