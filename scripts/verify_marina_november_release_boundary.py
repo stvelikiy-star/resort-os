@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "5c6b78c3ab717b973ff6f5efc3b45ffdc6eefc12",
+    "scripts/marina_rc3_additive_gate.py": "b94f6f63c13bcbf4586cbf3d0fae5792f95c8ea7",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -90,9 +90,9 @@ APPROVED_P0_BLOBS = {
     "services/api/app/owner_accounting_journal.py": "bfadba59080ec2badb554ee03ed39d964cb04c0e",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
     "services/api/app/owner_ledger_policy.py": "4dc0694917e9bb9d7a80786a265a87d7480beead",
-    "services/api/app/owner_accounting_postings.py": "6aec328b7106e116dea51647b56692925d4c6c6b",
+    "services/api/app/owner_accounting_postings.py": "4f2827bbdeb2edfd42d1b18cdf0e678fb5c3450a",
     "scripts/test_owner_ledger_policy.py": "cbf493b03dafafc33b6a035df674736cd3978be9",
-    "scripts/marina_owner_posting_api_ci.py": "4204f347d1d077be73ed29c8831c654beb4837fb",
+    "scripts/marina_owner_posting_api_ci.py": "8c548757cc39a2b9490d4fd1202f4734fcb88af9",
     "services/api/app/owner_revenue_source_journal.py": "9041de7df7ae429248b3c9877cd626cc4b5cb2ba",
     "packages/database/prisma/migrations/zz131_marina_owner_source_reversal_integrity_20261125/migration.sql": "57e9a0ffea9fc8ef4c97407d6bb70e2a8f5fd85b",
     "scripts/marina_owner_expense_posting_ci.py": "3c5879734d3bff96269559b1aa08e25adfe937c2",

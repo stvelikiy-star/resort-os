@@ -421,3 +421,158 @@ async def posted_profit(request:Request,from_date:date=Query(),to_date:date=Quer
                     "blockers":["PERIOD_SOURCE_COVERAGE_NOT_VERIFIED",
                                 "TAX_REFUNDS_STOCK_AND_EXPENSE_CLOSE_NOT_VERIFIED"],
                     "currency":"KGS"}
+
+async def period_coverage(conn,pid,from_date,to_date,tz):
+    """Read-only source-to-ledger coverage. A diagnostic, never a close approval."""
+    from .owner_delivered_revenue import delivered_sources
+    delivery=await delivered_sources(conn,pid,from_date,to_date,tz)
+    lodging=delivery["accommodation"]
+    dining=delivery["dining"]
+    # Match each operational source by identity and service date, not totals.
+    # Active POST means a POST without its exact REVERSE.
+    rows=await conn.fetch(
+        """WITH active_post AS (
+             SELECT p.*,q."sourceType",q."sourceId"
+             FROM owner_accounting_postings p
+             JOIN owner_accounting_journal_proposals q
+               ON q."propertyId"=p."propertyId" AND q.id=p."proposalId"
+             WHERE p."propertyId"=$1 AND p.action='POST'
+               AND NOT EXISTS(SELECT 1 FROM owner_accounting_postings r
+                 WHERE r."propertyId"=$1 AND r."reversesId"=p.id AND r.action='REVERSE')
+           ), sources AS (
+             SELECT e.id,e."sourceType",e."sourceId",e."serviceDate",e."faceValueKgs"
+             FROM owner_revenue_source_events e
+             WHERE e."propertyId"=$1 AND e.action='APPROVE_SOURCE'
+               AND e."serviceDate" BETWEEN $2 AND $3
+               AND NOT EXISTS(SELECT 1 FROM owner_revenue_source_events r
+                 WHERE r."propertyId"=$1 AND r."reversesId"=e.id AND r.action='REVERSE_SOURCE')
+           )
+           SELECT e.id,e."sourceType",e."sourceId",e."serviceDate",e."faceValueKgs",
+                  p.id AS posting_id,
+                  p."accountingDate" AS posting_date,
+                  c.id AS certification_id,
+                  c."grossAmountKgs" AS certified_gross
+           FROM sources e
+           LEFT JOIN active_post p ON p."sourceType"='REVENUE_SOURCE' AND p."sourceId"=e.id
+           LEFT JOIN owner_revenue_accounting_certifications c
+             ON c."propertyId"=$1 AND c."sourceEventId"=e.id
+             AND c."policyVersion"=p."policyVersion"
+           ORDER BY e.id""",pid,from_date,to_date)
+    by_key={(r["sourceType"],str(r["sourceId"]),r["serviceDate"].isoformat()):r for r in rows}
+    matched=set()
+    counts={"lodging_expected":lodging["delivered_booked_nights_count"],
+            "lodging_verified":0,"dining_expected":dining["served_orders_count"],
+            "dining_verified":0}
+    def match(kind,identifier,day,gross):
+        key=(kind,str(identifier),str(day))
+        row=by_key.get(key)
+        if row is None:
+            return False
+        matched.add(key)
+        return (row["posting_id"] is not None and row["certification_id"] is not None
+                and row["posting_date"]==row["serviceDate"]
+                and row["certified_gross"]==row["faceValueKgs"]==Decimal(str(gross)))
+    for night in lodging["night_preview"]:
+        if match("ROOM_NIGHT",night["reservation_id"],night["service_date"],
+                 night["allocated_booking_face_value_kgs"]):
+            counts["lodging_verified"]+=1
+    orders=await conn.fetch(
+        """SELECT o.id,o.status,o."totalKgs",
+                  (o."completedAt" AT TIME ZONE $4)::date AS served_local_date,
+                  f.id AS folio_id,f.status AS folio_status,
+                  f."sourceType" AS source_type,f."sourceId" AS source_id,
+                  f."amountKgs" AS folio_amount,f."serviceDate" AS service_date
+           FROM kitchen_orders o LEFT JOIN guest_folio_charges f
+             ON f.id=o."folioChargeId" AND f."propertyId"=o."propertyId"
+           WHERE o."propertyId"=$1 AND o.status='SERVED'
+             AND (o."completedAt" AT TIME ZONE $4)::date BETWEEN $2 AND $3""",
+        pid,from_date,to_date,tz)
+    from .owner_delivered_revenue import classify_served_order
+    for order in orders:
+        if classify_served_order(order) is None and match(
+            "DINING_ORDER",order["id"],order["served_local_date"],order["totalKgs"]):
+            counts["dining_verified"]+=1
+    coverage=await conn.fetchrow(
+        """WITH active_post AS (
+             SELECT q."sourceType",q."sourceId",p."accountingDate",p.id
+             FROM owner_accounting_postings p JOIN owner_accounting_journal_proposals q
+               ON q."propertyId"=p."propertyId" AND q.id=p."proposalId"
+             WHERE p."propertyId"=$1 AND p.action='POST'
+               AND NOT EXISTS(SELECT 1 FROM owner_accounting_postings r
+                 WHERE r."propertyId"=$1 AND r."reversesId"=p.id AND r.action='REVERSE')
+           )
+           SELECT
+             (SELECT count(*) FROM owner_expenses e WHERE e."propertyId"=$1
+               AND e.status='POSTED' AND e."expenseDate" BETWEEN $2 AND $3) AS expense_expected,
+             (SELECT count(*) FROM owner_expenses e JOIN active_post p
+               ON p."sourceType"='OPERATING_EXPENSE' AND p."sourceId"=e.id
+               AND p."accountingDate"=e."expenseDate"
+               WHERE e."propertyId"=$1 AND e.status='POSTED'
+                 AND e."expenseDate" BETWEEN $2 AND $3
+                 AND e.category IN ('UTILITIES','PAYROLL','MAINTENANCE','RENT','MARKETING')
+                 AND e."supplierName" IS NOT NULL AND e."documentReference" IS NOT NULL
+                 AND NOT EXISTS(SELECT 1 FROM kitchen_supplier_documents d
+                   WHERE d."propertyId"=$1 AND d."supplierName"=e."supplierName"
+                     AND d."documentReference"=e."documentReference")
+                 AND e."amountKgs"=(SELECT COALESCE(sum(l."amountKgs"),0)
+                   FROM owner_accounting_posting_lines l WHERE l."propertyId"=$1
+                     AND l."postingId"=p.id AND l."accountCode"='5200' AND l.side='DEBIT')
+             ) AS expense_verified,
+             (SELECT count(*) FROM kitchen_orders o JOIN active_post p
+               ON p."sourceType"='STOCK_CONSUMPTION' AND p."sourceId"=o.id
+               AND p."accountingDate"=(o."completedAt" AT TIME ZONE $4)::date
+               WHERE o."propertyId"=$1 AND o.status='SERVED'
+                 AND p."accountingDate" BETWEEN $2 AND $3
+                 AND owner_accounting_served_cogs_proof($1,o.id,p."accountingDate")=
+                   (SELECT COALESCE(sum(l."amountKgs"),0) FROM owner_accounting_posting_lines l
+                     WHERE l."propertyId"=$1 AND l."postingId"=p.id
+                       AND l."accountCode"='5100' AND l.side='DEBIT')
+             ) AS cogs_verified,
+             (SELECT count(*) FROM owner_revenue_correction_events c
+               JOIN owner_revenue_source_events e ON e."propertyId"=c."propertyId" AND e.id=c."approvalId"
+               WHERE c."propertyId"=$1 AND c.action='RECORD'
+                 AND (c."documentDate" BETWEEN $2 AND $3 OR e."serviceDate" BETWEEN $2 AND $3)
+                 AND NOT EXISTS(SELECT 1 FROM owner_revenue_correction_events r
+                   WHERE r."propertyId"=$1 AND r."reversesId"=c.id AND r.action='REVERSE')
+             ) AS active_corrections""",pid,from_date,to_date,tz)
+    counts.update(dict(coverage))
+    counts["cogs_expected"]=len(orders)
+    counts["unmatched_approved_sources"]=len(set(by_key)-matched)
+    blockers=[]
+    for category in ("lodging","dining","expense","cogs"):
+        if counts[category+"_expected"]!=counts[category+"_verified"]:
+            blockers.append(category.upper()+"_SOURCE_COVERAGE_INCOMPLETE")
+    if lodging["night_preview_truncated"]:
+        blockers.append("LODGING_PREVIEW_LIMIT_REQUIRES_FULL_RECONCILIATION")
+    if lodging["excluded_reservations_count"] or dining["excluded_orders_count"]:
+        blockers.append("DELIVERED_SOURCE_QUALIFICATION_INCOMPLETE")
+    if counts["unmatched_approved_sources"]:
+        blockers.append("APPROVED_SOURCE_NOT_MATCHED_TO_DELIVERY")
+    if counts["active_corrections"]:
+        blockers.append("ACTIVE_CORRECTIONS_REQUIRE_ACCOUNTING_POLICY")
+    if dining["non_dining_active_folio_charges"] or dining["non_dining_undated_folio_count"]:
+        blockers.append("OTHER_SERVICE_REVENUE_NOT_RECONCILED")
+    # Even a perfect match of these supported source categories does not prove
+    # legal document contents, completeness of all operations, or a sealed period.
+    blockers.extend(["INDEPENDENT_DOCUMENT_CONTENT_REVIEW_REQUIRED",
+                     "FULL_PERIOD_POLICY_AND_CLOSE_NOT_VERIFIED"])
+    return {"scope":"PROPERTY_SCOPED_READ_ONLY_PERIOD_DIAGNOSTIC",
+            "counts":counts,"blockers":blockers,
+            "period_completeness_verified":False,"recognized_profit_kgs":None,
+            "currency":"KGS"}
+
+
+@router.get("/period-coverage")
+async def period_coverage_view(request:Request,from_date:date=Query(),to_date:date=Query(),
+                               user=Depends(owner_only)):
+    posting_guard()
+    if from_date>to_date or (to_date-from_date).days>366:
+        raise HTTPException(422,detail={"code":"ACCOUNTING_PERIOD_INVALID"})
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
+            pid=await trusted_property_id(conn,user)
+            tz=await conn.fetchval('SELECT timezone FROM properties WHERE id=$1',pid)
+            if not tz:
+                raise HTTPException(503,detail={"code":"PROPERTY_TIMEZONE_UNAVAILABLE"})
+            return await period_coverage(conn,pid,from_date,to_date,tz)
+

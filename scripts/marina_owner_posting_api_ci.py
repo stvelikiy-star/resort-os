@@ -172,6 +172,12 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
         finally:
             await conn.close()
     asyncio.run(direct_source_reversal_denied())
+    coverage=client.get(base+"/period-coverage",params={"from_date":date.today().isoformat(),"to_date":date.today().isoformat()})
+    check(coverage.status_code,200,"period coverage diagnostic")
+    check(coverage.json()["period_completeness_verified"],False,"coverage cannot close period")
+    check(coverage.json()["recognized_profit_kgs"],None,"coverage does not fabricate profit")
+    check(coverage.json()["counts"]["unmatched_approved_sources"]>0,True,"synthetic approval not mistaken for delivered source")
+    check("APPROVED_SOURCE_NOT_MATCHED_TO_DELIVERY" in coverage.json()["blockers"],True,"unmatched source blocker")
     reverse_decision=client.post(decision_url,json={
         "id":str(uuid.uuid4()),"action":"REVERSE",
         "reason":"Independent synthetic posting cancellation review"})
