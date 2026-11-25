@@ -17,7 +17,7 @@ import asyncpg
 from fastapi import FastAPI, HTTPException
 from fastapi.routing import APIRoute
 
-# The deployment carries only a byte-for-byte copy of five FLEX-only modules.
+# The deployment carries only a byte-for-byte copy of explicitly listed FLEX-only modules.
 # CI compares them against services/api/app; no PMS application is imported.
 _BUNDLE_ROOT = Path(__file__).resolve().parent
 _BUNDLED_MODULES = (
@@ -26,6 +26,7 @@ _BUNDLED_MODULES = (
     "flex_partner_portal.py",
     "flex_onboarding.py",
     "flex_catalog_admin.py",
+    "flex_finance_simulation.py",
 )
 if any(not (_BUNDLE_ROOT / "app" / module).is_file() for module in _BUNDLED_MODULES):
     raise RuntimeError("FLEX_BUNDLED_MODULES_MISSING")
