@@ -647,3 +647,88 @@ before_guest=checks
 asyncio.run(verify_guest_service_ledger())
 asyncio.run(verify_guest_service_ledger(mutation_checks=True))
 print("MARINA_OWNER_GUEST_SERVICE_LEDGER_PASS",checks-before_guest)
+
+# One invoice, multiple independently reviewed corrections, one posting.
+# REFUND / PACKAGE_SPLIT are intentionally blocked from revenue recognition
+# until their separate cash and delivery provenance is established.
+def verify_combined_revenue_reductions():
+    _,_,sid,_,doc_id=asyncio.run(seed())
+    qid,post_id=uuid.uuid4(),uuid.uuid4()
+    base="/api/v1/admin/finance/owner/accounting-journal"
+    corr="/api/v1/admin/finance/owner/revenue-corrections"
+    doc_bytes=b"%PDF-1.4\\n% Synthetic accounting source certification\\n%%EOF\\n"
+    with TestClient(app,base_url="https://ledger-qa.invalid") as client:
+        def sign_in(name):
+            client.post("/api/v1/auth/logout")
+            check(client.post("/api/v1/auth/login",json={"username":name,"password":PASSWORD}).status_code,200,"combined correction login")
+        sign_in("owner")
+        ids=[]
+        def record(kind,amount,component="DINING"):
+            eid=uuid.uuid4()
+            response=client.post(corr,json={
+                "id":str(eid),"approval_id":str(sid),"kind":kind,"component":component,
+                "amount_kgs":amount,"document_reference":"CI-TAX-REVIEW-700",
+                "document_date":date.today().isoformat(),"document_sha256":hashlib.sha256(doc_bytes).hexdigest(),
+                "evidence_document_id":str(doc_id),"evidence_reference":"Synthetic invoice correction",
+                "reason":"Independent review required for combined correction"})
+            check(response.status_code,201,"record "+kind)
+            return eid
+        ids.extend([record("DISCOUNT","100"),record("CANCELLATION","50"),record("TAX_COMPONENT","40")])
+        refund_id=record("REFUND","100")
+        package_id=record("PACKAGE_SPLIT","200")
+        cert={
+            "id":str(uuid.uuid4()),"source_event_id":str(sid),"evidence_document_id":str(doc_id),
+            "tax_amount_kgs":"40","reduction_amount_kgs":"150",
+            "reduction_basis":"ADDITIONAL_TO_APPROVED_FACE",
+            "correction_event_ids":[str(i) for i in ids],
+            "policy_version":"CI-LEDGER-POLICY-1","reason":"Reviewed additional reductions not already in source face"}
+        sign_in("accounting_reviewer")
+        check(client.post(base+"/revenue-certifications",json={**cert,
+            "correction_event_ids":[str(i) for i in [*ids,refund_id,package_id]]}).status_code,409,
+            "refund and package cannot be silently included in revenue")
+        sign_in("owner")
+        for eid in (refund_id,package_id):
+            check(client.post(corr+"/"+str(eid)+"/reverse",json={"id":str(uuid.uuid4()),
+                "reason":"Remove unsupported synthetic evidence from fixture"}).status_code,201,"reverse unsupported evidence")
+        proposal_body={
+            "id":str(qid),"source_type":"REVENUE_SOURCE","source_id":str(sid),
+            "accounting_date":date.today().isoformat(),"policy_version":"CI-LEDGER-POLICY-1",
+            "reason":"Combined correction source posting after documentary review",
+            "lines":[{"account_code":"1100","side":"DEBIT","amount_kgs":"550"},
+                     {"account_code":"4200","side":"CREDIT","amount_kgs":"510"},
+                     {"account_code":"2100","side":"CREDIT","amount_kgs":"40"}]}
+        check(client.post(base+"/proposals",json=proposal_body).status_code,201,"combined reduced proposal")
+        sign_in("accounting_reviewer")
+        for change in ({"reduction_amount_kgs":"149"},{"correction_event_ids":[str(i) for i in ids[:-1]]},
+                       {"reduction_basis":None},{"tax_amount_kgs":"39"}):
+            check(client.post(base+"/revenue-certifications",json={**cert,**change}).status_code,409,
+                  "reject mismatched correction certification")
+        check(client.post(base+"/revenue-certifications",json=cert).status_code,201,"certify exact combined adjustments")
+        check(client.post(base+"/revenue-certifications",json=cert).json()["already_processed"],True,"combined certification replay")
+        decision_url=base+"/proposals/"+str(qid)+"/decisions"
+        check(client.post(decision_url,json={"id":str(uuid.uuid4()),"action":"APPROVE",
+              "reason":"Independent reduced revenue approval"}).status_code,201,"approve combined correction")
+        check(client.post(base+"/proposals/"+str(qid)+"/post",json={"id":str(post_id),
+              "reason":"Post exactly the reduced certified amount"}).status_code,201,"post reduced revenue")
+        async def verify_lines():
+            conn=await asyncpg.connect(parsed.geturl())
+            try:
+                lines=await conn.fetch("""SELECT "accountCode",side,"amountKgs"
+                    FROM owner_accounting_posting_lines WHERE "postingId"=$1 AND "propertyId"=$2""",post_id,p)
+                check(sorted((r["accountCode"],r["side"],int(r["amountKgs"])) for r in lines),
+                      [("1100","DEBIT",550),("2100","CREDIT",40),("4200","CREDIT",510)],"exact net receivable and tax split")
+            finally:
+                await conn.close()
+        asyncio.run(verify_lines())
+        check(client.post(decision_url,json={"id":str(uuid.uuid4()),"action":"REVERSE",
+              "reason":"Reverse synthetic combined correction posting"}).status_code,201,"approve reversal")
+        check(client.post(base+"/postings/"+str(post_id)+"/reverse",json={"id":str(uuid.uuid4()),
+              "reason":"Exact reversal of reduced revenue posting"}).status_code,201,"reverse combined posting")
+        for eid in ids:
+            check(client.post(corr+"/"+str(eid)+"/reverse",json={"id":str(uuid.uuid4()),
+                  "reason":"Reverse evidence after synthetic ledger reversal"}).status_code,201,"reverse reviewed correction")
+        check(client.post("/api/v1/admin/finance/owner/revenue-source-events/"+str(sid)+"/reverse",
+              json={"id":str(uuid.uuid4()),"reason":"Close synthetic combined source fixture"}).status_code,201,"reverse source fixture")
+before_combined=checks
+verify_combined_revenue_reductions()
+print("MARINA_OWNER_COMBINED_REDUCTIONS_PASS",checks-before_combined)
