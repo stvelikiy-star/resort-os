@@ -543,7 +543,7 @@ print("MARINA_OWNER_PERIOD_SQL_GUARDS_PASS",checks-before_period)
 
 # Actual task/folio, independent certificate and exact SQL posting; rolled
 # back after checking deferred constraints. No production connections.
-async def verify_guest_service_ledger(*, mutation_checks=False):
+async def verify_guest_service_ledger(*, mutation_checks=False, refund_checks=False):
     from datetime import timedelta
     conn=await asyncpg.connect(parsed.geturl())
     tx=conn.transaction()
@@ -589,6 +589,39 @@ async def verify_guest_service_ledger(*, mutation_checks=False):
           (id,"propertyId","sourceType","sourceId","serviceDate",action,"faceValueKgs","sourceSnapshot",reason,"createdById")
           VALUES($1,$2,'OTHER_SERVICE',$3,$4,'APPROVE_SOURCE',700,'{}'::jsonb,'Synthetic completed service evidence',$5)""",
           sid,p,tid,day,maker)
+        if refund_checks:
+            # Canonical payment + audit evidence from a synthetic reservation.
+            pay_id,refund_doc,refund_event=uuid.uuid4(),uuid.uuid4(),uuid.uuid4()
+            reference="CI-REFUND-"+str(pay_id)
+            content=b"%PDF-1.4 synthetic refund evidence"
+            digest=hashlib.sha256(content).hexdigest()
+            await conn.execute("""INSERT INTO payments
+                (id,"reservationId","amountKgs",method,status,provider,"paidAt",metadata,"createdAt","updatedAt")
+                VALUES($1,$2,100,'CASH','REFUNDED','MANAGER_MANUAL',now()-interval '1 day',
+                 jsonb_build_object('manual_full_refund_evidence',
+                  jsonb_build_object('reference',$3::text,'amount_kgs',100,
+                    'recorded_by_staff_id',$4::text,'origin','EXTERNAL_ALREADY_COMPLETED',
+                    'funds_sent_by_platform',false)),now(),now())""",pay_id,rid,reference,str(maker))
+            await conn.execute("""INSERT INTO audit_logs
+                (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"afterJson","createdAt")
+                VALUES($1,$2,'STAFF',$3,'CONFIRM_MANUAL_FULL_REFUND','Payment',$4,'PMS_MANUAL_REFUND','SUCCESS',
+                   jsonb_build_object('reservation_id',$5::text,'evidence_reference',$6::text,
+                   'amount_kgs',100,'external_refund_previously_completed',true,'funds_sent_by_platform',false),now())""",
+                uuid.uuid4(),p,str(maker),str(pay_id),str(rid),reference)
+            await conn.execute("""INSERT INTO owner_revenue_evidence_documents
+                (id,"propertyId","documentReference","documentDate","fileName","mediaType",sha256,content,"sizeBytes","uploadedById")
+                VALUES($1,$2,$3,$4,'refund.pdf','application/pdf',$5,$6,$7,$8)""",
+                refund_doc,p,reference,day,digest,content,len(content),maker)
+            await conn.execute("""INSERT INTO owner_revenue_correction_events
+                (id,"propertyId","approvalId",action,kind,component,"amountKgs","documentReference",
+                 "documentDate","documentSha256","evidenceReference",reason,"sourceSnapshot","createdById","evidenceDocumentId")
+                VALUES($1,$2,$3,'RECORD','REFUND','OTHER',100,$4,$5,$6,$4,
+                       'Synthetic full refund cash evidence','{}'::jsonb,$7,$8)""",
+                refund_event,p,sid,reference,day,digest,maker,refund_doc)
+            refund_proof="SELECT owner_revenue_refund_payment_id($1,$2,$3)"
+            check(await conn.fetchval(refund_proof,p,refund_event,reviewer),pay_id,"exact canonical full refund")
+            check(await conn.fetchval(refund_proof,pb,refund_event,reviewer),None,"foreign refund excluded")
+            check(await conn.fetchval(refund_proof,p,refund_event,maker),None,"refund maker cannot independently review")
         await conn.execute("""INSERT INTO owner_accounting_journal_proposals
           (id,"propertyId","sourceType","sourceId","accountingDate","policyVersion",reason,"payloadHash","createdById")
           SELECT $1,"propertyId","sourceType",$2,$3,"policyVersion",
@@ -607,12 +640,19 @@ async def verify_guest_service_ledger(*, mutation_checks=False):
           SELECT $1,"propertyId",$2,"evidenceDocumentId","reviewedById","grossAmountKgs","taxAmountKgs","netRevenueKgs","policyVersion",
                  'Independent other service document review'
           FROM owner_revenue_accounting_certifications WHERE "propertyId"=$3 AND "sourceEventId"=$4""",uuid.uuid4(),sid,p,source)
+        if refund_checks:
+            check(await conn.fetchval("""SELECT "paymentId" FROM owner_revenue_refund_bindings
+                WHERE "propertyId"=$1 AND "correctionEventId"=$2""",p,refund_event),pay_id,"refund uniquely bound")
         await race_post(conn,(sid,qid,did,reviewer))
         await conn.execute("SET CONSTRAINTS ALL IMMEDIATE")
         check(await conn.fetchval("""SELECT l."amountKgs" FROM owner_accounting_posting_lines l
           JOIN owner_accounting_postings po ON po.id=l."postingId" AND po."propertyId"=l."propertyId"
           WHERE po."proposalId"=$1 AND l."accountCode"='4300' AND l.side='CREDIT'""",qid),650,"service net revenue to 4300")
         check(await conn.fetchval("SELECT owner_revenue_has_active_posting($1,$2)",p,sid),True,"guest service posting is active")
+        if refund_checks:
+            check(await conn.fetchval("""SELECT "reductionAmountKgs" FROM owner_revenue_accounting_certifications
+                WHERE "propertyId"=$1 AND "sourceEventId"=$2""",p,sid),0,"cash refund never reduces earned revenue twice")
+            return
         # Separate top-level transactions preserve the existing xmin seal.
         if mutation_checks:
             # Synthetic fixture only, within the outer rolled-back CI transaction.
@@ -647,6 +687,9 @@ before_guest=checks
 asyncio.run(verify_guest_service_ledger())
 asyncio.run(verify_guest_service_ledger(mutation_checks=True))
 print("MARINA_OWNER_GUEST_SERVICE_LEDGER_PASS",checks-before_guest)
+before_refund=checks
+asyncio.run(verify_guest_service_ledger(refund_checks=True))
+print("MARINA_OWNER_CERTIFIED_REFUND_PASS",checks-before_refund)
 
 # One invoice, multiple independently reviewed corrections, one posting.
 # REFUND / PACKAGE_SPLIT are intentionally blocked from revenue recognition

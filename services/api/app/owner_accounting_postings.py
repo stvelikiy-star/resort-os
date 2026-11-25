@@ -471,7 +471,8 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
                   p.id AS posting_id,
                   p."accountingDate" AS posting_date,
                   c.id AS certification_id,
-                  c."grossAmountKgs" AS certified_gross
+                  c."grossAmountKgs" AS certified_gross,
+                  owner_revenue_certificate_current(c) AS certificate_current
            FROM sources e
            LEFT JOIN active_post p ON p."sourceType"='REVENUE_SOURCE' AND p."sourceId"=e.id
            LEFT JOIN owner_revenue_accounting_certifications c
@@ -488,6 +489,7 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
             return False
         matched.add(key)
         return (row["posting_id"] is not None and row["certification_id"] is not None
+                and row["certificate_current"] is True
                 and row["posting_date"]==row["serviceDate"]
                 and row["certified_gross"]==row["faceValueKgs"]==Decimal(str(gross)))
     def observe_night(reservation_id,service_date,gross):
