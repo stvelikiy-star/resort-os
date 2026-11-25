@@ -270,3 +270,17 @@ async def own_investment_projection(request: Request,plan_id: uuid.UUID=Query(..
                 return {"plan_id":str(plan_id),**investment_projection(row["principal"],row["share_bps"],row["bonus_months"],Decimal(monthly_revenue),start_month,elapsed_months)}
             except (ValueError,ArithmeticError):
                 raise HTTPException(422,detail="Invalid forecast scenario") from None
+
+
+@app.get("/v1/partner/me/proposals")
+async def own_partner_proposals(request: Request,principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    if principal.role!="PARTNER":
+        raise HTTPException(403,detail="Partner membership required")
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await conn.execute("SELECT set_config('flex.authorized_subject_id',$1,true)",principal.subject_id)
+            await conn.execute("SET LOCAL ROLE flex_identity_reader")
+            rows=await conn.fetch("""SELECT id,partner_subject_id,hotel_id,revision,hotel_name_snapshot,title,terms_text,state,created_at
+                FROM flex_qa_partner_proposals WHERE partner_subject_id=$1 ORDER BY hotel_id,revision DESC""",principal.subject_id)
+            return {"role":"PARTNER","proposals":[dict(p) for p in rows],"payouts_enabled":False,
+                "actual_paid_kg":None,"outstanding_payable_kg":None}
