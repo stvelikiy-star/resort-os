@@ -1427,3 +1427,22 @@ async def create_investor_plan(payload: InvestorPlanRequest,request: Request,
                 VALUES($1,$2,$3,$4)""",[(row["id"],payload.investor_id,h["id"],h["display_name"]) for h in hotels])
             links=await conn.fetch("SELECT * FROM flex_qa_investor_plan_hotels WHERE plan_id=$1 ORDER BY hotel_id",row["id"])
             return investor_plan_response(row,links)
+
+
+@app.get("/v1/platform/investment-projection")
+async def admin_investment_projection(request: Request,plan_id: uuid.UUID=Query(...),
+    monthly_revenue: str=Query(...,pattern=r"^(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,2})?$"),
+    start_month: date=Query(...),elapsed_months: int=Query(...,ge=0,le=120),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    from .flex_partner_portal import investment_projection
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn,principal)
+            row=await conn.fetchrow("SELECT principal,share_bps,bonus_months FROM flex_qa_investor_plans WHERE id=$1",plan_id)
+            if row is None:
+                raise HTTPException(404,detail="Investment proposal unavailable")
+            try:
+                return {"plan_id":str(plan_id),**investment_projection(row["principal"],row["share_bps"],row["bonus_months"],Decimal(monthly_revenue),start_month,elapsed_months)}
+            except (ValueError,ArithmeticError):
+                raise HTTPException(422,detail="Invalid forecast scenario") from None
