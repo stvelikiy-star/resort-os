@@ -1362,3 +1362,68 @@ async def append_agent_employment(payload: AgentEmploymentRequest,request: Reque
             row=await conn.fetchrow("""INSERT INTO flex_qa_agent_employment_events(agent_id,revision,action,created_by)
                 VALUES($1,$2,$3,$4) RETURNING *""",payload.agent_id,revision+1,payload.action,principal.subject_id)
             return {**dict(row),"payouts_enabled":False}
+
+
+INVESTOR_DRAFT_TIERS={150000:2500,250000:3500,400000:5000}
+
+
+class InvestorPlanRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    investor_id: uuid.UUID
+    expected_revision: int=Field(strict=True,ge=0,le=2147483646)
+    principal_kg: int=Field(strict=True)
+    hotel_ids: list[uuid.UUID]=Field(min_length=1,max_length=50)
+
+
+def investor_plan_response(row,hotels):
+    return {**dict(row),"principal":str(row["principal"]),
+        "hotels":[dict(h) for h in hotels],"payouts_enabled":False,
+        "principal_received_kg":None,"principal_repaid_kg":None,"bonus_end":None}
+
+
+@app.get("/v1/platform/investor-plans")
+async def investor_plans(request: Request,principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
+            await as_writer(conn,principal)
+            investors=await conn.fetch("SELECT id,platform_subject_id,status FROM flex_investors ORDER BY platform_subject_id,id")
+            hotels=await conn.fetch("SELECT id,display_name,status FROM flex_hotels WHERE status IN ('PENDING','ACTIVE') ORDER BY display_name,id")
+            plans=await conn.fetch("SELECT * FROM flex_qa_investor_plans ORDER BY investor_id,revision DESC")
+            links=await conn.fetch("SELECT * FROM flex_qa_investor_plan_hotels ORDER BY plan_id,hotel_id")
+            by_plan={}
+            for h in links:
+                by_plan.setdefault(h["plan_id"],[]).append(h)
+            return {"investors":[dict(i) for i in investors],"hotels":[dict(h) for h in hotels],
+                "plans":[investor_plan_response(p,by_plan.get(p["id"],[])) for p in plans],"payouts_enabled":False}
+
+
+@app.post("/v1/platform/investor-plans",status_code=201)
+async def create_investor_plan(payload: InvestorPlanRequest,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    if payload.principal_kg not in INVESTOR_DRAFT_TIERS or len(set(payload.hotel_ids))!=len(payload.hotel_ids):
+        raise HTTPException(422,detail="Choose approved investment tier and distinct hotels")
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await conn.fetchval("SELECT pg_advisory_xact_lock(hashtextextended($1,0))","FLEX_INVESTOR_PLAN_"+str(payload.investor_id))
+            last=await conn.fetchrow("SELECT * FROM flex_qa_investor_plans WHERE investor_id=$1 ORDER BY revision DESC LIMIT 1",payload.investor_id)
+            revision=last["revision"] if last else 0
+            if last and revision==payload.expected_revision+1 and last["principal"]==payload.principal_kg:
+                old=await conn.fetch("SELECT * FROM flex_qa_investor_plan_hotels WHERE plan_id=$1 ORDER BY hotel_id",last["id"])
+                if {h["hotel_id"] for h in old}==set(payload.hotel_ids):
+                    return investor_plan_response(last,old)
+            if revision!=payload.expected_revision:
+                raise HTTPException(409,detail="Investor plan revision changed")
+            if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_investors WHERE id=$1 AND status='ACTIVE')",payload.investor_id):
+                raise HTTPException(404,detail="Active investor unavailable")
+            hotels=await conn.fetch("SELECT id,display_name FROM flex_hotels WHERE id=ANY($1::uuid[]) AND status IN ('PENDING','ACTIVE') ORDER BY id",payload.hotel_ids)
+            if len(hotels)!=len(payload.hotel_ids):
+                raise HTTPException(404,detail="Commercial hotel unavailable")
+            row=await conn.fetchrow("""INSERT INTO flex_qa_investor_plans(investor_id,revision,principal,share_bps,created_by)
+                VALUES($1,$2,$3,$4,$5) RETURNING *""",payload.investor_id,revision+1,Decimal(payload.principal_kg),INVESTOR_DRAFT_TIERS[payload.principal_kg],principal.subject_id)
+            await conn.executemany("""INSERT INTO flex_qa_investor_plan_hotels(plan_id,investor_id,hotel_id,hotel_name_snapshot)
+                VALUES($1,$2,$3,$4)""",[(row["id"],payload.investor_id,h["id"],h["display_name"]) for h in hotels])
+            links=await conn.fetch("SELECT * FROM flex_qa_investor_plan_hotels WHERE plan_id=$1 ORDER BY hotel_id",row["id"])
+            return investor_plan_response(row,links)
