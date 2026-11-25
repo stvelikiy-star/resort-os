@@ -296,7 +296,7 @@ const catalogSkuAction=/^\/api\/actions\/catalog\/skus$/;
 const catalogPriceAction=/^\/api\/actions\/catalog\/skus\/([A-Z][A-Z0-9_]{1,79})\/prices$/;
 const configurationDraftAction=/^\/api\/actions\/subscription-drafts$/;
 const tariffPackageAction=/^\/api\/actions\/tariff-packages$/;
-const customerActions=new Map([['/api/actions/customer-profile','customer-profile'],['/api/actions/agreement-drafts','agreement-drafts'],['/api/actions/invoice-previews','invoice-previews'],['/api/actions/agreement-internal-approvals','agreement-internal-approvals'],['/api/actions/customer-agreement-acceptances','customer-agreement-acceptances'],['/api/actions/finance-simulation','finance-simulation'],['/api/actions/synthetic-cash-journal','synthetic-cash-journal'],['/api/actions/agent-assignments','agent-assignments'],['/api/actions/agent-employment','agent-employment'],['/api/actions/investor-plans','investor-plans']]);
+const customerActions=new Map([['/api/actions/customer-profile','customer-profile'],['/api/actions/agreement-drafts','agreement-drafts'],['/api/actions/invoice-previews','invoice-previews'],['/api/actions/agreement-internal-approvals','agreement-internal-approvals'],['/api/actions/customer-agreement-acceptances','customer-agreement-acceptances'],['/api/actions/finance-simulation','finance-simulation'],['/api/actions/synthetic-cash-journal','synthetic-cash-journal'],['/api/actions/agent-assignments','agent-assignments'],['/api/actions/agent-employment','agent-employment'],['/api/actions/investor-plans','investor-plans'],['/api/actions/partner-proposals','partner-proposals']]);
 const installationTrialPath='/api/actions/installation-trial';
 const commercialPolicyPath='/api/actions/commercial-policy';
 const tariffTemplatePath='/api/actions/tariff-templates';
@@ -307,6 +307,7 @@ function validateCatalogAdminAction(kind,body) {
   if(!body || typeof body!=='object'||Array.isArray(body))return null;
   const keys=Object.keys(body);
   const exact=allowed=>keys.length===allowed.length && allowed.every(k=>keys.includes(k));
+  if(kind==='partner-proposals')return exact(['partner_subject_id','hotel_id','expected_revision','title','terms_text'])&&typeof body.partner_subject_id==='string'&&body.partner_subject_id.length>=2&&body.partner_subject_id.length<=180&&typeof body.hotel_id==='string'&&flexUuidRe.test(body.hotel_id)&&Number.isInteger(body.expected_revision)&&body.expected_revision>=0&&body.expected_revision<=2147483646&&typeof body.title==='string'&&body.title.trim().length>=2&&body.title.length<=120&&typeof body.terms_text==='string'&&body.terms_text.trim().length>=2&&body.terms_text.length<=2000?{...body,title:body.title.trim(),terms_text:body.terms_text.trim()}:null;
   if(kind==='investor-plans')return exact(['investor_id','expected_revision','principal_kg','hotel_ids'])&&typeof body.investor_id==='string'&&flexUuidRe.test(body.investor_id)&&Number.isInteger(body.expected_revision)&&body.expected_revision>=0&&body.expected_revision<=2147483646&&[150000,250000,400000].includes(body.principal_kg)&&Array.isArray(body.hotel_ids)&&body.hotel_ids.length>=1&&body.hotel_ids.length<=50&&new Set(body.hotel_ids).size===body.hotel_ids.length&&body.hotel_ids.every(v=>typeof v==='string'&&flexUuidRe.test(v))?body:null;
   if(kind==='agent-employment')return exact(['agent_id','expected_revision','action'])&&typeof body.agent_id==='string'&&flexUuidRe.test(body.agent_id)&&Number.isInteger(body.expected_revision)&&body.expected_revision>=0&&body.expected_revision<=2147483646&&['START','STOP'].includes(body.action)?body:null;
   if(kind==='agent-assignments')return exact(['hotel_id','agent_id','expected_revision','action'])&&[body.hotel_id,body.agent_id].every(v=>typeof v==='string'&&flexUuidRe.test(v))&&Number.isInteger(body.expected_revision)&&body.expected_revision>=0&&body.expected_revision<=2147483646&&['ASSIGN','RELEASE'].includes(body.action)?body:null;
@@ -434,6 +435,7 @@ async function catalogAdminPost(req,res,url) {
   try{result=JSON.parse(response)}catch{return json(res,502,{error:'UPSTREAM_INVALID_JSON'})}
   if(!upstream.ok)return json(res,upstream.status,{error:'FLEX_QA_ADMIN_REJECTED',detail:
     typeof result.detail==='string'?result.detail:'Backend rejected the request'});
+  if(kind==='partner-proposals' && !(result.partner_subject_id===payload.partner_subject_id&&result.hotel_id===payload.hotel_id&&result.revision===payload.expected_revision+1&&result.title===payload.title&&result.terms_text===payload.terms_text&&result.state==='DRAFT'&&result.payouts_enabled===false))return json(res,502,{error:'UNEXPECTED_PARTNER_PROPOSAL'});
   if(kind==='investor-plans' && !(result.investor_id===payload.investor_id&&result.revision===payload.expected_revision+1&&Number(result.principal)===payload.principal_kg&&result.state==='DRAFT'&&result.payouts_enabled===false&&result.principal_received_kg===null&&result.principal_repaid_kg===null&&result.bonus_end===null&&Array.isArray(result.hotels)&&result.hotels.length===payload.hotel_ids.length&&payload.hotel_ids.every(id=>result.hotels.some(h=>h.hotel_id===id))))return json(res,502,{error:'UNEXPECTED_INVESTOR_PLAN'});
   if(kind==='agent-employment' && !(result.agent_id===payload.agent_id&&result.revision===payload.expected_revision+1&&result.action===payload.action&&result.payouts_enabled===false))return json(res,502,{error:'UNEXPECTED_EMPLOYMENT_STATE'});
   if(kind==='agent-assignments' && !(result.hotel_id===payload.hotel_id&&result.agent_id===payload.agent_id&&result.revision===payload.expected_revision+1&&result.action===payload.action&&result.payments_enabled===false&&result.payouts_enabled===false))return json(res,502,{error:'UNEXPECTED_ASSIGNMENT_STATE'});
@@ -459,6 +461,8 @@ async function catalogAdminPost(req,res,url) {
 }
 
 function routeAllowed(path, search) {
+  if(path==='/v1/platform/partner-proposals')return !search.size?'catalog_admin':null;
+  if(path==='/v1/partner/me/proposals')return !search.size?'partner':null;
   if(['/v1/platform/investment-projection','/v1/partner/me/investment-projection'].includes(path)){
     const valid=search.size===4&&flexUuidRe.test(search.get('plan_id')||'')&&amountPattern.test(search.get('monthly_revenue')||'')&&/^20[0-9]{2}-[0-9]{2}-01$/.test(search.get('start_month')||'')&&/^(0|[1-9][0-9]{0,2})$/.test(search.get('elapsed_months')||'')&&Number(search.get('elapsed_months'))<=120;
     return valid?(path.startsWith('/v1/platform/')?'catalog_admin':'partner'):null;
