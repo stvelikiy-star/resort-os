@@ -76,7 +76,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/owner_accrual_readiness.py": "a6484821beaae10aa3f3de3bbf5011e38389872f",
     "scripts/test_owner_served_kitchen_cost_trace.py": "c30f2859bd5769228c7cbcd1a1c6159797369abf",
     "scripts/marina_shared_served_cost_trace_ci.py": "0d8a608004d04fd6b4ad01f548da34fc59627385",
-    "apps/admin/components/AdminExperienceRuntime.tsx": "aeecbcd54bd3479ba80e541e31f884cf7ba2870d",
+    "apps/admin/components/AdminExperienceRuntime.tsx": "179f09acba2a201ddff2a07ec8f6e6d9778ed67b",
     "services/api/app/hotel_finance.py": "e8f78bcc467b87702f5d251917405ed0da838468",
     "apps/mobile/scripts/verify-backend-contract.mjs": "7471f286c2e700c0670c038e0c0c465238c71b07",
     "apps/mobile/app/finance.tsx": "4434075da2ed4f891d7d238d606e03783dd9b1dc",
