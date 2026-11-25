@@ -96,11 +96,18 @@ try {
     [randomUUID(),'flex-first:'+createHash('sha256').update(token).digest('hex'),email]);
   if(!await redeemFirstInvite(db,token,process.env.QA_PASSWORD,hashPassword))throw Error('QA invitation failed');
   await db.query("INSERT INTO flex_private.flex_platform_memberships(subject_id,role,active) SELECT id,'SUPER_ADMIN',true FROM flex_auth.\"user\" WHERE email=$1",[email]);
-  const ownerToken=randomBytes(32).toString('base64url');
+  // First-invite redemption is intentionally restricted to the very first user.
+  // Provision the second account only in this disposable CI fixture; do not
+  // loosen the real first-invite gate or fabricate its authenticated session.
+  if(process.env.GITHUB_ACTIONS!=='true'||process.env.PGDATABASE!=='flex_qa'||process.env.PGHOST!=='127.0.0.1'||process.env.PGUSER!=='flex_ci')throw Error('Unsafe owner fixture target');
   const ownerEmail=process.env.QA_OWNER_EMAIL;
-  await db.query('INSERT INTO verification(id,identifier,value,"expiresAt","createdAt","updatedAt") VALUES($1,$2,$3,now()+interval \'10 minutes\',now(),now())',
-    [randomUUID(),'flex-first:'+createHash('sha256').update(ownerToken).digest('hex'),ownerEmail]);
-  if(!await redeemFirstInvite(db,ownerToken,process.env.QA_OWNER_PASSWORD,hashPassword))throw Error('QA owner invitation failed');
+  const ownerId=randomUUID(),ownerHash=await hashPassword(process.env.QA_OWNER_PASSWORD);
+  await db.query('BEGIN');
+  try {
+    await db.query('INSERT INTO flex_auth."user"(id,name,email,"emailVerified","twoFactorEnabled","updatedAt") VALUES ($1,$2,$2,true,false,now())',[ownerId,ownerEmail]);
+    await db.query(`INSERT INTO flex_auth.account(id,"accountId","providerId","userId",password,"updatedAt") VALUES ($1,$2,'credential',$2,$3,now())`,[randomUUID(),ownerId,ownerHash]);
+    await db.query('COMMIT');
+  } catch(error) { await db.query('ROLLBACK'); throw error; }
   await db.query("INSERT INTO flex_private.flex_platform_memberships(subject_id,role,active) SELECT id,'HOTEL_OWNER',true FROM flex_auth.\"user\" WHERE email=$1",[ownerEmail]);
   await db.query("INSERT INTO flex_private.flex_platform_hotel_grants(subject_id,hotel_id,granted_by) SELECT id,'00000000-0000-0000-0000-00000000000a','fixture' FROM flex_auth.\"user\" WHERE email=$1",[ownerEmail]);
 } finally { await db.end(); }
