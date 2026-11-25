@@ -976,7 +976,30 @@ async function catalog(){
  '<section class="panel">'+(items.length?table([t('sku'),t('features'),t('price'),t('status')],items.map(i=>'<tr><td>'+safe(i.sku)+'</td><td>'+safe(i.name)+'</td><td>'+money(i.monthly_list_price,i.currency)+'</td><td><span class="chip">v'+safe(i.price_version)+'</span></td></tr>')):empty(t('noCatalog')))+'</section>';
 }
 function earningsSummary(o){return (o.groups?.length?table([t('groups'),t('gross'),t('refunds'),t('net')],o.groups.map(g=>'<tr><td>'+safe(g.role)+'</td><td>'+money(g.accrued_gross_kg)+'</td><td>'+money(g.reversed_kg)+'</td><td>'+money(g.net_accrued_kg)+'</td></tr>')):empty(t('noPartners')))+info('QA_ONLY_NOT_BANK_RECONCILED','info')}
-async function obligations(){const r=await api('/v1/platform/partner-earnings-summary?period='+state.period);return heading(t('obligations'),t('helpQa'))+toolbar()+periodButtons()+'<section class="panel spacing-top">'+earningsSummary(r)+'</section>'+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await agentEmploymentPanel().catch(e=>info(e.message,'error')):'')+info(t('notImplemented'))}
+function investorPlanLabels(){
+ return ({ru:{title:'Инвестиционные предложения',create:'Сохранить новую версию',capital:'Сумма вклада по предложению',share:'Доля подписочной выручки',bonus:'Дополнительный срок после возврата (мес.)',hotels:'Гостиницы по предложению',note:'Черновик условий, не подписанный договор. Проценты только от подписочной выручки закреплённых гостиниц. Получение вклада и возврат средств не подтверждены.',received:'Получение вклада',repaid:'Возврат вклада',unknown:'Не подтверждено',choose:'Выберите гостиницы',draft:'Черновик'},kg:{title:'Инвестициялык сунуштар',create:'Жаңы версияны сактоо',capital:'Сунуштагы салымдын суммасы',share:'Жазылуу кирешесинин үлүшү',bonus:'Салым кайтарылгандан кийинки кошумча мөөнөт (ай)',hotels:'Сунуштагы мейманканалар',note:'Бул шарттардын долбоору, кол коюлган келишим эмес. Үлүш бекитилген мейманканалардын жазылуу кирешесинен гана. Салым жана кайтарым ырасталган жок.',received:'Салымдын түшүшү',repaid:'Салымды кайтаруу',unknown:'Ырасталган жок',choose:'Мейманканаларды тандаңыз',draft:'Долбоор'},en:{title:'Investment proposals',create:'Save new version',capital:'Proposed principal',share:'Share of subscription revenue',bonus:'Additional term after repayment (months)',hotels:'Hotels in proposal',note:'Draft terms, not a signed contract. Share applies only to subscription revenue from assigned hotels. Principal receipt and repayment are unverified.',received:'Principal received',repaid:'Principal repaid',unknown:'Not verified',choose:'Select hotels',draft:'Draft'}})[state.lang];
+}
+function investorPlanTable(plans,investors=[]){
+ const l=investorPlanLabels();
+ return plans.length?table([t('investor'),t('skuVersion'),l.capital,l.share,l.bonus,l.hotels,t('status')],plans.map(p=>'<tr><td>'+safe(investors.find(i=>i.id===p.investor_id)?.platform_subject_id||p.investor_id)+'</td><td>'+safe(p.revision)+'</td><td>'+money(p.principal,'KGS')+'</td><td>'+safe(p.share_bps/100)+'%</td><td>'+safe(p.bonus_months)+'</td><td>'+safe((p.hotels||[]).map(h=>h.hotel_name_snapshot).join(', '))+'</td><td>'+safe(l.draft)+'</td></tr>')):empty(t('noData'));
+}
+async function investorPlanAdminPanel(){
+ const l=investorPlanLabels(),r=await api('/v1/platform/investor-plans'),active=r.investors.filter(i=>i.status==='ACTIVE');
+ const form=active.length&&r.hotels.length?'<form id="investor-plan-form" class="admin-form"><label>'+safe(t('investor'))+'<select name="investor_id">'+active.map(i=>'<option value="'+safe(i.id)+'" data-revision="'+safe(Math.max(0,...r.plans.filter(p=>p.investor_id===i.id).map(p=>p.revision)))+'">'+safe(i.platform_subject_id)+'</option>').join('')+'</select></label><label>'+safe(l.capital)+'<select name="principal_kg">'+[[150000,25],[250000,35],[400000,50]].map(([v,share])=>'<option value="'+v+'">'+money(v,'KGS')+' · '+share+'%</option>').join('')+'</select></label><fieldset><legend>'+safe(l.hotels)+'</legend>'+r.hotels.map(h=>'<label class="check-row"><input type="checkbox" name="hotel_ids" value="'+safe(h.id)+'">'+safe(h.display_name)+'</label>').join('')+'</fieldset><button type="submit" class="primary">'+safe(l.create)+'</button><div role="status"></div></form>':'';
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+form+investorPlanTable(r.plans,r.investors)+'</section>';
+}
+async function saveInvestorPlan(form){
+ const l=investorPlanLabels(),d=new FormData(form),b=form.querySelector('button'),status=form.querySelector('[role=status]'),hotel_ids=d.getAll('hotel_ids');
+ if(!hotel_ids.length||hotel_ids.length>50){status.textContent=l.choose;return;}
+ b.disabled=true;
+ try{await saveQaCatalogAction('investor-plans',{investor_id:String(d.get('investor_id')),expected_revision:Number(form.elements.investor_id.selectedOptions[0].dataset.revision),principal_kg:Number(d.get('principal_kg')),hotel_ids});await render();}catch(e){status.textContent=e.message;b.disabled=false;}
+}
+function ownInvestorPlans(r){
+ if(r.role!=='INVESTOR')return '';
+ const l=investorPlanLabels();
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+investorPlanTable(r.investment_plans||[])+'<div class="grid two">'+kv(l.received,l.unknown)+kv(l.repaid,l.unknown)+'</div></section>';
+}
+async function obligations(){const r=await api('/v1/platform/partner-earnings-summary?period='+state.period);return heading(t('obligations'),t('helpQa'))+toolbar()+periodButtons()+'<section class="panel spacing-top">'+earningsSummary(r)+'</section>'+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await agentEmploymentPanel().catch(e=>info(e.message,'error'))+await investorPlanAdminPanel().catch(e=>info(e.message,'error')):'')+info(t('notImplemented'))}
 function participantDetails(r){
  const l=({ru:{hotels:'Закреплённые гостиницы',modules:'Закреплённые модули',contracts:'Версии инвестиционных договоров',capital:'Вклад по договору',share:'Доля (%)',history:'История начислений',date:'Дата',accrual:'Начисление',reversal:'Сторно',more:'Показаны последние 100 операций за период.',unverified:'Фактические выплаты и остаток обязательств пока не подтверждаются банковскими данными.'},kg:{hotels:'Бекитилген мейманканалар',modules:'Бекитилген модулдар',contracts:'Инвестициялык келишимдердин версиялары',capital:'Келишим боюнча салым',share:'Үлүш (%)',history:'Эсептөөлөрдүн тарыхы',date:'Күн',accrual:'Эсептөө',reversal:'Жокко чыгаруу',more:'Мезгилдин акыркы 100 операциясы көрсөтүлдү.',unverified:'Чыныгы төлөмдөр жана милдеттенмелер банк маалыматы менен ырастала элек.'},en:{hotels:'Assigned hotels',modules:'Attributed modules',contracts:'Investment contract versions',capital:'Contract principal',share:'Share (%)',history:'Earnings history',date:'Date',accrual:'Accrual',reversal:'Reversal',more:'Latest 100 entries in the period.',unverified:'Actual payouts and outstanding obligations are not yet bank-verified.'}})[state.lang];
  const h=r.assigned_hotels||[],c=r.contracts||[],e=r.history||[];
@@ -988,7 +1011,7 @@ async function earnings(){
  return heading(state.me.role==='INVESTOR'?t('investor'):t('agent'),t('helpQa'))+toolbar()+periodButtons()+'<div class="grid spacing-top">'+
  metric(t('gross'),money(r.accrued_gross_kg),'cyan-text')+metric(t('refunds'),money(r.reversed_kg))+
  metric(t('net'),money(r.net_accrued_kg),'gold-text')+metric(t('paid'),money(r.actual_paid_kg))+'</div>'+
- '<section class="panel"><h2>'+safe(t('earnings'))+'</h2><div class="grid two">'+kv(t('events'),r.events)+kv(t('role'),r.role)+'</div></section>'+agentTermsPanel(r)+participantDetails(r)+info(t('notImplemented'))+info(safe(r.data_provenance||'QA_ONLY'),'info');
+ '<section class="panel"><h2>'+safe(t('earnings'))+'</h2><div class="grid two">'+kv(t('events'),r.events)+kv(t('role'),r.role)+'</div></section>'+agentTermsPanel(r)+ownInvestorPlans(r)+participantDetails(r)+info(t('notImplemented'))+info(safe(r.data_provenance||'QA_ONLY'),'info');
 }
 async function subscription(){
  const hotels=state.me?.hotels||[];
@@ -1075,6 +1098,7 @@ async function submitCommercialPrice(form){
  catch(err){status.textContent=err.message;button.disabled=false;}
 }
 main.addEventListener('submit',e=>{
+ if(e.target.id==='investor-plan-form'){e.preventDefault();saveInvestorPlan(e.target);return;}
  if(e.target.id==='agent-forecast-form'){e.preventDefault();calculateAgentForecast(e.target);return;}
  if(e.target.classList.contains('agent-employment-form')){e.preventDefault();saveAgentEmployment(e.target);return;}
  if(e.target.id==='agent-assignment-form'){e.preventDefault();saveAgentAssignment(e.target);return;}
