@@ -276,14 +276,23 @@ def run():
         owner_email=os.environ["QA_OWNER_EMAIL"]
         owner_password=os.environ["QA_OWNER_PASSWORD"]
         owner_secret=enroll(browser,owner_email,owner_password)
+        # Better Auth shares a database-backed 60-second rate window on the
+        # local runner IP. Enrollment and the second fresh login must not
+        # consume each other's allowance. Keep the production limiter intact.
+        time.sleep(65)
         owner_context=browser.new_context()
         owner=owner_context.new_page()
         owner.goto(ORIGIN)
         signin=owner.locator("#flex-identity-signin")
         signin.locator('[name="email"]').fill(owner_email)
         signin.locator('[name="password"]').fill(owner_password)
-        signin.locator('button[type="submit"]').click()
+        with owner.expect_response(ORIGIN+"/api/identity/sign-in/email") as signed_in:
+            signin.locator('button[type="submit"]').click()
+        reply=signed_in.value
+        assert reply.status==200,("owner sign-in HTTP",reply.status)
+        assert reply.json().get("twoFactorRedirect") is True, "Owner fresh password login did not request TOTP"
         challenge=owner.locator("#flex-identity-totp")
+        expect(challenge).to_be_visible(timeout=15000)
         challenge.locator('[name="code"]').fill(totp(owner_secret))
         with owner.expect_response(ORIGIN+"/api/identity/two-factor/verify-totp") as verified:
             challenge.locator('button[type="submit"]').click()
