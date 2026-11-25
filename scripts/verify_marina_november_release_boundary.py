@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "3201e11840ec35a25f660b81627c2447ff244690",
+    "scripts/marina_rc3_additive_gate.py": "eb7e1dcd8b3f5c4a3b805d88a6c0bcaf42907a29",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -62,9 +62,12 @@ APPROVED_P0_BLOBS = {
     # and test-only workflow. No production shared-auth promotion.
     "scripts/marina_shared_owner_finance_p0_ci.py": "71cabedce521c0019a3fd900d075830d51891a13",
     # Full refund can only be recorded after external evidence; nothing is sent.
-    "services/api/app/reception_reservations.py": "5ed3c98a334c523e629507ea81c2f55ac51881ea",
-    "services/api/app/manager_dashboard.py": "be33c7e0471bb668987bfb683bf3af052387dfa6",
-    "services/api/app/reservation_payments.py": "25119a6f2efb2207e73ee3ab66fe92f754a6cc49",
+    "services/api/app/reception_reservations.py": "1d03758e43b49b61b5424d092d20470e3d45b78c",
+    "services/api/app/manager_dashboard.py": "dff1947448f139502ed28ed21024054a7542eea3",
+    "services/api/app/payment_refund_read_model.py": "74327ded78a70f4834b097b40effc34b5ef554ed",
+    "scripts/payment_idempotency_helper_test.py": "83bda70f156a44451865302b1f618f799598b3b2",
+    ".github/workflows/payment-idempotency-ci.yml": "2eb5c186bbad8654dd61da429fe1491366ad6efd",
+    "services/api/app/reservation_payments.py": "b1102d8ddcf22479ed53b1d31022234885b90772",
     "services/api/app/pms_reservation_create.py": "f068836d615409443f1742fc492f27886f9d6aee",
     "scripts/marina_shared_manual_refund_evidence_ci.py": "f52d7947e64e935497617834e17535def9a59042",
     "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
@@ -75,8 +78,8 @@ APPROVED_P0_BLOBS = {
     "scripts/test_owner_served_kitchen_cost_trace.py": "c30f2859bd5769228c7cbcd1a1c6159797369abf",
     "scripts/marina_shared_served_cost_trace_ci.py": "0d8a608004d04fd6b4ad01f548da34fc59627385",
     "apps/admin/components/AdminExperienceRuntime.tsx": "aeecbcd54bd3479ba80e541e31f884cf7ba2870d",
-    "services/api/app/hotel_finance.py": "818ebdd386e7ec34e8c0fdcaecf59aaf5125d4bf",
-    "apps/mobile/scripts/verify-backend-contract.mjs": "73d08efd7c99adee25f8b1ab0ad36b67e1ed6c11",
+    "services/api/app/hotel_finance.py": "e8f78bcc467b87702f5d251917405ed0da838468",
+    "apps/mobile/scripts/verify-backend-contract.mjs": "7471f286c2e700c0670c038e0c0c465238c71b07",
     "apps/mobile/app/finance.tsx": "4434075da2ed4f891d7d238d606e03783dd9b1dc",
     "apps/mobile/src/api/liveModules.ts": "3b953a3a9caafb85397fe2ea5d8425bc737e9b86",
     "apps/mobile/src/api/contractValidation.ts": "bb4b0325bac08c6a362181e6e58a4306fd4d7dfc",

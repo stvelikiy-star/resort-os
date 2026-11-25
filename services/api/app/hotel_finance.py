@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .auth import require_roles, trusted_property_id
+from .payment_refund_read_model import refund_compatible_sql
 from .owner_kitchen_reconciliation import owner_inventory_reconciliation
 from .owner_accrual_readiness import accrual_source_snapshot
 from .owner_accounting_postings import posting_enabled, period_coverage
@@ -241,7 +242,7 @@ async def finance_summary(
         )
 
         active_reservations = await conn.fetchrow(
-            '''
+            await refund_compatible_sql(conn, '''
             WITH received AS (
               SELECT "reservationId",COALESCE(SUM("remainingReceivedKgs"),0)::bigint AS received_kgs
               FROM owner_reservation_payment_balances
@@ -261,7 +262,7 @@ async def finance_summary(
             LEFT JOIN received x ON x."reservationId"=r.id
             LEFT JOIN extras e ON e."reservationId"=r.id
             WHERE r."propertyId"=$1 AND r.status IN ('GUARANTEED','CHECKED_IN')
-            ''',
+            '''),
             pid,
         )
 
@@ -285,7 +286,7 @@ async def finance_summary(
         )
 
         refund_snapshot = await conn.fetchrow(
-            '''
+            await refund_compatible_sql(conn, '''
             SELECT COALESCE(SUM(CASE WHEN p.status='REFUNDED' THEN p."amountKgs" ELSE COALESCE(b."refundedKgs",0) END),0)::bigint AS amount_kgs,
                    COUNT(*)::int AS payment_count
             FROM payments p
@@ -293,22 +294,22 @@ async def finance_summary(
             LEFT JOIN reservations r ON r.id=p."reservationId"
             LEFT JOIN owner_reservation_payment_balances b ON b."paymentId"=p.id
             WHERE COALESCE(rr."propertyId",r."propertyId")=$1 AND (p.status='REFUNDED' OR b."refundedKgs">0)
-            ''',
+            '''),
             pid,
         )
 
         partial_refund_period = await conn.fetchrow(
-            """SELECT COALESCE(sum("amountKgs"),0)::bigint AS amount_kgs,
+            await refund_compatible_sql(conn, """SELECT COALESCE(sum("amountKgs"),0)::bigint AS amount_kgs,
                       count(*)::int AS event_count
                FROM owner_partial_refund_events WHERE "propertyId"=$1
                  AND "refundedAt">=($2::timestamp AT TIME ZONE 'UTC')
-                 AND "refundedAt"<($3::timestamp AT TIME ZONE 'UTC')""",
+                 AND "refundedAt"<($3::timestamp AT TIME ZONE 'UTC')"""),
             pid,from_ts,to_ts)
 
         # IMPORTANT: no SQL row limit is applied before receivable/exception calculation.
         # Operational snapshots must be complete even after years of reservation history.
         ledger_rows = await conn.fetch(
-            '''
+            await refund_compatible_sql(conn, '''
             WITH payment_stats AS (
               SELECT p."reservationId",
                      COALESCE(SUM(b."remainingReceivedKgs"),0)::bigint AS received_kgs,
@@ -354,7 +355,7 @@ async def finance_summary(
             WHERE r."propertyId"=$1
               AND r.status IN ('GUARANTEED','CHECKED_IN','CHECKED_OUT','CANCELLED')
             ORDER BY r."checkOut" DESC,r."createdAt" DESC
-            ''',
+            '''),
             pid,
         )
         reservation_ledger = [reservation_ledger_item(row) for row in ledger_rows]

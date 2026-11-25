@@ -15,14 +15,15 @@ import { resolve } from 'node:path';
  */
 const src = resolve(process.cwd(), '../../services/api/app');
 const pinned = {
+  'payment_refund_read_model.py': '74327ded78a70f4834b097b40effc34b5ef554ed',
   'auth.py': '59bed47d5f1de5ec98457e6849ea541356cc1929',
   'operations.py': '888be1aad873765a49eb0c902c99dfbb38e3d8e2',
   'operations_assignment.py': '6571408a94257d803ddc75b4a66c1b55d792a3fe',
   'staff_task_reports.py': '3a874ddc986fd91a5537540ee808d192c4fd6144',
   'staff_control.py': '5f090f4a318458e3a67f2ee59dd302cbc31b43bc',
   'main.py': '2a01b9898fc3e6e4d2a680f31691ba7e00a768ed',
-  'manager_dashboard.py': 'be33c7e0471bb668987bfb683bf3af052387dfa6',
-  'reception_reservations.py': '5ed3c98a334c523e629507ea81c2f55ac51881ea',
+  'manager_dashboard.py': 'dff1947448f139502ed28ed21024054a7542eea3',
+  'reception_reservations.py': '1d03758e43b49b61b5424d092d20470e3d45b78c',
   'pms_reservation_create.py': 'f068836d615409443f1742fc492f27886f9d6aee',
   'inbox.py': 'e860f157adfb7ec9e846a79f9fc8a6e64b1e6e7f',
   'owner_cash_reconciliation.py': 'd35423df92c85d30c2a0023e76e01b373d6c9016',
@@ -34,7 +35,7 @@ const pinned = {
   'owner_revenue_corrections.py': '10f52e7f916598620c73fa2d3a61f08bed435aaa',
   'owner_revenue_evidence.py': 'ed3c4aedee09802adfc36e696174a0055113fe73',
   'owner_delivered_revenue.py': '1e8881079cd4d4a64f96aaabbb51c1d21e59a035',
-  'hotel_finance.py': '818ebdd386e7ec34e8c0fdcaecf59aaf5125d4bf',
+  'hotel_finance.py': 'e8f78bcc467b87702f5d251917405ed0da838468',
   'kitchen_procurement.py': '2718f40a9ee512f40dbd5cbe648f4a525f5b6b25',
   'kitchen_stock.py': '76002784ca9ba6a9341159426e4e04ab1b182168',
   'kitchen_menu_management.py': '3d8f8947e3a26cd40f77f718887c5f674fb4038c',
