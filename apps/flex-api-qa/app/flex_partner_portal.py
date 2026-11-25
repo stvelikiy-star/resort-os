@@ -6,6 +6,7 @@ Not mounted in the existing hotel PMS or production FLEX API.
 """
 from __future__ import annotations
 
+import uuid
 from calendar import monthrange
 from contextlib import asynccontextmanager
 from datetime import datetime, time, timedelta, timezone
@@ -98,7 +99,7 @@ async def own_earnings(
         raise HTTPException(403, detail="Only verified agent or investor")
     start, end = _window(period)
     async with request.app.state.flex_pool.acquire() as conn:
-        async with conn.transaction(readonly=True):
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
             await _switch(conn, role, scope, party_id)
             row = await conn.fetchrow(
                 "SELECT "
@@ -109,6 +110,25 @@ async def own_earnings(
                 f"WHERE {column}=$1 AND recognized_at>=$2 AND recognized_at<=$3",
                 __import__("uuid").UUID(party_id), start, end,
             )
+            party_uuid=uuid.UUID(party_id)
+            history=await conn.fetch(
+                f"""SELECT e.id,e.entry_type,e.amount,e.recognized_at,r.hotel_id,r.sku
+                    FROM flex_partner_earnings_entries e
+                    JOIN flex_partner_rule_versions r ON r.id=e.rule_version_id
+                    WHERE e.{column}=$1 AND e.recognized_at>=$2 AND e.recognized_at<=$3
+                    ORDER BY e.recognized_at DESC,e.id DESC LIMIT 100""",
+                party_uuid,start,end)
+            if principal.role=="SALES_AGENT":
+                details=await conn.fetch("""SELECT h.id AS hotel_id,h.display_name,h.status,
+                    min(a.attributed_at) AS attributed_at,count(DISTINCT a.sku) AS attributed_modules
+                    FROM flex_agent_attributions a JOIN flex_hotels h ON h.id=a.hotel_id
+                    WHERE a.agent_id=$1 GROUP BY h.id,h.display_name,h.status ORDER BY h.display_name,h.id""",party_uuid)
+                contracts=[]
+            else:
+                details=[]
+                contracts=await conn.fetch("""SELECT id,contract_key,version,principal,share_bps,effective_from
+                    FROM flex_investor_contract_versions WHERE investor_id=$1
+                    ORDER BY contract_key,version DESC""",party_uuid)
             gross, refunded = row["gross"], row["refunded"]
             return {
                 "role":principal.role,
@@ -119,6 +139,11 @@ async def own_earnings(
                 "actual_paid_kg":None,
                 "payout_status":"NOT_IMPLEMENTED",
                 "events":row["events"],
+                "history_truncated":row["events"]>len(history),
+                "history":[{**dict(h),"amount":f"{h['amount']:.2f}"} for h in history],
+                "assigned_hotels":[dict(h) for h in details],
+                "contracts":[{**dict(c),"principal":f"{c['principal']:.2f}"} for c in contracts],
+                "outstanding_payable_kg":None,
                 "data_provenance":"QA_ONLY_NOT_BANK_RECONCILED",
             }
 
