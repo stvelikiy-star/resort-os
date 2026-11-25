@@ -246,6 +246,25 @@ async def health():
     }
 
 
+@app.get("/v1/platform/launch-offer")
+async def launch_offer_status(
+    request: Request,
+    principal: PlatformPrincipal = Depends(resolve_platform_principal),
+):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn, principal)
+            rows = await conn.fetch(
+                "SELECT r.hotel_id,r.slot,r.offer_id,r.created_at,h.display_name,"
+                "p.package_kind,p.subscription_term_total,p.implementation_total "
+                "FROM flex_launch_offer_reservations r JOIN flex_hotels h ON h.id=r.hotel_id "
+                "JOIN flex_tariff_package_versions p ON p.id=r.offer_id ORDER BY r.slot"
+            )
+            return {"capacity":50,"reserved":len(rows),"available":50-len(rows),
+                    "reservations":[dict(r) for r in rows],"payments_enabled":False}
+
+
 @app.get("/v1/platform/commercial-policy")
 async def commercial_policy(
     request: Request,
