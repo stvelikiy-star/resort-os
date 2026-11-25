@@ -1104,3 +1104,42 @@ async def accept_customer_agreement(payload: AgreementInternalApproval,request: 
             if saved is None:
                 raise HTTPException(409,detail="Customer acceptance unavailable")
             return {**dict(saved),"state":"CUSTOMER_ACCEPTED","client_signed":False,"subscription_activated":False,"payments_enabled":False}
+
+
+class SimulationEvent(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    kind: str = Field(pattern=r"^(PAYMENT|REFUND)$")
+    event_id: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
+    amount: str = Field(pattern=r"^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$")
+    payment_id: str | None = Field(default=None,pattern=r"^[a-zA-Z0-9_-]{1,64}$")
+
+
+class FinanceSimulationRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    hotel_id: uuid.UUID
+    agreement_id: uuid.UUID
+    events: list[SimulationEvent] = Field(max_length=100)
+
+
+@app.post("/v1/platform/finance-simulation",status_code=201)
+async def finance_simulation(payload: FinanceSimulationRequest,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    from .flex_finance_simulation import simulate_cash
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn,principal)
+            row=await conn.fetchrow("""SELECT p.subscription_term_total,p.implementation_total
+                FROM flex_commercial_agreement_versions a
+                JOIN flex_customer_agreement_acceptances c ON c.agreement_id=a.id AND c.hotel_id=a.hotel_id AND c.terms_digest=a.terms_digest
+                JOIN flex_tariff_package_versions p ON p.id=a.source_offer_id AND p.hotel_id=a.hotel_id
+                WHERE a.id=$1 AND a.hotel_id=$2 AND a.state='DRAFT'""",payload.agreement_id,payload.hotel_id)
+            if row is None:
+                raise HTTPException(404,detail="Customer-accepted commercial terms not found")
+            try:
+                result=simulate_cash(row["subscription_term_total"],row["implementation_total"],
+                    [e.model_dump() for e in payload.events])
+            except (ValueError,ArithmeticError) as exc:
+                raise HTTPException(422,detail=str(exc)) from None
+            return {**result,"hotel_id":str(payload.hotel_id),"agreement_id":str(payload.agreement_id),
+                    "persisted":False,"tax_status":"NOT_CALCULATED"}

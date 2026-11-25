@@ -700,6 +700,27 @@ async function submitCustomerOperation(form,kind){
  }catch(e){status.textContent=e.message;button.disabled=false;}
 }
 
+function simulationLabels(){
+ return ({ru:{title:'Тестовый расчёт оплат',note:'Только симуляция. Не создаёт реальные счета, платежи или подписки. Налоги не рассчитаны.',first:'Первая тестовая оплата',second:'Вторая тестовая оплата',refund:'Тестовый возврат',source:'Исходная оплата',run:'Рассчитать',cash:'Тестовые поступления',applied:'Зачтено',debt:'Задолженность',credit:'Переплата',diff:'Расхождение',kind:'Операция',amount:'Сумма',payment:'Оплата',reversal:'Возврат'},kg:{title:'Тесттик төлөм эсептөөсү',note:'Симуляция гана. Чыныгы эсеп, төлөм же жазылуу түзүлбөйт. Салыктар эсептелген жок.',first:'Биринчи тесттик төлөм',second:'Экинчи тесттик төлөм',refund:'Тесттик кайтаруу',source:'Баштапкы төлөм',run:'Эсептөө',cash:'Тесттик түшүм',applied:'Эсепке алынган',debt:'Карыз',credit:'Ашыкча төлөм',diff:'Айырма',kind:'Операция',amount:'Сумма',payment:'Төлөм',reversal:'Кайтаруу'},en:{title:'Test payment simulation',note:'Simulation only. No real invoices, payments or subscriptions. Taxes not calculated.',first:'First test payment',second:'Second test payment',refund:'Test refund',source:'Original payment',run:'Calculate',cash:'Simulated cash',applied:'Applied',debt:'Outstanding',credit:'Credit',diff:'Discrepancy',kind:'Operation',amount:'Amount',payment:'Payment',reversal:'Refund'}})[state.lang];
+}
+async function financeSimulationPanel(){
+ const l=simulationLabels(),r=await api('/v1/platform/agreement-drafts?hotel_id='+state.hotelId);
+ const ids=new Set((r.acceptances||[]).map(x=>x.agreement_id));
+ const agreements=r.agreements.filter(a=>ids.has(a.id));
+ const amount=(name,label)=>'<label>'+safe(label)+'<input name="'+name+'" inputmode="decimal" value="0" pattern="[0-9]+([.][0-9]{1,2})?" maxlength="15" required></label>';
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+(agreements.length?'<form id="finance-simulation-form" class="admin-form"><label>'+safe(customerLabels().agreements)+'<select name="agreement_id">'+agreements.map(a=>'<option value="'+safe(a.id)+'">'+safe(a.terms?.package_kind)+' · v'+safe(a.version)+' · '+money(a.terms?.subscription_term_total,'KGS')+'</option>').join('')+'</select></label>'+amount('first',l.first)+amount('second',l.second)+amount('refund',l.refund)+'<label>'+safe(l.source)+'<select name="payment_id"><option value="p1">'+safe(l.first)+'</option><option value="p2">'+safe(l.second)+'</option></select></label><button class="primary" type="submit">'+safe(l.run)+'</button><div role="status"></div><div class="simulation-result"></div></form>':empty(t('noData')))+'</section>';
+}
+async function submitFinanceSimulation(form){
+ const l=simulationLabels(),d=new FormData(form),status=form.querySelector('[role=status]'),result=form.querySelector('.simulation-result'),button=form.querySelector('button[type=submit]');
+ button.disabled=true;status.textContent='';result.innerHTML='';
+ try{
+  const events=[];
+  for(const [name,id] of [['first','p1'],['second','p2']])if(Number(d.get(name))!==0)events.push({kind:'PAYMENT',event_id:id,amount:d.get(name)});
+  if(Number(d.get('refund'))!==0)events.push({kind:'REFUND',event_id:'r1',amount:d.get('refund'),payment_id:d.get('payment_id')});
+  const r=await saveQaCatalogAction('finance-simulation',{hotel_id:state.hotelId,agreement_id:d.get('agreement_id'),events});
+  result.innerHTML='<div class="grid two">'+kv(l.cash,money(r.net_simulated_cash,'KGS'))+kv(l.debt,money(r.outstanding,'KGS'))+kv(l.credit,money(r.credit,'KGS'))+kv(l.diff,money(r.discrepancy,'KGS'))+'</div>'+table([l.kind,l.amount,l.cash,l.applied,l.debt,l.credit],r.history.map(x=>'<tr><td>'+safe(x.kind==='PAYMENT'?l.payment:l.reversal)+'</td>'+['amount','cash','applied','outstanding','credit'].map(k=>'<td>'+money(x[k],'KGS')+'</td>').join('')+'</tr>'));
+ }catch(e){status.textContent=e.message;}finally{button.disabled=false;}
+}
 async function financeReconciliationPanel(){
  const l=({ru:{title:'Финансовая сверка',amount_due:'Выставлено',net_confirmed_cash:'Получено за вычетом возвратов',net_applied_to_lines:'Зачтено',outstanding:'Задолженность',unapplied_cash_credit:'Переплата',ok:'Сверка пройдена',bad:'Расхождение',note:'Только выставленные счета с подтверждённым выпуском. Черновики не являются задолженностью.'},kg:{title:'Каржылык салыштыруу',amount_due:'Эсептелген',net_confirmed_cash:'Кайтаруулардан кийинки түшүм',net_applied_to_lines:'Эсепке алынган',outstanding:'Карыз',unapplied_cash_credit:'Ашыкча төлөм',ok:'Салыштыруу ийгиликтүү',bad:'Айырма бар',note:'Ырасталган эсептер гана. Долбоорлор карыз болуп эсептелбейт.'},en:{title:'Financial reconciliation',amount_due:'Issued total',net_confirmed_cash:'Net confirmed cash',net_applied_to_lines:'Applied',outstanding:'Outstanding',unapplied_cash_credit:'Unapplied credit',ok:'Reconciled',bad:'Discrepancy',note:'Only invoices with issuance evidence. Drafts are not receivables.'}})[state.lang];
  const r=await api('/v1/platform/financial-reconciliation?hotel_id='+state.hotelId),keys=['amount_due','net_confirmed_cash','net_applied_to_lines','outstanding','unapplied_cash_credit'];
@@ -767,7 +788,7 @@ async function hotelDetail(){
    '<tr><td>'+safe(i.number||i.id)+'</td><td><span class="chip">'+safe(i.status)+
    '</span></td><td>'+money(i.total,i.currency)+'</td><td>'+safe(date(i.due_at))+'</td></tr>')):
    empty(t('noInvoices')))+'</section>';
- if(state.hotelTab==='finance')return metadata+invoicesInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await financeReconciliationPanel().catch(e=>info(e.message,'error')):'')+info(t('warning'),'info');
+ if(state.hotelTab==='finance')return metadata+invoicesInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await financeReconciliationPanel().catch(e=>info(e.message,'error'))+await financeSimulationPanel().catch(e=>info(e.message,'error')):'')+info(t('warning'),'info');
  if(state.hotelTab==='subscription')return metadata+summary+subscriptionInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await installationTrialPanel().catch(e=>info(e.message,'error'))+await commercialHotelOfferForm().catch(e=>info(e.message,'error'))+await subscriptionPlanPanel().catch(e=>info(e.message,'error')):state.me?.role==='HOTEL_OWNER'&&state.status?.qa_catalog_admin_enabled?await customerAcceptancePanel().catch(e=>info(e.message,'error')):'')+draftHistory+info(t('draftOnly'),'info');
  return metadata+await hotelNameForm(id)+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await customerProfilePanel().catch(e=>info(e.message,'error')):'')+summary+subscriptionInfo+info(t('warning'),'info');
 }
@@ -900,6 +921,7 @@ async function submitCommercialPrice(form){
 main.addEventListener('submit',e=>{
  if(e.target.id==='customer-profile-form'){e.preventDefault();submitCustomerOperation(e.target,'customer-profile');return;}
  if(e.target.id==='agreement-draft-form'){e.preventDefault();submitCustomerOperation(e.target,'agreement-drafts');return;}
+ if(e.target.id==='finance-simulation-form'){e.preventDefault();submitFinanceSimulation(e.target);return;}
  if(e.target.classList.contains('customer-acceptance-form')){e.preventDefault();submitCustomerOperation(e.target,'customer-agreement-acceptances');return;}
  if(e.target.classList.contains('agreement-approval-form')){e.preventDefault();submitCustomerOperation(e.target,'agreement-internal-approvals');return;}
  if(e.target.classList.contains('invoice-preview-form')){e.preventDefault();submitCustomerOperation(e.target,'invoice-previews');return;}

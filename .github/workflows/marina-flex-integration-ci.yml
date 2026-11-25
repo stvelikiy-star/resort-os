@@ -54,6 +54,7 @@ jobs:
             marina_flex_subscription_contract_test.py \
             marina_flex_qr_provider_contract_test.py \
             marina_flex_renewal_decision_test.py \
+            marina_flex_finance_simulation_test.py \
             marina_flex_partner_earnings_contract_test.py
           do
             python "scripts/$test_file"
