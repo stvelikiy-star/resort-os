@@ -405,3 +405,41 @@ async def verify_concurrency():
 before_concurrency=checks
 asyncio.run(verify_concurrency())
 print("MARINA_OWNER_CONCURRENT_POST_REVERSE_PASS",checks-before_concurrency)
+
+# 600 nights across two valid completed stays: the public preview stays
+# bounded but every qualified night is delivered to financial reconciliation.
+async def verify_full_lodging_iteration():
+    from datetime import timedelta
+    from app.owner_delivered_revenue import delivered_sources, PREVIEW_LIMIT
+    start=date(2025,1,1)
+    end=start+timedelta(days=300)
+    reservations=[{
+        "id":uuid.uuid4(),"reservation_status":"CHECKED_OUT","stay_count":1,
+        "stay_status":"CHECKED_OUT","actual_in":start,"actual_out":end,
+        "has_room_assignment":True,"checkIn":start,"checkOut":end,"totalKgs":300001,
+    } for _ in range(2)]
+    class ReadFixture:
+        async def fetch(self,sql,*args):
+            if "FROM reservations r" in sql:
+                return reservations
+            if "FROM kitchen_orders o" in sql:
+                return []
+            raise AssertionError(sql)
+        async def fetchrow(self,sql,*args):
+            return {"charge_count":0,"face_value":0}
+        async def fetchval(self,sql,*args):
+            return 0
+    observed=[]
+    result=await delivered_sources(ReadFixture(),p,start,end,"Asia/Bishkek",
+                                   on_night=lambda rid,day,amount:observed.append((rid,day,amount)))
+    room=result["accommodation"]
+    check(room["delivered_booked_nights_count"],600,"all delivered nights counted")
+    check(len(observed),600,"all nights reach accounting observer")
+    check(len({(rid,day) for rid,day,_ in observed}),600,"unique nightly source identity")
+    check(sum(amount for _,_,amount in observed),600002,"exact nightly gross preserved")
+    check(len(room["night_preview"]),PREVIEW_LIMIT,"UI preview remains bounded")
+    check(room["night_preview_truncated"],True,"UI truncation reported")
+    check(observed[-1][1],end-timedelta(days=1),"last night beyond preview reconciled")
+before_lodging=checks
+asyncio.run(verify_full_lodging_iteration())
+print("MARINA_OWNER_FULL_LODGING_ITERATION_PASS",checks-before_lodging)

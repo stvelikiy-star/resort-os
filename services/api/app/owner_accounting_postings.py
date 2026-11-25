@@ -425,9 +425,6 @@ async def posted_profit(request:Request,from_date:date=Query(),to_date:date=Quer
 async def period_coverage(conn,pid,from_date,to_date,tz):
     """Read-only source-to-ledger coverage. A diagnostic, never a close approval."""
     from .owner_delivered_revenue import delivered_sources
-    delivery=await delivered_sources(conn,pid,from_date,to_date,tz)
-    lodging=delivery["accommodation"]
-    dining=delivery["dining"]
     # Match each operational source by identity and service date, not totals.
     # Active POST means a POST without its exact REVERSE.
     rows=await conn.fetch(
@@ -460,9 +457,7 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
            ORDER BY e.id""",pid,from_date,to_date)
     by_key={(r["sourceType"],str(r["sourceId"]),r["serviceDate"].isoformat()):r for r in rows}
     matched=set()
-    counts={"lodging_expected":lodging["delivered_booked_nights_count"],
-            "lodging_verified":0,"dining_expected":dining["served_orders_count"],
-            "dining_verified":0}
+    counts={"lodging_verified":0,"dining_verified":0}
     def match(kind,identifier,day,gross):
         key=(kind,str(identifier),str(day))
         row=by_key.get(key)
@@ -472,10 +467,14 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
         return (row["posting_id"] is not None and row["certification_id"] is not None
                 and row["posting_date"]==row["serviceDate"]
                 and row["certified_gross"]==row["faceValueKgs"]==Decimal(str(gross)))
-    for night in lodging["night_preview"]:
-        if match("ROOM_NIGHT",night["reservation_id"],night["service_date"],
-                 night["allocated_booking_face_value_kgs"]):
+    def observe_night(reservation_id,service_date,gross):
+        if match("ROOM_NIGHT",reservation_id,service_date,gross):
             counts["lodging_verified"]+=1
+    delivery=await delivered_sources(conn,pid,from_date,to_date,tz,on_night=observe_night)
+    lodging=delivery["accommodation"]
+    dining=delivery["dining"]
+    counts["lodging_expected"]=lodging["delivered_booked_nights_count"]
+    counts["dining_expected"]=dining["served_orders_count"]
     orders=await conn.fetch(
         """SELECT o.id,o.status,o."totalKgs",
                   (o."completedAt" AT TIME ZONE $4)::date AS served_local_date,
@@ -542,8 +541,6 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
     for category in ("lodging","dining","expense","cogs"):
         if counts[category+"_expected"]!=counts[category+"_verified"]:
             blockers.append(category.upper()+"_SOURCE_COVERAGE_INCOMPLETE")
-    if lodging["night_preview_truncated"]:
-        blockers.append("LODGING_PREVIEW_LIMIT_REQUIRES_FULL_RECONCILIATION")
     if lodging["excluded_reservations_count"] or dining["excluded_orders_count"]:
         blockers.append("DELIVERED_SOURCE_QUALIFICATION_INCOMPLETE")
     if counts["unmatched_approved_sources"]:
