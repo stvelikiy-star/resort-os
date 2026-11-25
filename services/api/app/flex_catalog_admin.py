@@ -1143,3 +1143,80 @@ async def finance_simulation(payload: FinanceSimulationRequest,request: Request,
                 raise HTTPException(422,detail=str(exc)) from None
             return {**result,"hotel_id":str(payload.hotel_id),"agreement_id":str(payload.agreement_id),
                     "persisted":False,"tax_status":"NOT_CALCULATED"}
+
+
+class SyntheticCashAppend(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    hotel_id: uuid.UUID
+    agreement_id: uuid.UUID
+    expected_sequence: int = Field(strict=True,ge=0,le=100)
+    event: SimulationEvent
+
+
+async def synthetic_cash_context(conn,hotel_id,agreement_id):
+    row=await conn.fetchrow("""SELECT p.subscription_term_total,p.implementation_total,
+        p.period_start,p.period_end_exclusive,p.package_kind,p.term_months
+        FROM flex_commercial_agreement_versions a
+        JOIN flex_customer_agreement_acceptances c ON c.agreement_id=a.id AND c.hotel_id=a.hotel_id AND c.terms_digest=a.terms_digest
+        JOIN flex_tariff_package_versions p ON p.id=a.source_offer_id AND p.hotel_id=a.hotel_id
+        WHERE a.id=$1 AND a.hotel_id=$2 AND a.state='DRAFT'""",agreement_id,hotel_id)
+    if row is None:
+        raise HTTPException(404,detail="Customer-accepted commercial terms not found")
+    rows=await conn.fetch("SELECT * FROM flex_qa_cash_events WHERE agreement_id=$1 AND hotel_id=$2 ORDER BY sequence",agreement_id,hotel_id)
+    return row,rows
+
+
+def synthetic_cash_event(row):
+    return {"kind":row["kind"],"event_id":row["event_id"],"amount":str(row["amount"]),"payment_id":row["payment_id"]}
+
+
+def synthetic_cash_snapshot(row,rows,hotel_id,agreement_id):
+    from .flex_finance_simulation import simulate_cash
+    events=[synthetic_cash_event(r) for r in rows]
+    result=simulate_cash(row["subscription_term_total"],row["implementation_total"],events)
+    return {**result,"hotel_id":str(hotel_id),"agreement_id":str(agreement_id),
+        "persisted":True,"journal":"SYNTHETIC_QA_ONLY","sequence":len(rows),
+        "test_balance_state":"TEST_SETTLED" if Decimal(result["outstanding"])==0 else "TEST_OUTSTANDING",
+        "period_start":row["period_start"],"period_end_exclusive":row["period_end_exclusive"],
+        "package_kind":row["package_kind"],"term_months":row["term_months"],
+        "events":[{**synthetic_cash_event(r),"sequence":r["sequence"],"created_at":r["created_at"],"created_by":r["created_by"]} for r in rows]}
+
+
+@app.get("/v1/platform/synthetic-cash-journal")
+async def read_synthetic_cash_journal(request: Request,hotel_id: uuid.UUID=Query(...),agreement_id: uuid.UUID=Query(...),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn,principal)
+            row,rows=await synthetic_cash_context(conn,hotel_id,agreement_id)
+            return synthetic_cash_snapshot(row,rows,hotel_id,agreement_id)
+
+
+@app.post("/v1/platform/synthetic-cash-journal",status_code=201)
+async def append_synthetic_cash_journal(payload: SyntheticCashAppend,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    from .flex_finance_simulation import simulate_cash
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await commercial_hotel_lock(conn,payload.hotel_id)
+            row,rows=await synthetic_cash_context(conn,payload.hotel_id,payload.agreement_id)
+            event=payload.event.model_dump()
+            for old in rows:
+                if old["event_id"]==event["event_id"]:
+                    if (old["kind"]!=event["kind"] or old["amount"]!=Decimal(event["amount"]) or old["payment_id"]!=event["payment_id"]):
+                        raise HTTPException(409,detail="Synthetic event ID already used")
+                    return synthetic_cash_snapshot(row,rows,payload.hotel_id,payload.agreement_id)
+            if payload.expected_sequence!=len(rows) or len(rows)>=100:
+                raise HTTPException(409,detail="Synthetic journal sequence changed or limit reached")
+            try:
+                simulate_cash(row["subscription_term_total"],row["implementation_total"],
+                    [synthetic_cash_event(r) for r in rows]+[event])
+            except (ValueError,ArithmeticError) as exc:
+                raise HTTPException(422,detail=str(exc)) from None
+            saved=await conn.fetchrow("""INSERT INTO flex_qa_cash_events(agreement_id,hotel_id,sequence,event_id,kind,amount,payment_id,created_by)
+                VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *""",payload.agreement_id,payload.hotel_id,len(rows)+1,
+                event["event_id"],event["kind"],Decimal(event["amount"]),event["payment_id"],principal.subject_id)
+            return synthetic_cash_snapshot(row,[*rows,saved],payload.hotel_id,payload.agreement_id)
