@@ -862,10 +862,26 @@ function agentEmploymentSummary(a){
  const l=employmentLabels();
  return '<section class="panel"><h2>'+safe(l.title)+'</h2><div class="grid two">'+kv(t('status'),l[a.employment_state]||l.UNRECORDED)+kv(l.plan,String(a.qa_new_assignments_this_month??0)+' / '+a.monthly_target)+kv(l.paid,a.paid_connections===null?l.unknown:String(a.paid_connections))+'</div>'+info(l.note,'info')+'</section>';
 }
+function agentForecastLabels(){
+ return ({ru:{title:'Калькулятор месячного дохода',note:'Прогноз, не начисление. Введите предполагаемое количество оплаченных новых гостиниц и дополнительных модулей. Расчёт только за полный рабочий месяц.',hotels:'Новые оплаченные гостиницы',modules:'Оплаченные дополнительные модули',calculate:'Рассчитать прогноз',progress:'Выполнение плана в сценарии',total:'Прогноз дохода',blocked:'Прогноз будущего дохода недоступен без действующего статуса работы. Ранее заработанные суммы не аннулируются.',invalid:'Укажите целые неотрицательные количества.'},kg:{title:'Айлык киреше калькулятору',note:'Болжол, эсептөө эмес. Болжолдонгон төлөнгөн жаңы мейманканаларды жана кошумча модулдарды киргизиңиз. Толук иш айы үчүн гана.',hotels:'Жаңы төлөнгөн мейманканалар',modules:'Төлөнгөн кошумча модулдар',calculate:'Болжолду эсептөө',progress:'Сценарийдеги пландын аткарылышы',total:'Киреше болжолу',blocked:'Иштөө абалы жок болсо келечектеги киреше болжолу жеткиликсиз. Мурунку эсептөөлөр жокко чыгарылбайт.',invalid:'Терс эмес бүтүн сандарды киргизиңиз.'},en:{title:'Monthly income calculator',note:'Forecast only, not accrued earnings. Enter hypothetical paid new hotels and paid add-on modules. Full working month only.',hotels:'New paid hotels',modules:'Paid add-on modules',calculate:'Calculate forecast',progress:'Scenario target progress',total:'Projected income',blocked:'Future forecast requires working status. Previously earned amounts are not erased.',invalid:'Enter non-negative whole numbers.'}})[state.lang];
+}
+function agentForecastPanel(a){
+ const l=agentForecastLabels();
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+(a.employment_state==='WORKING'?'<form id="agent-forecast-form" class="admin-form"><label>'+safe(l.hotels)+'<input type="number" name="hotels" min="0" max="10000" step="1" value="0" required></label><label>'+safe(l.modules)+'<input type="number" name="modules" min="0" max="100000" step="1" value="0" required></label><input type="hidden" name="salary" value="'+safe(a.monthly_salary)+'"><input type="hidden" name="connection" value="'+safe(a.connection_fee)+'"><input type="hidden" name="addon" value="'+safe(a.monthly_addon_fee)+'"><input type="hidden" name="target" value="'+safe(a.monthly_target)+'"><button type="submit" class="primary">'+safe(l.calculate)+'</button><div role="status" aria-live="polite"></div></form>':info(l.blocked,'info'))+'</section>';
+}
+function calculateAgentForecast(form){
+ const l=agentForecastLabels(),m=assignmentLabels(),d=new FormData(form),out=form.querySelector('[role=status]');
+ const hotels=Number(d.get('hotels')),modules=Number(d.get('modules')),target=Number(d.get('target'));
+ if(![hotels,modules].every(Number.isSafeInteger)||hotels<0||hotels>10000||modules<0||modules>100000||!Number.isSafeInteger(target)||target<1){out.textContent=l.invalid;return;}
+ const cents=name=>Math.round(Number(d.get(name))*100);
+ const salary=cents('salary'),connections=hotels*cents('connection'),addons=modules*cents('addon');
+ if(![salary,connections,addons,salary+connections+addons].every(v=>Number.isSafeInteger(v)&&v>=0)){out.textContent=l.invalid;return;}
+ out.innerHTML='<div class="grid two">'+kv(m.salary,money(salary/100,'KGS'))+kv(m.connection,money(connections/100,'KGS'))+kv(m.addon,money(addons/100,'KGS'))+kv(l.progress,hotels+' / '+target+' ('+Math.round(hotels/target*100)+'%)')+kv(l.total,money((salary+connections+addons)/100,'KGS'))+'</div>';
+}
 function agentTermsPanel(r){
  const a=r.agent_terms,l=assignmentLabels(),h=r.qa_assignments||[];
  if(!a)return '';
- return agentEmploymentSummary(a)+'<section class="panel"><h2>'+safe(l.terms)+'</h2><div class="grid two">'+kv(l.salary,money(a.monthly_salary,'KGS'))+kv(l.connection,money(a.connection_fee,'KGS'))+kv(l.addon,money(a.monthly_addon_fee,'KGS'))+kv(l.target,a.monthly_target)+'</div>'+info(l.eligible,'info')+'</section><section class="panel"><h2>'+safe(l.assigned)+'</h2>'+(h.length?table([t('hotel'),t('status'),t('periodStart')],h.map(x=>'<tr><td>'+safe(x.display_name)+'</td><td>'+safe(x.status)+'</td><td>'+safe(date(x.assigned_at))+'</td></tr>')):empty(t('noData')))+'</section>';
+ return agentEmploymentSummary(a)+agentForecastPanel(a)+'<section class="panel"><h2>'+safe(l.terms)+'</h2><div class="grid two">'+kv(l.salary,money(a.monthly_salary,'KGS'))+kv(l.connection,money(a.connection_fee,'KGS'))+kv(l.addon,money(a.monthly_addon_fee,'KGS'))+kv(l.target,a.monthly_target)+'</div>'+info(l.eligible,'info')+'</section><section class="panel"><h2>'+safe(l.assigned)+'</h2>'+(h.length?table([t('hotel'),t('status'),t('periodStart')],h.map(x=>'<tr><td>'+safe(x.display_name)+'</td><td>'+safe(x.status)+'</td><td>'+safe(date(x.assigned_at))+'</td></tr>')):empty(t('noData')))+'</section>';
 }
 async function hotelDetail(){
  const id=state.hotelId;
@@ -1059,6 +1075,7 @@ async function submitCommercialPrice(form){
  catch(err){status.textContent=err.message;button.disabled=false;}
 }
 main.addEventListener('submit',e=>{
+ if(e.target.id==='agent-forecast-form'){e.preventDefault();calculateAgentForecast(e.target);return;}
  if(e.target.classList.contains('agent-employment-form')){e.preventDefault();saveAgentEmployment(e.target);return;}
  if(e.target.id==='agent-assignment-form'){e.preventDefault();saveAgentAssignment(e.target);return;}
  if(e.target.id==='customer-profile-form'){e.preventDefault();submitCustomerOperation(e.target,'customer-profile');return;}
