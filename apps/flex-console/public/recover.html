@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Новый пароль · MARINA SMART FLEX</title>
+<link rel="stylesheet" href="/styles.css">
+<script defer src="/recover.js"></script>
+</head>
+<body>
+<main class="panel" style="max-width:520px;margin:6vh auto;padding:28px">
+  <div style="display:flex;justify-content:flex-end;gap:8px">
+    <label for="recover-lang" id="recover-lang-label">Язык</label>
+    <select id="recover-lang" aria-label="Language">
+      <option value="ru">RU</option><option value="kg">KG</option><option value="en">EN</option>
+    </select>
+  </div>
+  <h1 id="recover-title">Новый пароль MARINA SMART FLEX</h1>
+  <p id="recover-description">Введите новый пароль для подтверждённой почты. Дополнительные приложения не нужны.</p>
+  <form id="recover">
+    <label><span id="recover-password-label">Новый пароль (от 12 символов)</span>
+      <input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+    </label>
+    <label><span id="recover-confirm-label">Повторите пароль</span>
+      <input name="confirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+    </label>
+    <button type="submit" id="recover-submit">Сохранить пароль</button>
+  </form>
+  <p id="status" role="status" aria-live="polite"></p>
+</main>
+</body>
+</html>

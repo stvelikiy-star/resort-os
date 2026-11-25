@@ -1,0 +1,28 @@
+name: MARINA FLEX Paid Renewal Guard
+
+on:
+  pull_request:
+    paths:
+      - "services/api/app/flex_renewal.py"
+      - "scripts/marina_flex_renewal_decision_test.py"
+      - "docs/flex/FLEX_RENEWAL_GUARD.md"
+      - ".github/workflows/marina-flex-renewal-guard-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safe-renewal-preview:
+    name: FLEX ledger-to-renewal decision, no subscription mutation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile renewal policy only
+        run: python -m py_compile services/api/app/flex_renewal.py scripts/marina_flex_renewal_decision_test.py
+      - name: Verify fully paid, refunded, CI-only and cross-hotel decisions
+        run: python scripts/marina_flex_renewal_decision_test.py
