@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "897a0808b046c1c88481dcc11e6c5a4c6a01ac5a",
+    "scripts/marina_rc3_additive_gate.py": "04f654923ae1d17afe50252314e6593bd0eb54e1",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -90,10 +90,11 @@ APPROVED_P0_BLOBS = {
     "services/api/app/owner_accounting_journal.py": "bfadba59080ec2badb554ee03ed39d964cb04c0e",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
     "services/api/app/owner_ledger_policy.py": "4dc0694917e9bb9d7a80786a265a87d7480beead",
-    "services/api/app/owner_accounting_postings.py": "7fee7d7f9b21abe386e9c782646bf417203caf8f",
+    "services/api/app/owner_accounting_postings.py": "dbe841fe88a0ec50a6a5426cd8c390cc15fd86de",
+    "services/api/app/owner_revenue_corrections.py": "10f52e7f916598620c73fa2d3a61f08bed435aaa",
     "services/api/app/owner_delivered_revenue.py": "1e8881079cd4d4a64f96aaabbb51c1d21e59a035",
     "scripts/test_owner_ledger_policy.py": "cbf493b03dafafc33b6a035df674736cd3978be9",
-    "scripts/marina_owner_posting_api_ci.py": "913d1e4a7bb041424fa857e45aa6f2b5c3ff52b0",
+    "scripts/marina_owner_posting_api_ci.py": "5614230ffa3a0ed87d5f790fd866adaeb111ad01",
     "services/api/app/owner_revenue_source_journal.py": "9041de7df7ae429248b3c9877cd626cc4b5cb2ba",
     "packages/database/prisma/migrations/zz131_marina_owner_source_reversal_integrity_20261125/migration.sql": "57e9a0ffea9fc8ef4c97407d6bb70e2a8f5fd85b",
     "scripts/marina_owner_expense_posting_ci.py": "3c5879734d3bff96269559b1aa08e25adfe937c2",

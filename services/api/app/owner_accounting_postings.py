@@ -160,8 +160,9 @@ async def qualified_posting_source(conn,pid,proposal):
         return row
     if proposal["sourceType"]!="REVENUE_SOURCE":
         raise HTTPException(409,detail={"code":"ACCOUNTING_POSTING_SOURCE_TYPE_NOT_SUPPORTED"})
+    await conn.execute("SELECT owner_lock_revenue_posting($1,$2)",pid,proposal["sourceId"])
     row=await conn.fetchrow(
-        """SELECT e."faceValueKgs",e."sourceType",e."sourceSnapshot"
+        """SELECT e."faceValueKgs",e."sourceType",e."sourceSnapshot",e."serviceDate"
            FROM owner_revenue_source_events e
            WHERE e.id=$1 AND e."propertyId"=$2 AND e.action='APPROVE_SOURCE'
              AND NOT EXISTS(SELECT 1 FROM owner_revenue_source_events rev
@@ -169,6 +170,8 @@ async def qualified_posting_source(conn,pid,proposal):
         proposal["sourceId"],pid)
     if not row:
         raise HTTPException(409,detail={"code":"ACCOUNTING_SOURCE_UNVERIFIED_OR_REVERSED"})
+    if row["serviceDate"]!=proposal["accountingDate"]:
+        raise HTTPException(409,detail={"code":"ACCOUNTING_REVENUE_SERVICE_DATE_MISMATCH"})
     cert=await conn.fetchrow(
         """SELECT "grossAmountKgs","taxAmountKgs","netRevenueKgs"
            FROM owner_revenue_accounting_certifications

@@ -133,6 +133,24 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
     check(client.post(base+"/revenue-certifications",json=bad_cert).status_code,
           409,"certification duplicate blocked")
     body={"id":str(posting),"reason":"Reviewed synthetic service evidence and tax split"}
+    async def verify_wrong_date():
+        from datetime import timedelta
+        from app.owner_accounting_postings import qualified_posting_source
+        from fastapi import HTTPException
+        conn=await asyncpg.connect(parsed.geturl())
+        try:
+            async with conn.transaction():
+                q=await conn.fetchrow('SELECT * FROM owner_accounting_journal_proposals WHERE id=$1',proposal)
+                try:
+                    await qualified_posting_source(conn,p,{**dict(q),"accountingDate":date.today()-timedelta(days=1)})
+                except HTTPException as exc:
+                    check(exc.status_code,409,"wrong service date rejected")
+                    check(exc.detail["code"],"ACCOUNTING_REVENUE_SERVICE_DATE_MISMATCH","specific date error")
+                else:
+                    raise AssertionError("Wrong accounting date accepted")
+        finally:
+            await conn.close()
+    asyncio.run(verify_wrong_date())
     response=client.post(url,json=body)
     check(response.status_code,201,"approved posting")
     check(response.json()["accounting_posted"],True,"actual posted evidence")
