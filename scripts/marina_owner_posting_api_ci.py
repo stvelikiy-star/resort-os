@@ -518,7 +518,7 @@ async def verify_guest_service_ledger():
             rid,p,"CI-GUEST-"+str(rid),gid,day,day+timedelta(days=1))
         await conn.execute("""INSERT INTO stays
             (id,"propertyId","reservationId","guestId",status,"actualCheckInAt","createdAt","updatedAt")
-            VALUES($1,$2,$3,$4,'CHECKED_IN',now() AT TIME ZONE 'UTC',now(),now())""",stay_id,p,rid,gid)
+            VALUES($1,$2,$3,$4,'ACTIVE',now() AT TIME ZONE 'UTC',now(),now())""",stay_id,p,rid,gid)
         stay={"id":stay_id,"reservationId":rid,"guestId":gid}
         tid,fid,sid,qid,did=([uuid.uuid4() for _ in range(5)])
         await conn.execute("""INSERT INTO operational_tasks
