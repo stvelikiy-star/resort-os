@@ -46,6 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           for test_file in \
+            marina_flex_migration_runner_test.py \
             marina_flex_foundation_contract_test.py \
             marina_flex_control_plane_auth_test.py \
             marina_flex_pricing_contract_test.py \
@@ -175,3 +176,67 @@ jobs:
           set -euo pipefail
           test "$(psql -X -Atqc "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('properties','guests','reservations','folio','staff_users')" -d flex_restored_ci)" = "0"
           test "$(psql -X -Atqc "SELECT count(*) FROM flex_confirmed_payments WHERE provider <> 'FLEX_QA_SIMULATOR'" -d flex_restored_ci)" = "0"
+
+  migration-runner:
+    name: FLEX incremental migration runner against disposable PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: flex_ci
+          POSTGRES_USER: flex_ci
+          POSTGRES_PASSWORD: flex_ci_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flex_ci -d flex_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: flex_ci
+      PGPASSWORD: flex_ci_ci_only
+      PGDATABASE: flex_ci
+      FLEX_MIGRATION_DATABASE_URL: postgresql://flex_ci:flex_ci_ci_only@localhost:5432/flex_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r services/api/requirements-flex-control.txt
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Bootstrap synthetic baseline with frozen settlement
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_qa_db_preflight.sql
+          psql -X -v ON_ERROR_STOP=1 -c 'CREATE TABLE flex_schema_migrations(migration_id integer PRIMARY KEY,filename text NOT NULL,git_blob_sha char(40) NOT NULL,release_sha char(40) NOT NULL,disposition text NOT NULL,completed_at timestamptz DEFAULT now())'
+          for file in docs/flex/sql/00{01,02,03,04,05,06,07,08,09,10,11,12,13,14,15}_*.sql; do
+            name=$(basename "$file")
+            n=$((10#${name:0:4}))
+            disposition=APPLIED
+            if [ "$n" = 9 ]; then disposition=SKIPPED_PAYMENT_FREEZE; else psql -X -v ON_ERROR_STOP=1 -f "$file"; fi
+            psql -X -v ON_ERROR_STOP=1 -c "INSERT INTO flex_schema_migrations VALUES ($n,'$name','$(git hash-object "$file")','$(git rev-parse HEAD)','$disposition')"
+          done
+      - name: Apply pending migrations twice and prove freeze
+        run: |
+          set -euo pipefail
+          python scripts/marina_flex_migration_runner.py --ci --schema public
+          test "$(psql -X -Atqc 'SELECT count(*) FROM flex_schema_migrations')" = 15
+          python scripts/marina_flex_migration_runner.py --ci --schema public --apply
+          python scripts/marina_flex_migration_runner.py --ci --schema public --apply | tee /tmp/flex_runner_repeat.log
+          grep -q '0 pending' /tmp/flex_runner_repeat.log
+          test "$(psql -X -Atqc 'SELECT count(*) FROM flex_schema_migrations')" = 19
+          test "$(psql -X -Atqc 'SELECT disposition FROM flex_schema_migrations WHERE migration_id=9')" = SKIPPED_PAYMENT_FREEZE
+          test "$(psql -X -Atqc 'SELECT count(*) FROM flex_confirmed_payments')" = 0
+      - name: Reject checksum mismatch without changing schema
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -c "UPDATE flex_schema_migrations SET git_blob_sha=repeat('0',40) WHERE migration_id=14"
+          if python scripts/marina_flex_migration_runner.py --ci --schema public --apply > /tmp/flex_runner_bad.log 2>&1; then exit 1; fi
+          grep -q 'SHA or filename mismatch' /tmp/flex_runner_bad.log
+          test "$(psql -X -Atqc 'SELECT count(*) FROM flex_schema_migrations')" = 19
