@@ -296,6 +296,7 @@ const catalogSkuAction=/^\/api\/actions\/catalog\/skus$/;
 const catalogPriceAction=/^\/api\/actions\/catalog\/skus\/([A-Z][A-Z0-9_]{1,79})\/prices$/;
 const configurationDraftAction=/^\/api\/actions\/subscription-drafts$/;
 const tariffPackageAction=/^\/api\/actions\/tariff-packages$/;
+const customerActions=new Map([['/api/actions/customer-profile','customer-profile'],['/api/actions/agreement-drafts','agreement-drafts'],['/api/actions/invoice-previews','invoice-previews']]);
 const installationTrialPath='/api/actions/installation-trial';
 const commercialPolicyPath='/api/actions/commercial-policy';
 const tariffTemplatePath='/api/actions/tariff-templates';
@@ -306,6 +307,14 @@ function validateCatalogAdminAction(kind,body) {
   if(!body || typeof body!=='object'||Array.isArray(body))return null;
   const keys=Object.keys(body);
   const exact=allowed=>keys.length===allowed.length && allowed.every(k=>keys.includes(k));
+  if(kind==='customer-profile'){
+    const fields={contact_name:180,contact_email:254,contact_phone:40,responsible_name:180};
+    return exact(['hotel_id','expected_version',...Object.keys(fields)])&&typeof body.hotel_id==='string'&&flexUuidRe.test(body.hotel_id)&&Number.isInteger(body.expected_version)&&body.expected_version>=0&&body.expected_version<=2147483646&&Object.entries(fields).every(([k,n])=>typeof body[k]==='string'&&body[k].length<=n)?body:null;
+  }
+  if(kind==='agreement-drafts'||kind==='invoice-previews'){
+    const key=kind==='agreement-drafts'?'offer_id':'agreement_id';
+    return exact(['hotel_id',key])&&[body.hotel_id,body[key]].every(x=>typeof x==='string'&&flexUuidRe.test(x))?body:null;
+  }
   if(kind==='installation')return exact(['hotel_id'])&&typeof body.hotel_id==='string'&&flexUuidRe.test(body.hotel_id)?{hotel_id:body.hotel_id}:null;
   if(kind==='commercial') {
     if(!exact(['expected_version','price_kind','code','monthly_price'])||!Number.isInteger(body.expected_version)||body.expected_version<1||body.expected_version>2147483646||!['PACKAGE','MODULE'].includes(body.price_kind)||typeof body.code!=='string'||!/^[A-Z][A-Z0-9_]{1,79}$/.test(body.code)||typeof body.monthly_price!=='string'||!amountPattern.test(body.monthly_price)||Number(body.monthly_price)<=0)return null;
@@ -384,7 +393,7 @@ async function catalogAdminPost(req,res,url) {
   if(!session.csrf||!fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
   const priceMatch=url.pathname.match(catalogPriceAction);
   const kind=catalogSkuAction.test(url.pathname)?'sku':priceMatch?'price':
-    configurationDraftAction.test(url.pathname)?'draft':tariffPackageAction.test(url.pathname)?'package':url.pathname===tariffTemplatePath?'template':url.pathname===commercialPolicyPath?'commercial':url.pathname===installationTrialPath?'installation':null;
+    configurationDraftAction.test(url.pathname)?'draft':tariffPackageAction.test(url.pathname)?'package':url.pathname===tariffTemplatePath?'template':url.pathname===commercialPolicyPath?'commercial':url.pathname===installationTrialPath?'installation':customerActions.get(url.pathname)||null;
   if(!kind)return json(res,404,{error:'ACTION_NOT_ALLOWED'});
   let raw='';
   for await(const part of req) {
@@ -395,7 +404,7 @@ async function catalogAdminPost(req,res,url) {
   try{parsed=JSON.parse(raw)}catch{return json(res,400,{error:'INVALID_JSON'})}
   const payload=validateCatalogAdminAction(kind,parsed);
   if(!payload)return json(res,422,{error:'INVALID_QA_CONFIGURATION'});
-  const path=kind==='installation'?'/v1/platform/installation-trial':kind==='commercial'?'/v1/platform/commercial-policy':kind==='sku'?'/v1/platform/catalog/skus':
+  const path=customerActions.has(url.pathname)?'/v1/platform/'+kind:kind==='installation'?'/v1/platform/installation-trial':kind==='commercial'?'/v1/platform/commercial-policy':kind==='sku'?'/v1/platform/catalog/skus':
     kind==='price'?'/v1/platform/catalog/skus/'+priceMatch[1]+'/prices':
     kind==='template'?'/v1/platform/tariff-templates':kind==='package'?'/v1/platform/tariff-packages':'/v1/platform/subscription-drafts';
   const upstream=await fetch(catalogAdminApiOrigin+path,{
@@ -411,6 +420,9 @@ async function catalogAdminPost(req,res,url) {
   try{result=JSON.parse(response)}catch{return json(res,502,{error:'UPSTREAM_INVALID_JSON'})}
   if(!upstream.ok)return json(res,upstream.status,{error:'FLEX_QA_ADMIN_REJECTED',detail:
     typeof result.detail==='string'?result.detail:'Backend rejected the request'});
+  if(kind==='customer-profile' && !(result.hotel_id===payload.hotel_id&&result.version===payload.expected_version+1))return json(res,502,{error:'UNEXPECTED_PROFILE_STATE'});
+  if(kind==='agreement-drafts' && !(result.hotel_id===payload.hotel_id&&result.source_offer_id===payload.offer_id&&result.state==='DRAFT'&&result.signed_at===null))return json(res,502,{error:'UNEXPECTED_AGREEMENT_STATE'});
+  if(kind==='invoice-previews' && !(result.hotel_id===payload.hotel_id&&result.agreement_version_id===payload.agreement_id&&result.status==='NON_ISSUABLE'&&result.tax_status==='NOT_CALCULATED'))return json(res,502,{error:'UNEXPECTED_PREVIEW_STATE'});
   if(kind==='commercial' && !(result.version===payload.expected_version+1&&result.entitlement_changed===false&&result.payment_collected===false))return json(res,502,{error:'UNEXPECTED_PRICE_STATE'});
   if(kind==='sku' && !(result.status==='PLANNED'&&result.published===false&&result.entitlement_changed===false))
     return json(res,502,{error:'UNEXPECTED_SKU_STATE'});
@@ -427,11 +439,11 @@ async function catalogAdminPost(req,res,url) {
 
 function routeAllowed(path, search) {
   if(search && [...search.keys()].some(k=>!['period','hotel_id'].includes(k)))return null;
-  if(search.has('hotel_id')&&!['/v1/platform/subscription-drafts','/v1/platform/tariff-packages','/v1/platform/installation-trial'].includes(path))return null;
+  if(search.has('hotel_id')&&!['/v1/platform/subscription-drafts','/v1/platform/tariff-packages','/v1/platform/installation-trial','/v1/platform/customer-profile','/v1/platform/agreement-drafts'].includes(path))return null;
   if(search.has('period')&&!['/v1/partner/me/earnings','/v1/platform/partner-earnings-summary'].includes(path))return null;
   if(['/v1/me','/v1/hotels','/v1/catalog'].includes(path) && !search.size) return 'core';
   if((path==='/v1/platform/catalog'||path==='/v1/platform/commercial-policy'||path==='/v1/platform/launch-offer'||path==='/v1/platform/tariff-templates'||catalogVersionsRead.test(path))&&!search.size)return 'catalog_admin';
-  if((path==='/v1/platform/tariff-packages'||path==='/v1/platform/installation-trial')&&search.size===1&&
+  if((path==='/v1/platform/tariff-packages'||path==='/v1/platform/installation-trial'||path==='/v1/platform/customer-profile'||path==='/v1/platform/agreement-drafts')&&search.size===1&&
      flexUuidRe.test(search.get('hotel_id')||''))return 'catalog_admin';
   if(path==='/v1/platform/subscription-drafts'&&
      (!search.size||(search.size===1&&flexUuidRe.test(search.get('hotel_id')||''))))
@@ -479,13 +491,13 @@ export async function handler(req,res) {
         exp:Date.now() + lifetimeSeconds * 1000};
       return cookie(cookies.session,seal(session),lifetimeSeconds);
     }:null);
-    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||hotelNameRoute.test(url.pathname)||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath||url.pathname===commercialPolicyPath||url.pathname===installationTrialPath))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
+    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||hotelNameRoute.test(url.pathname)||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath||url.pathname===commercialPolicyPath||url.pathname===installationTrialPath||customerActions.has(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
     if(url.pathname==='/api/status') return json(res,200,{build_sha:/^[0-9a-f]{40}$/.test(process.env.VERCEL_GIT_COMMIT_SHA||'')?process.env.VERCEL_GIT_COMMIT_SHA:null,configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,password_login:bridgeConfigured && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true',identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
     if(url.pathname==='/api/session') { const s=await commercialSession(req);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
     if(req.method==='POST'&&hotelNameRoute.test(url.pathname))return await hotelNameAction(req,res,url);
     if(req.method==='POST'&&(linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))return await trustedLinkAction(req,res,url);
-    if(req.method==='POST'&&(catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath||url.pathname===commercialPolicyPath||url.pathname===installationTrialPath))return await catalogAdminPost(req,res,url);
+    if(req.method==='POST'&&(catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath||url.pathname===commercialPolicyPath||url.pathname===installationTrialPath||customerActions.has(url.pathname)))return await catalogAdminPost(req,res,url);
     if(url.pathname==='/api/auth/login') return await authLogin(res);
     if(url.pathname==='/api/auth/callback') return await authCallback(req,res,url);
     if(url.pathname==='/api/auth/logout') return redirect(res,'/',{'Set-Cookie':cookie(cookies.session,'',0)});
