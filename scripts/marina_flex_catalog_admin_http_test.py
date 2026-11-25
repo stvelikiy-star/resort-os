@@ -559,5 +559,52 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
             self.assertTrue(all(Decimal(v)==0 for v in data["totals"].values()))
 
 
+    def test_14_internal_approval_and_subscription_plan(self):
+        read="/v1/platform/subscription-plans?hotel_id="
+        path="/v1/platform/agreement-internal-approvals"
+        contract=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()["agreements"][0]
+        body={"hotel_id":HOTEL_A,"agreement_id":contract["id"],
+              "terms_digest":contract["terms_digest"],"acknowledged":True}
+        self.assertEqual(self.get(read+HOTEL_A).json(),[])
+        self.assertEqual(self.get(read+HOTEL_A,who="owner-a").status_code,403)
+        self.assertEqual(self.post(path,body,"owner-a").status_code,403)
+        self.assertEqual(self.post(path,body,mfa=False).status_code,403)
+        self.assertEqual(self.post(path,{**body,"hotel_id":HOTEL_B}).status_code,404)
+        self.assertEqual(self.post(path,{**body,"terms_digest":"0"*64}).status_code,409)
+        self.assertEqual(self.post(path,{**body,"acknowledged":False}).status_code,422)
+        self.assertEqual(self.post(path,{**body,"client_signed":True}).status_code,422)
+        result=self.post(path,body)
+        self.assertEqual(result.status_code,201,result.text)
+        saved=result.json()
+        self.assertEqual(saved["state"],"INTERNALLY_APPROVED")
+        self.assertFalse(saved["client_signed"])
+        self.assertFalse(saved["subscription_activated"])
+        self.assertFalse(saved["payments_enabled"])
+        self.assertEqual(self.post(path,body).json(),saved)
+        plans=self.get(read+HOTEL_A).json()
+        self.assertEqual(len(plans),1)
+        plan=plans[0]
+        self.assertEqual(plan["agreement_id"],contract["id"])
+        self.assertEqual(plan["terms_digest"],contract["terms_digest"])
+        self.assertEqual(plan["term_months"],12)
+        self.assertEqual(Decimal(plan["subscription_term_total"]),Decimal("108000"))
+        self.assertEqual(Decimal(plan["implementation_total"]),Decimal("25000"))
+        self.assertEqual((plan["state"],plan["enforcement"]),("PLAN_ONLY","OFF"))
+        self.assertFalse(plan["subscription_activated"])
+        self.assertEqual(self.get(read+HOTEL_B).json(),[])
+        history=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()
+        self.assertEqual(len(history["approvals"]),1)
+        self.assertEqual(history["agreements"][0]["state"],"DRAFT")
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_agreement_internal_approvals"),1)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_commercial_agreement_versions WHERE state='SIGNED'"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscriptions"),2)
+            finally: await con.close()
+        asyncio.run(verify())
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)

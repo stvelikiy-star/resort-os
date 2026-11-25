@@ -914,7 +914,8 @@ async def agreement_drafts(request: Request,hotel_id: uuid.UUID=Query(...),
             await as_writer(conn,principal)
             rows=await conn.fetch("SELECT * FROM flex_commercial_agreement_versions WHERE hotel_id=$1 ORDER BY version DESC",hotel_id)
             previews=await conn.fetch("SELECT * FROM flex_non_issuable_invoice_previews WHERE hotel_id=$1 ORDER BY created_at DESC",hotel_id)
-            return {"agreements":[draft_agreement_response(r) for r in rows],"previews":[dict(r) for r in previews]}
+            approvals=await conn.fetch("SELECT * FROM flex_agreement_internal_approvals WHERE hotel_id=$1 ORDER BY approved_at DESC",hotel_id)
+            return {"agreements":[draft_agreement_response(r) for r in rows],"previews":[dict(r) for r in previews],"approvals":[dict(r) for r in approvals]}
 
 
 @app.post("/v1/platform/agreement-drafts",status_code=201)
@@ -998,3 +999,59 @@ async def financial_reconciliation(request: Request,hotel_id: uuid.UUID=Query(..
                     "reconciled":all(reconciled(r) for r in rows),
                     "invoices":[{**dict(r),**{k:str(r[k]) for k in fields}} for r in rows],
                     "payments_enabled":False,"payouts_enabled":False}
+
+
+class AgreementInternalApproval(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    hotel_id: uuid.UUID
+    agreement_id: uuid.UUID
+    terms_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    acknowledged: bool = Field(strict=True)
+
+
+@app.post("/v1/platform/agreement-internal-approvals",status_code=201)
+async def approve_agreement_internally(payload: AgreementInternalApproval,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    if payload.acknowledged is not True:
+        raise HTTPException(422,detail="Internal review acknowledgement required")
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await commercial_hotel_lock(conn,payload.hotel_id)
+            row=await conn.fetchrow("SELECT id,terms_digest FROM flex_commercial_agreement_versions WHERE id=$1 AND hotel_id=$2 AND state='DRAFT' AND source_offer_id IS NOT NULL",payload.agreement_id,payload.hotel_id)
+            if row is None:
+                raise HTTPException(404,detail="Draft agreement unavailable for hotel")
+            if row["terms_digest"]!=payload.terms_digest:
+                raise HTTPException(409,detail="Agreement terms digest mismatch")
+            await conn.execute("INSERT INTO flex_agreement_internal_approvals(agreement_id,hotel_id,terms_digest,approved_by) VALUES($1,$2,$3,$4) ON CONFLICT(agreement_id) DO NOTHING",payload.agreement_id,payload.hotel_id,payload.terms_digest,principal.subject_id)
+            saved=await conn.fetchrow("SELECT * FROM flex_agreement_internal_approvals WHERE agreement_id=$1",payload.agreement_id)
+            return {**dict(saved),"state":"INTERNALLY_APPROVED","client_signed":False,"subscription_activated":False,"payments_enabled":False}
+
+
+@app.get("/v1/platform/subscription-plans")
+async def subscription_plans(request: Request,hotel_id: uuid.UUID=Query(...),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn,principal)
+            rows=await conn.fetch("""SELECT a.id AS agreement_id,a.hotel_id,a.version,a.terms_digest,
+                p.id AS offer_id,p.package_kind,p.commercial_policy_version,p.term_months,p.period_start,
+                p.period_end_exclusive,p.sku_snapshot,p.subscription_term_total,p.implementation_total,
+                r.approved_at
+                FROM flex_agreement_internal_approvals r
+                JOIN flex_commercial_agreement_versions a ON a.id=r.agreement_id AND a.hotel_id=r.hotel_id AND a.terms_digest=r.terms_digest
+                JOIN flex_tariff_package_versions p ON p.id=a.source_offer_id AND p.hotel_id=a.hotel_id
+                WHERE a.hotel_id=$1 AND a.state='DRAFT' ORDER BY a.version DESC""",hotel_id)
+            result=[]
+            for row in rows:
+                data=dict(row)
+                if isinstance(data["sku_snapshot"],str):
+                    data["sku_snapshot"]=json.loads(data["sku_snapshot"])
+                for k in ("subscription_term_total","implementation_total"):
+                    data[k]=str(data[k])
+                data.update(state="PLAN_ONLY",enforcement="OFF",client_signed=False,
+                    subscription_activated=False,payments_enabled=False)
+                result.append(data)
+            return result
