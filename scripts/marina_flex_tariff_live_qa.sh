@@ -53,11 +53,11 @@ GRANT USAGE ON SCHEMA flex_auth TO flex_auth_runtime;
 ALTER ROLE flex_auth_runtime IN DATABASE flex_qa SET search_path=flex_auth;
 ALTER ROLE flex_qa_read_runtime IN DATABASE flex_qa SET search_path=flex_private;
 GRANT flex_hotel_reader,flex_identity_reader,flex_platform_admin_reader,flex_catalog_draft_writer,
-      flex_agent_statement_reader,flex_investor_statement_reader,flex_platform_statement_reader
+      flex_agent_statement_reader,flex_investor_statement_reader,flex_platform_statement_reader,flex_customer_acceptance_writer
       TO flex_qa_read_runtime WITH INHERIT FALSE, SET TRUE;
 GRANT USAGE ON SCHEMA flex_private TO flex_qa_read_runtime,flex_hotel_reader,flex_identity_reader,
       flex_platform_admin_reader,flex_catalog_draft_writer,flex_agent_statement_reader,
-      flex_investor_statement_reader,flex_platform_statement_reader;
+      flex_investor_statement_reader,flex_platform_statement_reader,flex_customer_acceptance_writer;
 SQL
 
 export FLEX_ENVIRONMENT=qa FLEX_AUTH_ENABLED=true FLEX_AUTH_SCHEMA_READY=true FLEX_MFA_BRIDGE_ENABLED=true
