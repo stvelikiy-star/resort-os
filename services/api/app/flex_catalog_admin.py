@@ -986,7 +986,7 @@ async def financial_reconciliation(request: Request,hotel_id: uuid.UUID=Query(..
             if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_hotels WHERE id=$1)",hotel_id):
                 raise HTTPException(404,detail="Commercial hotel unavailable")
             # Issued invoices only; NON_ISSUABLE previews are never receivables.
-            rows=await conn.fetch("SELECT b.* FROM flex_refund_adjusted_invoice_balances b WHERE b.hotel_id=$1 ORDER BY b.invoice_id",hotel_id)
+            rows=await conn.fetch("SELECT b.* FROM flex_refund_adjusted_invoice_balances b JOIN flex_issued_invoice_records e ON e.invoice_id=b.invoice_id AND e.hotel_id=b.hotel_id JOIN flex_invoices i ON i.id=b.invoice_id WHERE b.hotel_id=$1 AND i.status IN ('ISSUED','PARTIALLY_PAID','PAID') ORDER BY b.invoice_id",hotel_id)
             fields=("amount_due","net_confirmed_cash","net_applied_to_lines","outstanding","unapplied_cash_credit")
             totals={key:sum((r[key] for r in rows),Decimal("0.00")) for key in fields}
             def reconciled(r):
