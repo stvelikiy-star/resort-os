@@ -352,6 +352,36 @@ def run():
         evidence=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
         assert evidence=={"payments":0,"refunds":0,"subscriptions":2},evidence
         print("PASS browser synthetic 61000 quote, 65000 receipts, 9000 refund, 5000 debt, zero discrepancy, no ledger writes")
+        journal=page.locator("#synthetic-journal-open")
+        expect(journal).to_be_visible()
+        journal.locator('[name="agreement_id"]').select_option(contract["id"])
+        journal.locator('button[type="submit"]').click()
+        for n,kind,amount,source in [(1,"PAYMENT","20000",None),(2,"PAYMENT","45000",None),(3,"REFUND","9000","event-2")]:
+            expect(journal.locator('[name="expected_sequence"]')).to_have_value(str(n-1))
+            journal.locator('[name="event_kind"]').select_option(kind)
+            journal.locator('[name="event_amount"]').fill(amount)
+            if source:
+                journal.locator('[name="payment_id"]').fill(source)
+            with page.expect_response(ORIGIN+"/api/actions/synthetic-cash-journal") as submitted:
+                journal.locator('[data-journal-append]').click()
+            response=submitted.value
+            assert response.status==201,("synthetic journal",response.status,response.text()[:250])
+            assert response.json()["sequence"]==n
+        expect(journal.locator(".journal-result")).to_contain_text("5,000 KGS")
+        page.reload()
+        open_card(page,HOTEL_A)
+        page.locator('[data-hotel-tab="finance"]').click()
+        journal=page.locator("#synthetic-journal-open")
+        journal.locator('[name="agreement_id"]').select_option(contract["id"])
+        journal.locator('button[type="submit"]').click()
+        expect(journal.locator('[name="expected_sequence"]')).to_have_value("3")
+        expect(journal.locator(".journal-result")).to_contain_text("5,000 KGS")
+        query="""SELECT json_build_object('test_events',(SELECT count(*) FROM flex_private.flex_qa_cash_events),
+          'payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments),
+          'refunds',(SELECT count(*) FROM flex_private.flex_payment_reversals))"""
+        evidence=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
+        assert evidence=={"test_events":3,"payments":0,"refunds":0},evidence
+        print("PASS browser persisted synthetic journal, reload, 5000 debt, no real ledger writes")
         browser.close()
 
 
