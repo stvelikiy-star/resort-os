@@ -151,6 +151,44 @@ def run():
                     ident,hotel,1,pct,total,source,1 if source else None,"TARIFF_E2E","DRAFT","OFF")
         print("PASS real SUPER_ADMIN password/TOTP login, catalog and shared template revision 1")
         print("PASS reopened hotel A v1 10% = 3600.00 KGS; hotel B v1 25% = 3000.00 KGS; both match PostgreSQL")
+        open_card(page, HOTEL_A)
+        form=page.locator("#hotel-commercial-offer")
+        expect(form).to_be_visible()
+        form.locator('[name="package_kind"]').select_option("BASE")
+        form.locator('[name="term_months"]').select_option("12")
+        form.locator('[name="launch_offer"]').check()
+        form.locator('[name="include_implementation"]').check()
+        with page.expect_response(ORIGIN+"/api/actions/tariff-packages") as submitted:
+            form.locator('button[type="submit"]').click()
+        response=submitted.value
+        assert response.status==201, ("launch offer",response.status,response.text()[:250])
+        launch=response.json()
+        from decimal import Decimal
+        assert Decimal(str(launch["subscription_term_total"]))==Decimal("36000")
+        assert Decimal(str(launch["implementation_total"]))==Decimal("25000")
+        assert launch["launch_offer_slot"]==1
+        assert launch["launch_offer_reserved"] and not launch["payments_enabled"] and not launch["subscription_activated"]
+        # Navigation waits for the saved card to finish rendering.
+        expect(page.locator("#hotel-commercial-offer")).to_be_visible()
+        stats=page.request.get(ORIGIN+"/api/data/v1/platform/launch-offer",ignore_https_errors=True)
+        assert stats.status==200, ("launch stats",stats.status)
+        data=stats.json()
+        assert (data["capacity"],data["reserved"],data["available"])==(50,1,49)
+        assert data["reservations"][0]["offer_id"]==launch["id"]
+        page.locator('#nav [data-view="catalog"]').click()
+        panel=page.locator("section.panel").filter(has=page.get_by_role("heading",name="Launch offer",exact=True))
+        expect(panel).to_contain_text("1 / 50")
+        expect(panel).to_contain_text("49")
+        expect(panel.locator("tr").filter(has_text="BASE")).to_contain_text("36,000 KGS")
+        expect(panel.locator("tr").filter(has_text="BASE")).to_contain_text("25,000 KGS")
+        query="""SELECT json_build_object('slot',r.slot,'hotel',r.hotel_id,'offer',r.offer_id,
+            'total',p.subscription_term_total,'implementation',p.implementation_total,
+            'payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments))
+            FROM flex_private.flex_launch_offer_reservations r
+            JOIN flex_private.flex_tariff_package_versions p ON p.id=r.offer_id"""
+        saved=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
+        assert saved=={"slot":1,"hotel":HOTEL_A,"offer":launch["id"],"total":36000,"implementation":25000,"payments":0},saved
+        print("PASS browser launch offer BASE 36000 + setup 25000, capacity 1/50, independent PostgreSQL match")
         browser.close()
 
 

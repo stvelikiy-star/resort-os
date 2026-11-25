@@ -334,10 +334,11 @@ function validateCatalogAdminAction(kind,body) {
     const source='source_template_id' in body;
     const commercial='commercial_policy_version' in body;
     const termFields=['term_months','include_implementation','standard_term_discount'].filter(k=>k in body);
+    if('launch_offer' in body && (typeof body.launch_offer!=='boolean'||!commercial))return null;
     if(termFields.length&&(!commercial||termFields.length!==3||![1,3,6,12].includes(body.term_months)||typeof body.include_implementation!=='boolean'||typeof body.standard_term_discount!=='boolean'))return null;
     if(commercial&&(!Number.isInteger(body.commercial_policy_version)||body.commercial_policy_version<1||source))return null;
     if(source && (typeof body.source_template_id!=='string'||!flexUuidRe.test(body.source_template_id)))return null;
-    if(!exact(['hotel_id','package_kind','title','period_start','skus','discount_pct','trial_days','custom_monthly_price',...(source?['source_template_id']:[]),...(commercial?['commercial_policy_version']:[]),...termFields]))return null;
+    if(!exact(['hotel_id','package_kind','title','period_start','skus','discount_pct','trial_days','custom_monthly_price',...(source?['source_template_id']:[]),...(commercial?['commercial_policy_version']:[]),...termFields,...('launch_offer' in body?['launch_offer']:[])]))return null;
     if(typeof body.hotel_id!=='string'||!flexUuidRe.test(body.hotel_id))return null;
     if(!['BASE','BUSINESS','PREMIUM','CUSTOM'].includes(body.package_kind))return null;
     if(typeof body.title!=='string'||body.title.trim().length<2||body.title.trim().length>120)return null;
@@ -356,7 +357,7 @@ function validateCatalogAdminAction(kind,body) {
     return {hotel_id:body.hotel_id,package_kind:body.package_kind,title:body.title.trim(),
       period_start:body.period_start,skus:body.skus,discount_pct:body.discount_pct,
       trial_days:body.trial_days,custom_monthly_price:body.custom_monthly_price,
-      ...(source?{source_template_id:body.source_template_id}:{}),...(commercial?{commercial_policy_version:body.commercial_policy_version}:{}),...(termFields.length?{term_months:body.term_months,include_implementation:body.include_implementation,standard_term_discount:body.standard_term_discount}:{})};
+      ...(source?{source_template_id:body.source_template_id}:{}),...(commercial?{commercial_policy_version:body.commercial_policy_version}:{}),...('launch_offer' in body?{launch_offer:body.launch_offer}:{}),...(termFields.length?{term_months:body.term_months,include_implementation:body.include_implementation,standard_term_discount:body.standard_term_discount}:{})};
   }
   if(kind==='draft') {
     if(!exact(['hotel_id','title','period_start','period_end','skus']))return null;
@@ -429,7 +430,7 @@ function routeAllowed(path, search) {
   if(search.has('hotel_id')&&!['/v1/platform/subscription-drafts','/v1/platform/tariff-packages','/v1/platform/installation-trial'].includes(path))return null;
   if(search.has('period')&&!['/v1/partner/me/earnings','/v1/platform/partner-earnings-summary'].includes(path))return null;
   if(['/v1/me','/v1/hotels','/v1/catalog'].includes(path) && !search.size) return 'core';
-  if((path==='/v1/platform/catalog'||path==='/v1/platform/commercial-policy'||path==='/v1/platform/tariff-templates'||catalogVersionsRead.test(path))&&!search.size)return 'catalog_admin';
+  if((path==='/v1/platform/catalog'||path==='/v1/platform/commercial-policy'||path==='/v1/platform/launch-offer'||path==='/v1/platform/tariff-templates'||catalogVersionsRead.test(path))&&!search.size)return 'catalog_admin';
   if((path==='/v1/platform/tariff-packages'||path==='/v1/platform/installation-trial')&&search.size===1&&
      flexUuidRe.test(search.get('hotel_id')||''))return 'catalog_admin';
   if(path==='/v1/platform/subscription-drafts'&&

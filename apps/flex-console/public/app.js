@@ -393,6 +393,11 @@ async function saveInstallationTrial(form){
  try{await saveQaCatalogAction('installation-trial',{hotel_id:String(new FormData(form).get('hotel_id'))});await render();}
  catch(e){status.textContent=e.message;button.disabled=false;}
 }
+async function launchOfferPanel(){
+ const l=({ru:{title:'Стартовая акция',reserved:'Зарезервировано',available:'Свободно',slot:'Место',hotel:'Гостиница',note:'Резервация не подтверждает оплату или активацию.',annual:'Подписка за год',setup:'Внедрение'},kg:{title:'Баштапкы акция',reserved:'Ээлеген орундар',available:'Бош орундар',slot:'Орун',hotel:'Мейманкана',note:'Орун ээлөө төлөмдү же активдештирүүнү ырастабайт.',annual:'Жылдык жазылуу',setup:'Орнотуу'},en:{title:'Launch offer',reserved:'Reserved',available:'Available',slot:'Slot',hotel:'Hotel',note:'Reservation does not confirm payment or activation.',annual:'Annual subscription',setup:'Implementation'}})[state.lang];
+ const r=await api('/v1/platform/launch-offer');
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2><div class="grid two">'+kv(l.reserved,r.reserved+' / '+r.capacity)+kv(l.available,r.available)+'</div>'+info(l.note,'info')+(r.reservations.length?table([l.slot,l.hotel,t('packageType'),l.annual,l.setup,t('periodStart')],r.reservations.map(x=>'<tr><td>'+safe(x.slot)+'</td><td>'+safe(x.display_name)+'</td><td>'+safe(x.package_kind)+'</td><td>'+money(x.subscription_term_total,'KGS')+'</td><td>'+money(x.implementation_total,'KGS')+'</td><td>'+safe(date(x.created_at))+'</td></tr>')):empty(t('noData')))+'</section>';
+}
 async function commercialHotelOfferForm(){
  const r=await api('/v1/platform/commercial-policy'), p=r.policy;
  const labels={ru:{title:'Коммерческий тариф',note:'Предложение без активации подписки',extras:'Дополнительные модули'},kg:{title:'Коммерциялык тариф',note:'Жазылууну активдештирбеген сунуш',extras:'Кошумча модулдар'},en:{title:'Commercial tariff',note:'Offer without subscription activation',extras:'Additional modules'}};
@@ -402,14 +407,14 @@ async function commercialHotelOfferForm(){
  '<label>'+safe(t('periodStart'))+'<input type="date" name="period_start" required value="'+safe(dateValue(2))+'"></label>'+
  '<fieldset><legend>'+safe(l.extras)+'</legend>'+Object.entries(p.module_monthly_prices).map(([k,v])=>'<label class="check-row"><input type="checkbox" name="extras" value="'+safe(k)+'"><span>'+safe(k)+' · '+money(v,p.currency)+'</span></label>').join('')+'</fieldset>'+
  '<label>'+safe(t('packageDiscount'))+'<input name="discount_pct" type="number" min="0" max="100" step="0.01" value="0" required></label>'+
- '<label>'+safe({ru:'Месяцев',kg:'Ай',en:'Months'}[state.lang]||'Месяцев')+'<select name="term_months">'+[1,3,6,12].map(n=>'<option value="'+n+'">'+n+'</option>').join('')+'</select></label><label class="check-row"><input type="checkbox" name="standard_term_discount">'+safe({ru:'Стандартная скидка за срок',kg:'Мөөнөт үчүн стандарттык арзандатуу',en:'Standard term discount'}[state.lang]||'Стандартная скидка')+'</label><label class="check-row"><input type="checkbox" name="include_implementation">'+safe({ru:'Включить внедрение',kg:'Орнотууну кошуу',en:'Include implementation'}[state.lang]||'Включить внедрение')+'</label><button class="primary" type="submit">'+safe(t('packageSave'))+'</button><div role="status" aria-live="polite"></div></form></section>';
+ '<label>'+safe({ru:'Месяцев',kg:'Ай',en:'Months'}[state.lang]||'Месяцев')+'<select name="term_months">'+[1,3,6,12].map(n=>'<option value="'+n+'">'+n+'</option>').join('')+'</select></label><label class="check-row"><input type="checkbox" name="standard_term_discount">'+safe({ru:'Стандартная скидка за срок',kg:'Мөөнөт үчүн стандарттык арзандатуу',en:'Standard term discount'}[state.lang]||'Стандартная скидка')+'</label><label class="check-row"><input type="checkbox" name="launch_offer">'+safe({ru:'Стартовая акция: 40% на первый год (резервация)',kg:'Баштапкы акция: биринчи жылга 40% (орун ээлөө)',en:'Launch offer: 40% off first year (reservation)'}[state.lang]||'Launch offer')+'</label><label class="check-row"><input type="checkbox" name="include_implementation">'+safe({ru:'Включить внедрение',kg:'Орнотууну кошуу',en:'Include implementation'}[state.lang]||'Включить внедрение')+'</label><button class="primary" type="submit">'+safe(t('packageSave'))+'</button><div role="status" aria-live="polite"></div></form></section>';
 }
 async function saveCommercialHotelOffer(form){
  const d=new FormData(form),button=form.querySelector('button[type=submit]'),status=form.querySelector('[role=status]');
  button.disabled=true;
  try{
  const kind=String(d.get('package_kind'));
- await saveQaCatalogAction('tariff-packages',{hotel_id:state.hotelId,package_kind:kind,title:kind,period_start:String(d.get('period_start')),skus:d.getAll('extras'),discount_pct:String(d.get('discount_pct')),trial_days:5,custom_monthly_price:null,commercial_policy_version:Number(d.get('policy_version')),term_months:Number(d.get('term_months')),standard_term_discount:d.has('standard_term_discount'),include_implementation:d.has('include_implementation')});
+ await saveQaCatalogAction('tariff-packages',{hotel_id:state.hotelId,package_kind:kind,title:kind,period_start:String(d.get('period_start')),skus:d.getAll('extras'),discount_pct:String(d.get('discount_pct')),trial_days:5,custom_monthly_price:null,commercial_policy_version:Number(d.get('policy_version')),term_months:Number(d.get('term_months')),launch_offer:d.has('launch_offer'),standard_term_discount:d.has('standard_term_discount'),include_implementation:d.has('include_implementation')});
  await render();
  }catch(e){status.textContent=e.message;button.disabled=false;}
 }
@@ -725,7 +730,7 @@ async function catalog(){
  if(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled){
   const items=await api('/v1/platform/catalog');
   state.catalogItems=items;
-  return heading(t('adminCatalog'),t('helpQa'))+toolbar()+adminCatalogButtons()+await commercialPolicyPanel()+
+  return heading(t('adminCatalog'),t('helpQa'))+toolbar()+adminCatalogButtons()+await commercialPolicyPanel()+await launchOfferPanel().catch(e=>info(e.message,'error'))+
     '<div class="grid three">'+metric(t('activeSku'),items.length,'cyan-text')+
     metric(t('currency'),'KGS')+metric(t('readOnly'),'QA')+'</div>'+
     '<section class="panel">'+(items.length?table([t('sku'),t('skuTitle'),t('status'),t('price'),t('actions')],

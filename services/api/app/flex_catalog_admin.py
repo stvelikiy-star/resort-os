@@ -158,6 +158,7 @@ class NewTariffPackageProposal(BaseModel):
     term_months: int | None = Field(default=None, strict=True)
     include_implementation: bool = Field(default=False, strict=True)
     standard_term_discount: bool = Field(default=False, strict=True)
+    launch_offer: bool = Field(default=False, strict=True)
     discount_pct: str = "0"
     trial_days: int = Field(default=0, ge=0, le=90)
     source_template_id: uuid.UUID | None = None
@@ -195,6 +196,8 @@ class NewTariffPackageProposal(BaseModel):
 
 
 def ensure_package_proposal(payload: NewTariffPackageProposal) -> None:
+    if payload.launch_offer and (payload.commercial_policy_version is None or payload.package_kind == 'CUSTOM' or payload.term_months != 12 or payload.standard_term_discount or Decimal(payload.discount_pct) != 0 or payload.custom_monthly_price is not None or payload.source_template_id is not None):
+        raise HTTPException(422, detail='Launch offer requires a standard annual package without combined discounts')
     if payload.term_months is not None and payload.term_months not in {1,3,6,12}:
         raise HTTPException(422, detail="Unsupported subscription term")
     if payload.commercial_policy_version is None and (payload.term_months is not None or payload.include_implementation or payload.standard_term_discount):
@@ -241,6 +244,25 @@ async def health():
         "status": "ok", "mode": "QA_CATALOG_CONFIGURATION",
         "payments_enabled": False, "subscriptions_activated": False,
     }
+
+
+@app.get("/v1/platform/launch-offer")
+async def launch_offer_status(
+    request: Request,
+    principal: PlatformPrincipal = Depends(resolve_platform_principal),
+):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn, principal)
+            rows = await conn.fetch(
+                "SELECT r.hotel_id,r.slot,r.offer_id,r.created_at,h.display_name,"
+                "p.package_kind,p.subscription_term_total,p.implementation_total "
+                "FROM flex_launch_offer_reservations r JOIN flex_hotels h ON h.id=r.hotel_id "
+                "JOIN flex_tariff_package_versions p ON p.id=r.offer_id ORDER BY r.slot"
+            )
+            return {"capacity":50,"reserved":len(rows),"available":50-len(rows),
+                    "reservations":[dict(r) for r in rows],"payments_enabled":False}
 
 
 @app.get("/v1/platform/commercial-policy")
@@ -610,6 +632,15 @@ async def create_tariff_package_proposal(
                         raise HTTPException(422, detail="Unknown commercial module")
                     base = Decimal(str(package.get("price",package.get("base_price"))))
                     extra = selected - included
+                    if payload.launch_offer:
+                        if extra or policy['launch_offer'] != {'discount_pct':40,'months':12,'first_hotels':50,'first_year_only':True,'prepayment_required':True}:
+                            raise HTTPException(422, detail='Launch offer policy or add-ons not eligible')
+                        await conn.fetchval("SELECT pg_advisory_xact_lock(hashtext('FLEX_LAUNCH_OFFER_50'))")
+                        if await conn.fetchval('SELECT EXISTS(SELECT 1 FROM flex_launch_offer_reservations WHERE hotel_id=$1)', payload.hotel_id):
+                            raise HTTPException(409, detail='Hotel already has a launch reservation')
+                        launch_slot = await conn.fetchval('SELECT min(n) FROM generate_series(1,50) n WHERE NOT EXISTS(SELECT 1 FROM flex_launch_offer_reservations r WHERE r.slot=n)')
+                        if launch_slot is None:
+                            raise HTTPException(409, detail='Launch offer capacity exhausted')
                     list_total = base + sum((Decimal(str(prices[k])) for k in extra),Decimal("0"))
                     if payload.custom_monthly_price is not None and Decimal(payload.custom_monthly_price) < base:
                         raise HTTPException(422, detail="CUSTOM price below mandatory base")
@@ -650,6 +681,8 @@ async def create_tariff_package_proposal(
                     end = date(year,month+1,min(start.day,monthrange(year,month+1)[1]))
                     if payload.standard_term_discount:
                         discount = Decimal(str(policy["term_discounts_pct"][str(months)]))
+                    if payload.launch_offer:
+                        discount = Decimal('40')
                     implementation = Decimal(str(policy["implementation_fee"])) if payload.include_implementation else Decimal("0")
                 custom=(Decimal(payload.custom_monthly_price)
                         if payload.custom_monthly_price is not None else None)
@@ -676,7 +709,11 @@ async def create_tariff_package_proposal(
                     json.dumps(items),list_total,discount,payload.trial_days,
                     custom,total,principal.subject_id,payload.source_template_id,payload.commercial_policy_version,months,start,end,term_total,implementation,
                 )
+                if payload.launch_offer:
+                    await conn.execute('INSERT INTO flex_launch_offer_reservations(hotel_id,slot,offer_id,created_by) VALUES($1,$2,$3,$4)',payload.hotel_id,launch_slot,row['id'],principal.subject_id)
                 return {
+                    "launch_offer_reserved":payload.launch_offer,
+                    "launch_offer_slot":launch_slot if payload.launch_offer else None,
                     "id":str(row["id"]),"hotel_id":str(payload.hotel_id),
                     "package_kind":payload.package_kind,"version":version,
                     "source_template_id":payload.source_template_id,
