@@ -78,7 +78,7 @@ jobs:
             0007_flex_invoice_ledger_preview.sql \
             0008_flex_refund_reconciliation_preview.sql \
             0009_flex_signed_qa_settlement_preview.sql \
-            0010_flex_partner_earnings_preview.sql 0027_flex_participant_details.sql; do
+            0010_flex_partner_earnings_preview.sql 0011_flex_catalog_subscription_drafts_preview.sql 0027_flex_participant_details.sql 0028_flex_qa_agent_assignments.sql; do
             psql -X -v ON_ERROR_STOP=1 -f "docs/flex/sql/$f"
           done
           psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_rls_isolation_contract.sql
