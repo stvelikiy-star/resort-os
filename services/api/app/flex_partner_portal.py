@@ -9,7 +9,8 @@ from __future__ import annotations
 import uuid
 from calendar import monthrange
 from contextlib import asynccontextmanager
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from zoneinfo import ZoneInfo
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
@@ -212,3 +213,60 @@ async def admin_earnings_summary(
                     "events":r["events"],
                 } for r in rows],
             }
+
+
+def investment_projection(principal: Decimal, share_bps: int, bonus_months: int,
+                          monthly_revenue: Decimal, start_month: date, elapsed_months: int):
+    """Hypothetical constant-revenue scenario; never evidence of actual cash."""
+    if (principal,share_bps) not in {(Decimal("150000"),2500),(Decimal("250000"),3500),(Decimal("400000"),5000)} or bonus_months!=3:
+        raise ValueError("Unsupported investment plan")
+    if (not monthly_revenue.is_finite() or monthly_revenue<0 or monthly_revenue>Decimal("999999999999")
+        or monthly_revenue!=monthly_revenue.quantize(Decimal("0.01")) or start_month.day!=1
+        or not 2000<=start_month.year<=2090 or not 0<=elapsed_months<=120):
+        raise ValueError("Invalid forecast scenario")
+    share=(monthly_revenue*Decimal(share_bps)/Decimal(10000)).quantize(Decimal("0.01"),rounding=ROUND_HALF_UP)
+    def month_at(offset):
+        year,month=divmod(start_month.year*12+start_month.month-1+offset,12)
+        return date(year,month+1,1)
+    def money(v): return f"{v:.2f}"
+    zero=Decimal("0.00")
+    months_to_return=int((principal+share-Decimal("0.01"))//share) if share else None
+    repaid=min(principal,share*elapsed_months)
+    remaining=principal-repaid
+    bonus_paid=zero
+    bonus_start=bonus_end=repayment_date=None
+    final_principal_payment=None
+    if months_to_return is not None and months_to_return<=120:
+        bonus_start=month_at(months_to_return)
+        repayment_date=bonus_start-timedelta(days=1)
+        bonus_end=month_at(months_to_return+bonus_months)
+        final_principal_payment=principal-share*(months_to_return-1)
+        bonus_paid=share*min(bonus_months,max(0,elapsed_months-months_to_return))
+    stage=("RETURN" if remaining>0 else "BONUS" if elapsed_months<months_to_return+bonus_months else "ENDED")
+    return {"mode":"FORECAST_ONLY","currency":"KGS","stage":stage,
+        "monthly_share":money(share),"projected_principal_repaid":money(repaid),
+        "projected_principal_remaining":money(remaining),"projected_bonus_paid":money(bonus_paid),
+        "projected_total_received":money(repaid+bonus_paid),
+        "final_principal_payment":money(final_principal_payment) if final_principal_payment is not None else None,
+        "months_to_return":months_to_return if months_to_return is not None and months_to_return<=120 else None,
+        "projected_repayment_date":repayment_date,"bonus_start":bonus_start,"bonus_end_exclusive":bonus_end,
+        "payouts_enabled":False,"actual_principal_repaid":None}
+
+
+@app.get("/v1/partner/me/investment-projection")
+async def own_investment_projection(request: Request,plan_id: uuid.UUID=Query(...),
+    monthly_revenue: str=Query(...,pattern=r"^(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,2})?$"),
+    start_month: date=Query(...),elapsed_months: int=Query(...,ge=0,le=120),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    if principal.role!="INVESTOR" or not principal.investor_id or not (principal.mfa_verified or qa_password_reads()):
+        raise HTTPException(403,detail="Verified investor required")
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await _switch(conn,"flex_investor_statement_reader","flex.authorized_investor_id",principal.investor_id)
+            row=await conn.fetchrow("SELECT principal,share_bps,bonus_months FROM flex_qa_investor_plans WHERE id=$1 AND investor_id=$2",plan_id,uuid.UUID(principal.investor_id))
+            if row is None:
+                raise HTTPException(404,detail="Investment proposal unavailable")
+            try:
+                return {"plan_id":str(plan_id),**investment_projection(row["principal"],row["share_bps"],row["bonus_months"],Decimal(monthly_revenue),start_month,elapsed_months)}
+            except (ValueError,ArithmeticError):
+                raise HTTPException(422,detail="Invalid forecast scenario") from None
