@@ -506,9 +506,20 @@ async def verify_guest_service_ledger():
     try:
         maker=await conn.fetchval("""SELECT id FROM staff_users WHERE "propertyId"=$1 AND username='owner'""",p)
         reviewer=await conn.fetchval("""SELECT id FROM staff_users WHERE "propertyId"=$1 AND username='accounting_reviewer'""",p)
-        stay=await conn.fetchrow("""SELECT id,"reservationId","guestId" FROM stays WHERE "propertyId"=$1 AND "reservationId" IS NOT NULL LIMIT 1""",p)
-        assert stay, "CI requires a real stay fixture"
+        # This workflow runs before browser stay creation. Create its own
+        # real relational fixture in the same rolled-back transaction.
         day=await conn.fetchval("SELECT (now() AT TIME ZONE timezone)::date FROM properties WHERE id=$1",p)
+        gid,rid,stay_id=uuid.uuid4(),uuid.uuid4(),uuid.uuid4()
+        await conn.execute("""INSERT INTO guests (id,"propertyId","firstName","lastName","createdAt","updatedAt")
+            VALUES($1,$2,'CI','Guest service',now(),now())""",gid,p)
+        await conn.execute("""INSERT INTO reservations
+            (id,"propertyId","bookingNumber","primaryGuestId",status,"checkIn","checkOut",adults,"totalKgs","createdAt","updatedAt")
+            VALUES($1,$2,$3,$4,'CHECKED_IN',$5,$6,1,2000,now(),now())""",
+            rid,p,"CI-GUEST-"+str(rid),gid,day,day+timedelta(days=1))
+        await conn.execute("""INSERT INTO stays
+            (id,"propertyId","reservationId","guestId",status,"actualCheckInAt","createdAt","updatedAt")
+            VALUES($1,$2,$3,$4,'CHECKED_IN',now() AT TIME ZONE 'UTC',now(),now())""",stay_id,p,rid,gid)
+        stay={"id":stay_id,"reservationId":rid,"guestId":gid}
         tid,fid,sid,qid,did=([uuid.uuid4() for _ in range(5)])
         await conn.execute("""INSERT INTO operational_tasks
           (id,"propertyId","reservationId","stayId","serviceCode","serviceDate",type,status,priority,
