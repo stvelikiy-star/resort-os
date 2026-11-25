@@ -394,6 +394,41 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
             finally:await con.close()
         asyncio.run(verify())
 
+    def test_11_launch_capacity_and_base_price(self):
+        from concurrent.futures import ThreadPoolExecutor
+        async def seed():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT current_database()"),"flex_ci")
+                ids=[uuid.uuid4() for _ in range(49)]
+                await con.executemany("INSERT INTO flex_hotels(id,display_name) VALUES($1,$2)",
+                                      [(i,"Synthetic launch capacity") for i in ids])
+                return [str(i) for i in ids]
+            finally: await con.close()
+        ids=asyncio.run(seed())
+        path="/v1/platform/tariff-packages"
+        data={"package_kind":"BASE","title":"Launch capacity",
+              "period_start":datetime.now(ZoneInfo("Asia/Bishkek")).date().isoformat(),
+              "skus":[],"commercial_policy_version":3,"discount_pct":"0",
+              "trial_days":5,"custom_monthly_price":None,"term_months":12,
+              "standard_term_discount":False,"include_implementation":True,"launch_offer":True}
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            results=list(pool.map(lambda i:self.post(path,{**data,"hotel_id":i}),ids))
+        self.assertEqual(sorted(x.status_code for x in results),[201]*48+[409])
+        accepted=[x.json() for x in results if x.status_code==201]
+        self.assertEqual(len({x["launch_offer_slot"] for x in accepted}),48)
+        for row in accepted:
+            self.assertEqual(Decimal(row["subscription_term_total"]),Decimal("39600"))
+            self.assertEqual(Decimal(row["implementation_total"]),Decimal("25000"))
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_launch_offer_reservations"),50)
+                self.assertEqual(await con.fetchval("SELECT count(DISTINCT slot) FROM flex_launch_offer_reservations"),50)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+            finally: await con.close()
+        asyncio.run(verify())
+
     def test_09_installation_trial_is_one_time_and_admin_only(self):
         path="/v1/platform/installation-trial"
         data={"hotel_id":HOTEL_A}
