@@ -293,6 +293,7 @@ function PartialRefundPanel({payments, onRecorded}: {
   const [documentInfo, setDocumentInfo] = useState("");
   const [documentLink, setDocumentLink] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [externalDone, setExternalDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -316,7 +317,7 @@ function PartialRefundPanel({payments, onRecorded}: {
     try {
       const n = Number(amount);
       const ref = reference.trim().replace(/\s+/g," ");
-      if (!payment?.reservation_id || !Number.isSafeInteger(n) || n <= 0 || n > payment.amount_kgs ||
+      if (!externalDone || !payment?.reservation_id || !Number.isSafeInteger(n) || n <= 0 || n > payment.amount_kgs ||
           ref.length < 8 || ref.length > 150 || reason.trim().length < 8 || !documentDate ||
           !stamp || !/(Z|[+-]\d{2}:\d{2})$/.test(stamp) || !Number.isFinite(Date.parse(stamp)) ||
           !file || file.size < 16 || file.size > 2*1024*1024 ||
@@ -390,7 +391,8 @@ function PartialRefundPanel({payments, onRecorded}: {
       <label>Время возврата с часовым поясом <input placeholder="2026-11-25T15:30:00+06:00" value={stamp} onChange={e=>setStamp(e.target.value)}/></label>
       <label>Причина <textarea maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label>
       <label>PDF, PNG, JPEG · до 2 МБ <input type="file" accept="application/pdf,image/png,image/jpeg" onChange={e=>setFile(e.target.files?.[0] || null)}/></label>
-      <button type="button" className="btn" onClick={()=>void prepare()}>Сохранить документ</button>
+      <label><input type="checkbox" checked={externalDone} onChange={e=>setExternalDone(e.target.checked)}/>Возврат уже выполнен вне платформы</label>
+      <button type="button" className="btn" disabled={!externalDone} onClick={()=>void prepare()}>Сохранить документ</button>
     </fieldset>
     <fieldset disabled={busy}>
       <legend>OWNER 2 · независимая проверка</legend>
@@ -468,7 +470,7 @@ export default function HotelFinanceBoard() {
 
     {error && <div className="error-box">{error}</div>}
     {loading && !data ? <div className="loading">Загрузка финансов…</div> : data && <>
-      {data.owner_accrual_readiness_snapshot && <PartialRefundPanel payments={data.recent_payments} onRecorded={()=>void load()}/>}
+      {!loading && !error && ledger && data.owner_accrual_readiness_snapshot && <PartialRefundPanel payments={data.recent_payments} onRecorded={()=>void load()}/>}
       <section className="finance-kpis">
         <article><span>Получено за период</span><strong>{money(data.period_payments.received_kgs)}</strong><small>{data.period_payments.received_count} записей Payment.status=RECEIVED</small></article>
         <article><span>Общий долг</span><strong>{money(data.receivables_snapshot.outstanding_kgs)}</strong><small>{data.receivables_snapshot.debtor_count} броней с остатком</small></article>
