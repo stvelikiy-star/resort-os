@@ -739,5 +739,32 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         asyncio.run(verify())
 
 
+    def test_18_explicit_credit_application(self):
+        path="/v1/platform/synthetic-cash-journal"
+        contract=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()["agreements"][0]
+        base={"hotel_id":HOTEL_A,"agreement_id":contract["id"]}
+        def append(n,key,amount,kind="PAYMENT",payment_id=None):
+            return self.post(path,{**base,"expected_sequence":n,"event":{
+                "kind":kind,"event_id":key,"amount":amount,"payment_id":payment_id}})
+        self.assertEqual(append(3,"p3","8000").status_code,201)
+        before=append(4,"r2","4000","REFUND","p1").json()
+        self.assertEqual(Decimal(before["outstanding"]),Decimal("4000"))
+        self.assertEqual(Decimal(before["credit"]),Decimal("5000"))
+        self.assertEqual(append(5,"bad-credit","4001","CREDIT_APPLY","p3").status_code,422)
+        result=append(5,"c1","4000","CREDIT_APPLY","p3")
+        self.assertEqual(result.status_code,201,result.text)
+        after=result.json()
+        self.assertEqual(Decimal(after["outstanding"]),Decimal("0"))
+        self.assertEqual(Decimal(after["credit"]),Decimal("1000"))
+        self.assertEqual(after["net_simulated_cash"],before["net_simulated_cash"])
+        self.assertEqual(append(5,"c1","4000","CREDIT_APPLY","p3").json(),after)
+        self.assertFalse(after["payments_enabled"])
+        self.assertFalse(after["subscription_activated"])
+        refund=append(6,"r3","2000","REFUND","p3").json()
+        self.assertEqual(Decimal(refund["outstanding"]),Decimal("1000"))
+        self.assertEqual(Decimal(refund["credit"]),Decimal("0"))
+        self.assertEqual(Decimal(refund["discrepancy"]),Decimal("0"))
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)
