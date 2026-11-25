@@ -134,6 +134,7 @@ async def own_earnings(
                      WHERE agent_id=$1 AND action='ASSIGN' GROUP BY hotel_id) a
                     WHERE first_assignment>=$2 AND first_assignment<=$3""",party_uuid,month_start,end)
                 contracts=[]
+                investment_plans=[]
             else:
                 details=[]
                 qa_assignments=[]
@@ -142,6 +143,14 @@ async def own_earnings(
                 contracts=await conn.fetch("""SELECT id,contract_key,version,principal,share_bps,effective_from
                     FROM flex_investor_contract_versions WHERE investor_id=$1
                     ORDER BY contract_key,version DESC""",party_uuid)
+                drafts=await conn.fetch("""SELECT id,investor_id,revision,principal,share_bps,bonus_months,revenue_basis,state,created_at
+                    FROM flex_qa_investor_plans WHERE investor_id=$1 ORDER BY revision DESC""",party_uuid)
+                links=await conn.fetch("SELECT plan_id,hotel_id,hotel_name_snapshot FROM flex_qa_investor_plan_hotels WHERE investor_id=$1 ORDER BY plan_id,hotel_id",party_uuid)
+                by_plan={}
+                for h in links:
+                    by_plan.setdefault(h["plan_id"],[]).append(dict(h))
+                investment_plans=[{**dict(p),"principal":str(p["principal"]),"hotels":by_plan.get(p["id"],[]),
+                    "principal_received_kg":None,"principal_repaid_kg":None,"bonus_end":None} for p in drafts]
             gross, refunded = row["gross"], row["refunded"]
             return {
                 "role":principal.role,
@@ -163,6 +172,7 @@ async def own_earnings(
                     "qa_new_assignments_this_month":planned_connections,
                     "paid_connections":None,"payable_amount":None} if principal.role=="SALES_AGENT" else None),
                 "contracts":[{**dict(c),"principal":f"{c['principal']:.2f}"} for c in contracts],
+                "investment_plans":investment_plans,
                 "outstanding_payable_kg":None,
                 "data_provenance":"QA_ONLY_NOT_BANK_RECONCILED",
             }
