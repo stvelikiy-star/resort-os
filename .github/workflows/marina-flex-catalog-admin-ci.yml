@@ -94,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           psql -X -v ON_ERROR_STOP=1 -c "CREATE ROLE flex_catalog_runtime_ci LOGIN PASSWORD 'flex_catalog_ci_only' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT"
-          psql -X -v ON_ERROR_STOP=1 -c "GRANT flex_hotel_reader, flex_identity_reader, flex_platform_admin_reader, flex_catalog_draft_writer TO flex_catalog_runtime_ci WITH INHERIT FALSE, SET TRUE"
+          psql -X -v ON_ERROR_STOP=1 -c "GRANT flex_hotel_reader, flex_identity_reader, flex_platform_admin_reader, flex_catalog_draft_writer, flex_customer_acceptance_writer TO flex_catalog_runtime_ci WITH INHERIT FALSE, SET TRUE"
           psql -X -v ON_ERROR_STOP=1 -c "SELECT 1 / CASE WHEN NOT pg_has_role('flex_catalog_runtime_ci','flex_catalog_draft_writer','USAGE') THEN 1 ELSE 0 END"
       - name: Real signed MFA HTTP catalog and subscription draft QA E2E
         env:

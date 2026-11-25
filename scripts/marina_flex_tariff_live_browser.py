@@ -25,7 +25,7 @@ def totp(secret):
     return f"{value % 1000000:06d}"
 
 
-def enroll(browser):
+def enroll(browser, email=None, password=None):
     context = browser.new_context()
     page = context.new_page()
     page.goto(ORIGIN)
@@ -41,8 +41,8 @@ def enroll(browser):
         assert reply["status"] == 200, (path, reply["status"], reply["data"].get("code"))
         return reply["data"]
 
-    password = os.environ["QA_PASSWORD"]
-    post("sign-in/email", {"email": os.environ["QA_EMAIL"], "password": password})
+    password = password or os.environ["QA_PASSWORD"]
+    post("sign-in/email", {"email": email or os.environ["QA_EMAIL"], "password": password})
     setup = post("two-factor/enable", {"password": password})
     secret = parse_qs(urlsplit(setup["totpURI"]).query)["secret"][0]
     post("two-factor/verify-totp", {"code": totp(secret), "trustDevice": False})
@@ -272,6 +272,61 @@ def run():
         evidence=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
         assert evidence=={"approvals":1,"signed":0,"payments":0,"subscriptions":2},evidence
         print("PASS browser internal agreement approval and subscription plan; client signature, payment and activation remain disabled")
+        # Real invitation-backed owner session; no forged identity or admin impersonation.
+        owner_email=os.environ["QA_OWNER_EMAIL"]
+        owner_password=os.environ["QA_OWNER_PASSWORD"]
+        owner_secret=enroll(browser,owner_email,owner_password)
+        # Better Auth shares a database-backed 60-second rate window on the
+        # local runner IP. Enrollment and the second fresh login must not
+        # consume each other's allowance. Keep the production limiter intact.
+        time.sleep(65)
+        owner_context=browser.new_context()
+        owner=owner_context.new_page()
+        owner.goto(ORIGIN)
+        signin=owner.locator("#flex-identity-signin")
+        signin.locator('[name="email"]').fill(owner_email)
+        signin.locator('[name="password"]').fill(owner_password)
+        with owner.expect_response(ORIGIN+"/api/identity/sign-in/email") as signed_in:
+            signin.locator('button[type="submit"]').click()
+        reply=signed_in.value
+        assert reply.status==200,("owner sign-in HTTP",reply.status)
+        assert reply.json().get("twoFactorRedirect") is True, "Owner fresh password login did not request TOTP"
+        challenge=owner.locator("#flex-identity-totp")
+        expect(challenge).to_be_visible(timeout=15000)
+        challenge.locator('[name="code"]').fill(totp(owner_secret))
+        with owner.expect_response(ORIGIN+"/api/identity/two-factor/verify-totp") as verified:
+            challenge.locator('button[type="submit"]').click()
+        assert verified.value.status==200
+        me=owner.request.get(ORIGIN+"/api/data/v1/me",ignore_https_errors=True)
+        assert me.status==200 and me.json()["role"]=="HOTEL_OWNER"
+        assert me.json()["hotels"]==[HOTEL_A]
+        owner.locator("#lang").select_option("en")
+        owner.locator('[data-hotel-tab="subscription"]').click()
+        panel=owner.locator("section.panel").filter(has=owner.get_by_role("heading",name="Confirm commercial terms",exact=True))
+        expect(panel).to_be_visible()
+        expect(panel).to_contain_text("36,000 KGS")
+        expect(panel).to_contain_text("25,000 KGS")
+        form=panel.locator(".customer-acceptance-form")
+        form.locator('[name="acknowledged"]').check()
+        with owner.expect_response(ORIGIN+"/api/actions/customer-agreement-acceptances") as submitted:
+            form.locator('button[type="submit"]').click()
+        response=submitted.value
+        assert response.status==201,("owner acceptance",response.status,response.text()[:250])
+        accepted=response.json()
+        assert accepted["agreement_id"]==contract["id"] and accepted["terms_digest"]==contract["terms_digest"]
+        assert not accepted["client_signed"] and not accepted["subscription_activated"] and not accepted["payments_enabled"]
+        expect(panel.get_by_text("Customer accepted terms",exact=False)).to_be_visible()
+        denied=owner.request.get(ORIGIN+"/api/data/v1/platform/customer-agreement-acceptances?hotel_id="+HOTEL_B,ignore_https_errors=True)
+        assert denied.status==404
+        page.locator('[data-hotel-tab="history"]').click()
+        expect(page.get_by_text("Customer accepted terms",exact=True)).to_be_visible()
+        query="""SELECT json_build_object('acceptances',count(*),'signed',(SELECT count(*) FROM flex_private.flex_commercial_agreement_versions WHERE state='SIGNED'),
+            'payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments),'subscriptions',(SELECT count(*) FROM flex_private.flex_subscriptions))
+            FROM flex_private.flex_customer_agreement_acceptances"""
+        evidence=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
+        assert evidence=={"acceptances":1,"signed":0,"payments":0,"subscriptions":2},evidence
+        owner_context.close()
+        print("PASS browser real hotel owner accepted exact terms; other hotel denied; administrator sees evidence; PostgreSQL matches")
         browser.close()
 
 

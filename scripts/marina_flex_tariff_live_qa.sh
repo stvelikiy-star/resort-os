@@ -53,11 +53,11 @@ GRANT USAGE ON SCHEMA flex_auth TO flex_auth_runtime;
 ALTER ROLE flex_auth_runtime IN DATABASE flex_qa SET search_path=flex_auth;
 ALTER ROLE flex_qa_read_runtime IN DATABASE flex_qa SET search_path=flex_private;
 GRANT flex_hotel_reader,flex_identity_reader,flex_platform_admin_reader,flex_catalog_draft_writer,
-      flex_agent_statement_reader,flex_investor_statement_reader,flex_platform_statement_reader
+      flex_agent_statement_reader,flex_investor_statement_reader,flex_platform_statement_reader,flex_customer_acceptance_writer
       TO flex_qa_read_runtime WITH INHERIT FALSE, SET TRUE;
 GRANT USAGE ON SCHEMA flex_private TO flex_qa_read_runtime,flex_hotel_reader,flex_identity_reader,
       flex_platform_admin_reader,flex_catalog_draft_writer,flex_agent_statement_reader,
-      flex_investor_statement_reader,flex_platform_statement_reader;
+      flex_investor_statement_reader,flex_platform_statement_reader,flex_customer_acceptance_writer;
 SQL
 
 export FLEX_ENVIRONMENT=qa FLEX_AUTH_ENABLED=true FLEX_AUTH_SCHEMA_READY=true FLEX_MFA_BRIDGE_ENABLED=true
@@ -69,6 +69,7 @@ export FLEX_DATABASE_URL="postgresql://flex_qa_read_runtime:$api_password@127.0.
 export FLEX_AUTH_DATABASE_URL="postgresql://flex_auth_runtime:$auth_password@127.0.0.1:5457/flex_qa?sslmode=verify-full"
 export FLEX_SESSION_KEY=$(openssl rand -base64 32) BETTER_AUTH_SECRET=$(openssl rand -hex 48)
 export QA_PASSWORD=$(openssl rand -hex 24) QA_EMAIL=qa-admin@example.test
+export QA_OWNER_PASSWORD=$(openssl rand -hex 24) QA_OWNER_EMAIL=qa-owner@example.test
 export QA_TLS_CERT="$qa_dir/server.crt" QA_TLS_KEY="$qa_dir/server.key"
 openssl genpkey -algorithm ED25519 -out "$qa_dir/issuer.key"
 export FLEX_MFA_PRIVATE_KEY="$(cat "$qa_dir/issuer.key")"
@@ -95,18 +96,32 @@ try {
     [randomUUID(),'flex-first:'+createHash('sha256').update(token).digest('hex'),email]);
   if(!await redeemFirstInvite(db,token,process.env.QA_PASSWORD,hashPassword))throw Error('QA invitation failed');
   await db.query("INSERT INTO flex_private.flex_platform_memberships(subject_id,role,active) SELECT id,'SUPER_ADMIN',true FROM flex_auth.\"user\" WHERE email=$1",[email]);
+  // First-invite redemption is intentionally restricted to the very first user.
+  // Provision the second account only in this disposable CI fixture; do not
+  // loosen the real first-invite gate or fabricate its authenticated session.
+  if(process.env.GITHUB_ACTIONS!=='true'||process.env.PGDATABASE!=='flex_qa'||process.env.PGHOST!=='127.0.0.1'||process.env.PGUSER!=='flex_ci')throw Error('Unsafe owner fixture target');
+  const ownerEmail=process.env.QA_OWNER_EMAIL;
+  const ownerId=randomUUID(),ownerHash=await hashPassword(process.env.QA_OWNER_PASSWORD);
+  await db.query('BEGIN');
+  try {
+    await db.query('INSERT INTO flex_auth."user"(id,name,email,"emailVerified","twoFactorEnabled","updatedAt") VALUES ($1,$2,$2,true,false,now())',[ownerId,ownerEmail]);
+    await db.query(`INSERT INTO flex_auth.account(id,"accountId","providerId","userId",password,"updatedAt") VALUES ($1,$2,'credential',$2,$3,now())`,[randomUUID(),ownerId,ownerHash]);
+    await db.query('COMMIT');
+  } catch(error) { await db.query('ROLLBACK'); throw error; }
+  await db.query("INSERT INTO flex_private.flex_platform_memberships(subject_id,role,active) SELECT id,'HOTEL_OWNER',true FROM flex_auth.\"user\" WHERE email=$1",[ownerEmail]);
+  await db.query("INSERT INTO flex_private.flex_platform_hotel_grants(subject_id,hotel_id,granted_by) SELECT id,'00000000-0000-0000-0000-00000000000a','fixture' FROM flex_auth.\"user\" WHERE email=$1",[ownerEmail]);
 } finally { await db.end(); }
 JS
 )
 # Runtime processes receive only their own DB credential.
 (
- unset PGPASSWORD PGUSER QA_PASSWORD FLEX_AUTH_DATABASE_URL FLEX_MFA_PRIVATE_KEY FLEX_SESSION_KEY BETTER_AUTH_SECRET
+ unset PGPASSWORD PGUSER QA_PASSWORD QA_OWNER_PASSWORD FLEX_AUTH_DATABASE_URL FLEX_MFA_PRIVATE_KEY FLEX_SESSION_KEY BETTER_AUTH_SECRET
  exec python -m uvicorn index:app --app-dir apps/flex-api-qa --host 127.0.0.1 --port 8443 \
    --ssl-keyfile "$QA_TLS_KEY" --ssl-certfile "$QA_TLS_CERT"
 ) >"$qa_dir/api.log" 2>&1 &
 (
  cd apps/flex-console
- unset PGPASSWORD PGUSER QA_PASSWORD FLEX_DATABASE_URL
+ unset PGPASSWORD PGUSER QA_PASSWORD QA_OWNER_PASSWORD FLEX_DATABASE_URL
  exec node --input-type=module <<'JS'
 import https from 'node:https';
 import fs from 'node:fs';
