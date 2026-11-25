@@ -894,6 +894,7 @@ async function start(){
 nav.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b){state.view=b.dataset.view;state.hotelId=null;state.search='';render();}});
 main.addEventListener('click',e=>{
  const b=e.target.closest('button');if(!b)return;
+ if(b.hasAttribute('data-journal-append')){appendSyntheticJournal(b);return;}
  if(b.dataset.view){const target=b.dataset.view;if(!['hotel','hotel-link','subscription-draft','subscription'].includes(target))state.hotelId=null;state.view=target;render();}
  if(b.dataset.hotel){state.hotelId=b.dataset.hotel;state.hotelTab='overview';state.view=state.me.role==='SUPER_ADMIN'?'hotel':'subscription';state.linkChallenge=null;state.linkSuccess=false;render();}
  if(b.dataset.hotelTab && ['overview','subscription','finance','usage','relations','history'].includes(b.dataset.hotelTab)){state.hotelTab=b.dataset.hotelTab;render();}
