@@ -1257,3 +1257,58 @@ async def append_synthetic_cash_journal(payload: SyntheticCashAppend,request: Re
                 VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *""",payload.agreement_id,payload.hotel_id,len(rows)+1,
                 event["event_id"],event["kind"],Decimal(event["amount"]),event["payment_id"],principal.subject_id)
             return synthetic_cash_snapshot(row,[*rows,saved],payload.hotel_id,payload.agreement_id)
+
+
+# Assignment administration: immutable QA events, one current assignment per hotel.
+class AgentAssignmentRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    hotel_id: uuid.UUID
+    agent_id: uuid.UUID
+    expected_revision: int = Field(strict=True,ge=0,le=2147483646)
+    action: str = Field(pattern=r"^(ASSIGN|RELEASE)$")
+
+
+@app.get("/v1/platform/agent-assignments")
+async def agent_assignments(request: Request,hotel_id: uuid.UUID=Query(...),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
+            await as_writer(conn,principal)
+            if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_hotels WHERE id=$1)",hotel_id):
+                raise HTTPException(404,detail="Hotel unavailable")
+            rows=await conn.fetch("SELECT * FROM flex_qa_agent_assignments WHERE hotel_id=$1 ORDER BY revision DESC",hotel_id)
+            agents=await conn.fetch("SELECT id,platform_subject_id,status FROM flex_agents WHERE status='ACTIVE' ORDER BY platform_subject_id,id")
+            return {"hotel_id":str(hotel_id),"revision":rows[0]["revision"] if rows else 0,
+                "current":dict(rows[0]) if rows and rows[0]["action"]=="ASSIGN" else None,
+                "history":[dict(r) for r in rows],"agents":[dict(r) for r in agents],
+                "payments_enabled":False,"payouts_enabled":False}
+
+
+@app.post("/v1/platform/agent-assignments",status_code=201)
+async def append_agent_assignment(payload: AgentAssignmentRequest,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await commercial_hotel_lock(conn,payload.hotel_id)
+            if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_hotels WHERE id=$1 AND status IN ('PENDING','ACTIVE'))",payload.hotel_id):
+                raise HTTPException(404,detail="Hotel unavailable")
+            last=await conn.fetchrow("SELECT * FROM flex_qa_agent_assignments WHERE hotel_id=$1 ORDER BY revision DESC LIMIT 1",payload.hotel_id)
+            revision=last["revision"] if last else 0
+            if last and revision==payload.expected_revision+1 and last["agent_id"]==payload.agent_id and last["action"]==payload.action:
+                return {**dict(last),"payments_enabled":False,"payouts_enabled":False}
+            if revision!=payload.expected_revision:
+                raise HTTPException(409,detail="Assignment revision changed")
+            active=last is not None and last["action"]=="ASSIGN"
+            if payload.action=="ASSIGN":
+                if active:
+                    raise HTTPException(409,detail="Release current assignment first")
+                if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_agents WHERE id=$1 AND status='ACTIVE')",payload.agent_id):
+                    raise HTTPException(404,detail="Active agent unavailable")
+            elif not active or last["agent_id"]!=payload.agent_id:
+                raise HTTPException(409,detail="No matching current assignment")
+            row=await conn.fetchrow("""INSERT INTO flex_qa_agent_assignments(hotel_id,revision,agent_id,action,created_by)
+                VALUES($1,$2,$3,$4,$5) RETURNING *""",payload.hotel_id,revision+1,payload.agent_id,payload.action,principal.subject_id)
+            return {**dict(row),"payments_enabled":False,"payouts_enabled":False}
