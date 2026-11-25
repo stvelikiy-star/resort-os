@@ -57,7 +57,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "5a1a6ba598abe040e1649a50b64899516c4a6a7d",
+    "scripts/marina_rc3_additive_gate.py": "f0f7409661cd94fb80472afe52f56f9da433d35d",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -105,7 +105,7 @@ APPROVED_P0_BLOBS = {
     # MARINA batch provenance: reviewed additive migration, API and executable test.
     "scripts/marina_shared_three_hotel_restore_ci.py": "0f00022721637c58d3897f5164496af7173e37dd",
     "scripts/release_contract.py": "7871d08dee2d4a0ddba216404635fbffd8161be0",
-    "scripts/release_contract_test.py": "5df07b6c5a4f9be21a2e9e3f87ba87d796ad5c5c",
+    "scripts/release_contract_test.py": "b57e90422c8afde12c1b67b2cb5c453d7cafe62d",
     ".github/workflows/marina-zz113-rollback-ci.yml": "251b0b6f8a8d682bb58761863cecb895cb4c1afe",
     "scripts/marina_disposable_upgrade_acceptance_ci.py": "b877c5976def9451853953b86ec48b6804ab16b0",
     ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "9bf375ac39d02cf78122dbe4544f1d69d3335cb6",
