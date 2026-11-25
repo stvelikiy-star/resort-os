@@ -1492,3 +1492,94 @@ async def create_partner_proposal(payload: PartnerProposalRequest,request: Reque
             row=await conn.fetchrow("""INSERT INTO flex_qa_partner_proposals(partner_subject_id,hotel_id,revision,hotel_name_snapshot,title,terms_text,created_by)
                 VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *""",payload.partner_subject_id,payload.hotel_id,revision+1,hotel,payload.title,payload.terms_text,principal.subject_id)
             return {**dict(row),"payouts_enabled":False}
+
+
+@app.get("/v1/platform/commercial-center")
+async def commercial_center(request: Request,offset: int=Query(0,ge=0,le=1000000),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    """Page-scoped, read-only financial center. Drafts and ledger never combined."""
+    from .flex_finance_simulation import simulate_cash
+    require_admin(principal)
+    limit=25
+    today=datetime.now(ZoneInfo("Asia/Bishkek")).date()
+    fields=("amount_due","net_confirmed_cash","net_applied_to_lines","outstanding","unapplied_cash_credit")
+    zero=Decimal("0.00")
+    draft_fields=("subscription","implementation","net_simulated_cash","outstanding","credit")
+    def amounts(keys): return {k:zero for k in keys}
+    def display(values): return {k:str(v) for k,v in values.items()}
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
+            await as_writer(conn,principal)
+            count=await conn.fetchval("SELECT count(*) FROM flex_hotels")
+            hotels=await conn.fetch("SELECT id,display_name,status FROM flex_hotels ORDER BY display_name,id LIMIT $1 OFFSET $2",limit,offset)
+            ids=[h["id"] for h in hotels]
+            plans=await conn.fetch("""SELECT DISTINCT ON(a.hotel_id) a.hotel_id,a.id AS agreement_id,a.version,
+                p.package_kind,p.period_start,p.period_end_exclusive,p.subscription_term_total,p.implementation_total
+                FROM flex_commercial_agreement_versions a
+                JOIN flex_customer_agreement_acceptances c ON c.agreement_id=a.id AND c.hotel_id=a.hotel_id AND c.terms_digest=a.terms_digest
+                JOIN flex_tariff_package_versions p ON p.id=a.source_offer_id AND p.hotel_id=a.hotel_id
+                WHERE a.hotel_id=ANY($1::uuid[]) AND a.state='DRAFT'
+                ORDER BY a.hotel_id,a.version DESC""",ids)
+            by_hotel={p["hotel_id"]:p for p in plans}
+            plan_ids=[p["agreement_id"] for p in plans]
+            events=await conn.fetch("""SELECT agreement_id,kind,event_id,amount,payment_id
+                FROM flex_qa_cash_events WHERE agreement_id=ANY($1::uuid[]) ORDER BY agreement_id,sequence""",plan_ids)
+            by_plan={}
+            for event in events:
+                by_plan.setdefault(event["agreement_id"],[]).append(synthetic_cash_event(event))
+            previews=await conn.fetch("""SELECT hotel_id,count(*) AS n FROM flex_non_issuable_invoice_previews
+                WHERE hotel_id=ANY($1::uuid[]) GROUP BY hotel_id""",ids)
+            preview_counts={r["hotel_id"]:r["n"] for r in previews}
+            trials=await conn.fetch("SELECT hotel_id,trial_start,trial_end_exclusive FROM flex_installation_completions WHERE hotel_id=ANY($1::uuid[])",ids)
+            trial_by_hotel={r["hotel_id"]:r for r in trials}
+            roster=await conn.fetchrow("""SELECT
+                (SELECT count(*) FROM flex_agents WHERE status='ACTIVE') AS active_agents,
+                (SELECT count(*) FROM flex_investors WHERE status='ACTIVE') AS active_investors,
+                (SELECT count(*) FROM flex_platform_memberships WHERE role='PARTNER' AND active) AS active_partners,
+                (SELECT count(*) FROM flex_qa_investor_plans) AS investor_draft_versions,
+                (SELECT count(*) FROM flex_qa_partner_proposals) AS partner_draft_versions""")
+            result=[]
+            draft_totals=amounts(draft_fields)
+            for hotel in hotels:
+                hid=hotel["id"]
+                plan=by_hotel.get(hid)
+                trial=trial_by_hotel.get(hid)
+                trial_state="NOT_STARTED" if not trial or today<trial["trial_start"] else "ACTIVE" if today<trial["trial_end_exclusive"] else "EXPIRED"
+                item={**dict(hotel),"preview_count":preview_counts.get(hid,0),"trial_state":trial_state,"test_plan":None}
+                if plan:
+                    sub,setup=plan["subscription_term_total"],plan["implementation_total"]
+                    journal=by_plan.get(plan["agreement_id"],[])
+                    balance=simulate_cash(sub,setup,journal) if sub+setup>zero or journal else {"net_simulated_cash":"0.00","outstanding":"0.00","credit":"0.00"}
+                    values={"subscription":sub,"implementation":setup,**{k:Decimal(balance[k]) for k in ("net_simulated_cash","outstanding","credit")}}
+                    for k,v in values.items(): draft_totals[k]+=v
+                    item["test_plan"]={"agreement_id":plan["agreement_id"],"version":plan["version"],"package_kind":plan["package_kind"],
+                        "period_start":plan["period_start"],"period_end_exclusive":plan["period_end_exclusive"],**display(values)}
+                result.append(item)
+            # Return to original runtime, then use the existing per-hotel ledger scope.
+            await conn.execute("RESET ROLE")
+            await conn.execute("SET LOCAL ROLE flex_platform_admin_reader")
+            ledger_totals=amounts(fields)
+            ledger_count=0
+            reconciled=True
+            for item in result:
+                await conn.execute("SELECT set_config('flex.authorized_hotel_id',$1,true)",str(item["id"]))
+                rows=await conn.fetch("""SELECT b.* FROM flex_refund_adjusted_invoice_balances b
+                    JOIN flex_issued_invoice_records e ON e.invoice_id=b.invoice_id AND e.hotel_id=b.hotel_id
+                    JOIN flex_invoices i ON i.id=b.invoice_id
+                    WHERE b.hotel_id=$1 AND i.status IN ('ISSUED','PARTIALLY_PAID','PAID')""",item["id"])
+                values={k:sum((r[k] for r in rows),zero) for k in fields}
+                ok=all(r["amount_due"]==r["net_applied_to_lines"]+r["outstanding"] and
+                    r["net_confirmed_cash"]==r["net_applied_to_lines"]+r["unapplied_cash_credit"]
+                    and all(r[k]>=zero for k in fields) for r in rows)
+                item["ledger"]={"invoice_count":len(rows),"reconciled":ok,**display(values)}
+                for k,v in values.items(): ledger_totals[k]+=v
+                ledger_count+=len(rows)
+                reconciled=reconciled and ok
+            return {"currency":"KGS","offset":offset,"limit":limit,"hotel_count":count,"page_count":len(result),
+                "rows":result,"trial_active_on_page":sum(r["trial_state"]=="ACTIVE" for r in result),
+                "preview_count_on_page":sum(r["preview_count"] for r in result),
+                "test_plan_totals":display(draft_totals),"test_plan_basis":"LATEST_ACCEPTED_DRAFT_PER_HOTEL_ON_PAGE",
+                "ledger_totals":display(ledger_totals),"ledger_invoice_count":ledger_count,"ledger_reconciled":reconciled,
+                "ledger_basis":"ISSUED_INVOICE_LEDGER_ON_PAGE_NOT_BANK_VERIFIED",
+                "participant_counts":dict(roster),"actual_revenue_kg":None,"actual_payouts_kg":None,
+                "actual_partner_obligations_kg":None,"payments_enabled":False,"payouts_enabled":False}
