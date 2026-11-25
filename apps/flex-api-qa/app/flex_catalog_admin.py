@@ -915,7 +915,8 @@ async def agreement_drafts(request: Request,hotel_id: uuid.UUID=Query(...),
             rows=await conn.fetch("SELECT * FROM flex_commercial_agreement_versions WHERE hotel_id=$1 ORDER BY version DESC",hotel_id)
             previews=await conn.fetch("SELECT * FROM flex_non_issuable_invoice_previews WHERE hotel_id=$1 ORDER BY created_at DESC",hotel_id)
             approvals=await conn.fetch("SELECT * FROM flex_agreement_internal_approvals WHERE hotel_id=$1 ORDER BY approved_at DESC",hotel_id)
-            return {"agreements":[draft_agreement_response(r) for r in rows],"previews":[dict(r) for r in previews],"approvals":[dict(r) for r in approvals]}
+            acceptances=await conn.fetch("SELECT * FROM flex_customer_agreement_acceptances WHERE hotel_id=$1 ORDER BY accepted_at DESC",hotel_id)
+            return {"agreements":[draft_agreement_response(r) for r in rows],"previews":[dict(r) for r in previews],"approvals":[dict(r) for r in approvals],"acceptances":[dict(r) for r in acceptances]}
 
 
 @app.post("/v1/platform/agreement-drafts",status_code=201)
@@ -1055,3 +1056,51 @@ async def subscription_plans(request: Request,hotel_id: uuid.UUID=Query(...),
                     subscription_activated=False,payments_enabled=False)
                 result.append(data)
             return result
+
+
+CUSTOMER_ACCEPTANCE_ROLE="flex_customer_acceptance_writer"
+
+
+async def as_customer_acceptance(conn,principal,hotel_id):
+    if principal.role!="HOTEL_OWNER" or str(hotel_id) not in principal.hotel_ids:
+        raise HTTPException(404,detail="Hotel not found")
+    if not principal.mfa_verified:
+        raise HTTPException(403,detail="Verified customer session required")
+    if not await conn.fetchval("SELECT pg_has_role(current_user,$1,'MEMBER') AND NOT pg_has_role(current_user,$1,'USAGE')",CUSTOMER_ACCEPTANCE_ROLE):
+        raise HTTPException(503,detail="Customer acceptance is not enabled for this runtime")
+    await conn.execute("SELECT set_config('flex.authorized_subject_id',$1,true)",principal.subject_id)
+    await conn.execute("SET LOCAL ROLE "+CUSTOMER_ACCEPTANCE_ROLE)
+
+
+@app.get("/v1/platform/customer-agreement-acceptances")
+async def customer_agreement_acceptances(request: Request,hotel_id: uuid.UUID=Query(...),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_customer_acceptance(conn,principal,hotel_id)
+            rows=await conn.fetch("""SELECT a.id AS agreement_id,a.hotel_id,a.version,a.terms,a.terms_digest,
+                c.accepted_at FROM flex_commercial_agreement_versions a
+                LEFT JOIN flex_customer_agreement_acceptances c ON c.agreement_id=a.id
+                WHERE a.hotel_id=$1 AND a.state='DRAFT' ORDER BY a.version DESC""",hotel_id)
+            return [{**draft_agreement_response(row),"state":"CUSTOMER_ACCEPTED" if row["accepted_at"] else "AWAITING_CUSTOMER",
+                "client_signed":False,"subscription_activated":False,"payments_enabled":False} for row in rows]
+
+
+@app.post("/v1/platform/customer-agreement-acceptances",status_code=201)
+async def accept_customer_agreement(payload: AgreementInternalApproval,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    if payload.acknowledged is not True:
+        raise HTTPException(422,detail="Explicit acceptance required")
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_customer_acceptance(conn,principal,payload.hotel_id)
+            row=await conn.fetchrow("SELECT id,terms_digest FROM flex_commercial_agreement_versions WHERE id=$1 AND hotel_id=$2 AND state='DRAFT'",payload.agreement_id,payload.hotel_id)
+            if row is None:
+                raise HTTPException(404,detail="Approved customer terms not found")
+            if row["terms_digest"]!=payload.terms_digest:
+                raise HTTPException(409,detail="Agreement terms digest mismatch")
+            await conn.execute("INSERT INTO flex_customer_agreement_acceptances(agreement_id,hotel_id,terms_digest,accepted_by) VALUES($1,$2,$3,$4) ON CONFLICT(agreement_id) DO NOTHING",payload.agreement_id,payload.hotel_id,payload.terms_digest,principal.subject_id)
+            saved=await conn.fetchrow("SELECT agreement_id,hotel_id,terms_digest,accepted_at FROM flex_customer_agreement_acceptances WHERE agreement_id=$1",payload.agreement_id)
+            if saved is None:
+                raise HTTPException(409,detail="Customer acceptance unavailable")
+            return {**dict(saved),"state":"CUSTOMER_ACCEPTED","client_signed":False,"subscription_activated":False,"payments_enabled":False}
