@@ -38,6 +38,7 @@ class RenewalLedgerEvidence:
     agreement_signed: bool
     hotel_link_verified: bool
     invoice_finalized: bool
+    term_months: int = 1  # From the immutable signed agreement, never client input.
 
 
 @dataclass(frozen=True)
@@ -80,15 +81,20 @@ def decide_renewal(e: RenewalLedgerEvidence, *, now: datetime) -> RenewalDecisio
         e.current_period_end, e.invoice_period_start, e.invoice_period_end
     )):
         raise ValueError("Invalid billing date")
+    if type(e.term_months) is not int or e.term_months not in (1, 3, 6, 12):
+        raise ValueError("Unsupported signed agreement term")
+    # Current contract uses complete calendar-month renewal periods.
+    last_month = e.invoice_period_start.year * 12 + e.invoice_period_start.month - 1 + e.term_months - 1
+    year, month0 = divmod(last_month, 12)
+    if year > 9999:
+        raise ValueError("Renewal period outside supported date range")
+    expected_end = date(year, month0 + 1, monthrange(year, month0 + 1)[1])
     if (
         e.current_period_end + timedelta(days=1) != e.invoice_period_start
         or e.invoice_period_start.day != 1
-        or e.invoice_period_end != date(
-            e.invoice_period_start.year, e.invoice_period_start.month,
-            monthrange(e.invoice_period_start.year, e.invoice_period_start.month)[1]
-        )
+        or e.invoice_period_end != expected_end
     ):
-        raise ValueError("Invoice must cover the exact next billing month")
+        raise ValueError("Invoice must cover the exact next signed billing term")
 
     total, paid, due = (money(e.invoice_total_kg),
                         money(e.refunded_net_allocated_kg), money(e.outstanding_kg))
