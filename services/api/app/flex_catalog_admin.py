@@ -1303,6 +1303,10 @@ async def append_agent_assignment(payload: AgentAssignmentRequest,request: Reque
                 raise HTTPException(409,detail="Assignment revision changed")
             active=last is not None and last["action"]=="ASSIGN"
             if payload.action=="ASSIGN":
+                await conn.fetchval("SELECT pg_advisory_xact_lock(hashtextextended($1,0))","FLEX_EMPLOYMENT_"+str(payload.agent_id))
+                employment=await conn.fetchval("SELECT action FROM flex_qa_agent_employment_events WHERE agent_id=$1 ORDER BY revision DESC LIMIT 1",payload.agent_id)
+                if employment=="STOP":
+                    raise HTTPException(409,detail="Agent employment stopped")
                 if active:
                     raise HTTPException(409,detail="Release current assignment first")
                 if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_agents WHERE id=$1 AND status='ACTIVE')",payload.agent_id):
@@ -1312,3 +1316,49 @@ async def append_agent_assignment(payload: AgentAssignmentRequest,request: Reque
             row=await conn.fetchrow("""INSERT INTO flex_qa_agent_assignments(hotel_id,revision,agent_id,action,created_by)
                 VALUES($1,$2,$3,$4,$5) RETURNING *""",payload.hotel_id,revision+1,payload.agent_id,payload.action,principal.subject_id)
             return {**dict(row),"payments_enabled":False,"payouts_enabled":False}
+
+
+class AgentEmploymentRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    agent_id: uuid.UUID
+    expected_revision: int=Field(strict=True,ge=0,le=2147483646)
+    action: str=Field(pattern=r"^(START|STOP)$")
+
+
+@app.get("/v1/platform/agent-employment")
+async def agent_employment(request: Request,principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn,principal)
+            rows=await conn.fetch("""SELECT a.id AS agent_id,a.platform_subject_id,a.status,
+                coalesce(e.revision,0) AS revision,e.action,e.created_at
+                FROM flex_agents a LEFT JOIN LATERAL
+                (SELECT revision,action,created_at FROM flex_qa_agent_employment_events
+                 WHERE agent_id=a.id ORDER BY revision DESC LIMIT 1) e ON true
+                ORDER BY a.platform_subject_id,a.id""")
+            return {"agents":[dict(r) for r in rows],"payouts_enabled":False}
+
+
+@app.post("/v1/platform/agent-employment",status_code=201)
+async def append_agent_employment(payload: AgentEmploymentRequest,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await conn.fetchval("SELECT pg_advisory_xact_lock(hashtextextended($1,0))","FLEX_EMPLOYMENT_"+str(payload.agent_id))
+            agent=await conn.fetchval("SELECT status FROM flex_agents WHERE id=$1",payload.agent_id)
+            if agent is None or (payload.action=="START" and agent!="ACTIVE"):
+                raise HTTPException(404,detail="Agent unavailable")
+            last=await conn.fetchrow("SELECT * FROM flex_qa_agent_employment_events WHERE agent_id=$1 ORDER BY revision DESC LIMIT 1",payload.agent_id)
+            revision=last["revision"] if last else 0
+            if last and revision==payload.expected_revision+1 and last["action"]==payload.action:
+                return {**dict(last),"payouts_enabled":False}
+            if revision!=payload.expected_revision:
+                raise HTTPException(409,detail="Employment revision changed")
+            if (payload.action=="STOP" and (not last or last["action"]!="START")) or (payload.action=="START" and last and last["action"]=="START"):
+                raise HTTPException(409,detail="Employment transition unavailable")
+            row=await conn.fetchrow("""INSERT INTO flex_qa_agent_employment_events(agent_id,revision,action,created_by)
+                VALUES($1,$2,$3,$4) RETURNING *""",payload.agent_id,revision+1,payload.action,principal.subject_id)
+            return {**dict(row),"payouts_enabled":False}
