@@ -214,4 +214,31 @@ BEGIN
   END;
 END
 $test$;
+-- When migration 0022 is installed, exercise the exact issued-invoice
+-- query used by the HTTP endpoint under its non-writing runtime reader.
+SELECT CASE WHEN to_regclass('flex_refund_adjusted_invoice_balances') IS NULL THEN false
+ ELSE has_table_privilege('flex_platform_admin_reader','flex_refund_adjusted_invoice_balances','SELECT') END AS flex_chain_reader_ready \gset
+\if :flex_chain_reader_ready
+SET LOCAL flex.authorized_hotel_id='00000000-0000-0000-0000-00000000000a';
+SET LOCAL ROLE flex_platform_admin_reader;
+DO $reader$
+DECLARE b record;
+BEGIN
+ SELECT v.* INTO b FROM flex_refund_adjusted_invoice_balances v
+ JOIN flex_issued_invoice_records e ON e.invoice_id=v.invoice_id AND e.hotel_id=v.hotel_id
+ JOIN flex_invoices i ON i.id=v.invoice_id
+ WHERE v.hotel_id='00000000-0000-0000-0000-00000000000a' AND i.invoice_number='FLEX_ISSUANCE_CI_A'
+   AND i.status IN ('ISSUED','PARTIALLY_PAID','PAID');
+ IF NOT FOUND OR b.net_confirmed_cash IS DISTINCT FROM 170.00 OR b.outstanding IS DISTINCT FROM 9.20
+    OR b.unapplied_cash_credit IS DISTINCT FROM 0.00 THEN
+  RAISE EXCEPTION 'FLEX_CHAIN_RUNTIME_READER_MISMATCH';
+ END IF;
+ IF has_table_privilege(current_user,'flex_confirmed_payments','INSERT') OR
+    has_table_privilege(current_user,'flex_payment_reversals','INSERT') THEN
+  RAISE EXCEPTION 'FLEX_CHAIN_READER_MUST_NOT_WRITE';
+ END IF;
+ RAISE NOTICE 'PASS FLEX issued-invoice reconciliation runtime reader, cash 170.00, debt 9.20, credit 0.00';
+END $reader$;
+RESET ROLE;
+\endif
 ROLLBACK;
