@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from .payment_refund_read_model import refund_compatible_sql
 from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/admin/pms", tags=["admin-pms-control"])
@@ -34,7 +35,7 @@ async def control_snapshot(
         generated_at = await conn.fetchval("SELECT now()")
 
         reservations = await conn.fetch(
-            '''
+            await refund_compatible_sql(conn, '''
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
                    r.adults,r.children,r."totalKgs",
                    g."firstName",g."lastName",g.phone,g.email,
@@ -77,8 +78,8 @@ async def control_snapshot(
                 AND ib2."blockType"='RESERVATION'
             ) seg ON true
             LEFT JOIN LATERAL (
-              SELECT COALESCE(SUM(p."amountKgs") FILTER (WHERE p.status='RECEIVED'),0)::bigint AS paid_kgs
-              FROM payments p
+              SELECT COALESCE(SUM(p."remainingReceivedKgs"),0)::bigint AS paid_kgs
+              FROM owner_reservation_payment_balances p
               WHERE p."reservationId"=r.id
             ) pay ON true
             WHERE r."propertyId"=$1
@@ -93,7 +94,7 @@ async def control_snapshot(
             ORDER BY
               CASE r.status::text WHEN 'CHECKED_IN' THEN 0 ELSE 1 END,
               r."checkIn",r."createdAt" DESC
-            ''',
+            '''),
             prop["id"],
             local_today,
             start,

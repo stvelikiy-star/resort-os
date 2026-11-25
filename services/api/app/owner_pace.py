@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from .payment_refund_read_model import refund_compatible_sql
 from .auth import require_roles
 from .service_auth import require_automation_service
 
@@ -121,10 +122,10 @@ async def build_forward_snapshot(conn, prop, as_of: date, horizon_days: int) -> 
     )
 
     active = await conn.fetchrow(
-        '''
+        await refund_compatible_sql(conn, '''
         WITH paid AS (
-          SELECT "reservationId",COALESCE(SUM("amountKgs") FILTER (WHERE status='RECEIVED'),0)::bigint AS paid_kgs
-          FROM payments WHERE "reservationId" IS NOT NULL GROUP BY "reservationId"
+          SELECT "reservationId",COALESCE(SUM("remainingReceivedKgs"),0)::bigint AS paid_kgs
+          FROM owner_reservation_payment_balances WHERE "reservationId" IS NOT NULL GROUP BY "reservationId"
         )
         SELECT count(*)::int AS active_reservations,
                COALESCE(SUM(r."totalKgs"),0)::bigint AS active_total_kgs,
@@ -134,7 +135,7 @@ async def build_forward_snapshot(conn, prop, as_of: date, horizon_days: int) -> 
         LEFT JOIN paid p ON p."reservationId"=r.id
         WHERE r."propertyId"=$1 AND r.status IN ('GUARANTEED','CHECKED_IN')
           AND r."checkOut">=$2::date
-        ''',
+        '''),
         pid,
         as_of,
     )
@@ -436,10 +437,10 @@ async def owner_brief(
         near_end = today + timedelta(days=3)
 
         arrival_rows = await conn.fetch(
-            '''
+            await refund_compatible_sql(conn, '''
             WITH paid AS (
-              SELECT "reservationId",COALESCE(SUM("amountKgs") FILTER (WHERE status='RECEIVED'),0)::bigint AS paid_kgs
-              FROM payments WHERE "reservationId" IS NOT NULL GROUP BY "reservationId"
+              SELECT "reservationId",COALESCE(SUM("remainingReceivedKgs"),0)::bigint AS paid_kgs
+              FROM owner_reservation_payment_balances WHERE "reservationId" IS NOT NULL GROUP BY "reservationId"
             )
             SELECT r.id,r."bookingNumber",r."checkIn",r."checkOut",r."totalKgs",
                    COALESCE(p.paid_kgs,0)::bigint AS paid_kgs,
@@ -459,7 +460,7 @@ async def owner_brief(
             WHERE r."propertyId"=$1 AND r.status='GUARANTEED'
               AND r."checkIn">=$2::date AND r."checkIn"<$3::date
             ORDER BY r."checkIn",room.code NULLS LAST,r."createdAt"
-            ''',
+            '''),
             pid,
             today,
             near_end,

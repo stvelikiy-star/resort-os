@@ -1,0 +1,39 @@
+name: MARINA OWNER Recognition Source Truth CI
+
+on:
+  pull_request:
+    paths:
+      - 'services/api/app/owner_recognition_policy.py'
+      - 'services/api/app/owner_accrual_readiness.py'
+      - 'scripts/test_owner_recognition_policy.py'
+      - '.github/workflows/marina-owner-recognition-policy-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  finance-source-truth:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify read-only recognition classifications and property boundaries
+        run: python -m unittest scripts.test_owner_recognition_policy -v
+      - name: Verify integration never posts or invents recognized profit
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('services/api/app/owner_recognition_policy.py').read_text()
+          route=Path('services/api/app/owner_accrual_readiness.py').read_text()
+          assert 'async def reconciliation_snapshot(' in s
+          assert 'from .owner_recognition_policy import reconciliation_snapshot' in route
+          assert '"financial_source_reconciliation":evidence_reconciliation' in route
+          assert '"recognized_profit_kgs":None' in s
+          assert '"completeness_verified":False' in s
+          assert 'UPDATE ' not in s and 'INSERT INTO ' not in s and 'DELETE FROM ' not in s
+          print('MARINA_OWNER_SOURCE_RECONCILIATION_FAIL_CLOSED_PASS')
+          PY

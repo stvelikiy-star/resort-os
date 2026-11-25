@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from .payment_refund_read_model import refund_compatible_sql
 from .service_auth import require_automation_service
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
@@ -121,7 +122,7 @@ async def crm_feed(
         property_id = await _property_id(conn)
 
         request_rows = await conn.fetch(
-            '''
+            await refund_compatible_sql(conn, '''
             SELECT rr.id,rr.source,rr."guestName",rr.phone,rr.email,rr."checkIn",rr."checkOut",
                    rr.adults,rr.children,rr."quotedTotalKgs",rr.notes,rr."createdAt",
                    rr.status::text AS request_status,
@@ -138,9 +139,9 @@ async def crm_feed(
             LEFT JOIN reservations r ON r."requestId"=rr.id
             LEFT JOIN LATERAL (
               SELECT
-                COALESCE(SUM(CASE WHEN p.status='RECEIVED' THEN p."amountKgs" ELSE 0 END),0)::int AS received_kgs,
+                COALESCE(SUM(CASE WHEN p.status='RECEIVED' THEN COALESCE(b."remainingReceivedKgs",p."amountKgs") ELSE 0 END),0)::int AS received_kgs,
                 MAX(p."updatedAt") AS updated_at
-              FROM payments p
+              FROM payments p LEFT JOIN owner_reservation_payment_balances b ON b."paymentId"=p.id
               WHERE p."requestId"=rr.id OR (r.id IS NOT NULL AND p."reservationId"=r.id)
             ) pay ON true
             WHERE rr."propertyId"=$1
@@ -151,14 +152,14 @@ async def crm_feed(
                   ) > $2)
             ORDER BY sync_updated_at ASC, rr.id ASC
             LIMIT $3
-            ''',
+            '''),
             property_id,
             since,
             limit + 1,
         )
 
         reservation_rows = await conn.fetch(
-            '''
+            await refund_compatible_sql(conn, '''
             SELECT r.id,r."requestId",r."bookingNumber",r."checkIn",r."checkOut",r.adults,r.children,
                    r."totalKgs",r."createdAt",r.status::text AS reservation_status,
                    g."firstName" AS guest_name,g.phone,g.email,
@@ -170,16 +171,16 @@ async def crm_feed(
             LEFT JOIN reservation_requests rr ON rr.id=r."requestId"
             LEFT JOIN LATERAL (
               SELECT
-                COALESCE(SUM(CASE WHEN p.status='RECEIVED' THEN p."amountKgs" ELSE 0 END),0)::int AS received_kgs,
+                COALESCE(SUM(CASE WHEN p.status='RECEIVED' THEN COALESCE(b."remainingReceivedKgs",p."amountKgs") ELSE 0 END),0)::int AS received_kgs,
                 MAX(p."updatedAt") AS updated_at
-              FROM payments p
+              FROM payments p LEFT JOIN owner_reservation_payment_balances b ON b."paymentId"=p.id
               WHERE p."reservationId"=r.id
             ) pay ON true
             WHERE r."propertyId"=$1
               AND ($2::timestamptz IS NULL OR GREATEST(r."updatedAt",COALESCE(pay.updated_at,r."updatedAt")) > $2)
             ORDER BY sync_updated_at ASC, r.id ASC
             LIMIT $3
-            ''',
+            '''),
             property_id,
             since,
             limit + 1,

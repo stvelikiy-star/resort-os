@@ -3,6 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from .payment_refund_read_model import refund_compatible_sql
 from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/admin/reports", tags=["admin-reports"])
@@ -147,25 +148,25 @@ async def reports_overview(
         )
 
         active_debt = await conn.fetchrow(
-            '''
+            await refund_compatible_sql(conn, '''
             WITH paid AS (
-              SELECT "reservationId",COALESCE(SUM("amountKgs") FILTER (WHERE status='RECEIVED'),0)::bigint AS paid_kgs
-              FROM payments WHERE "reservationId" IS NOT NULL GROUP BY "reservationId"
+              SELECT "reservationId",COALESCE(SUM("remainingReceivedKgs"),0)::bigint AS paid_kgs
+              FROM owner_reservation_payment_balances WHERE "reservationId" IS NOT NULL GROUP BY "reservationId"
             )
             SELECT COUNT(*) FILTER (WHERE GREATEST(r."totalKgs"-COALESCE(p.paid_kgs,0),0)>0)::int AS debtor_count,
                    COALESCE(SUM(GREATEST(r."totalKgs"-COALESCE(p.paid_kgs,0),0)),0)::bigint AS outstanding_kgs
             FROM reservations r
             LEFT JOIN paid p ON p."reservationId"=r.id
             WHERE r."propertyId"=$1 AND r.status IN ('GUARANTEED','CHECKED_IN')
-            ''',
+            '''),
             pid,
         )
 
         debtors = await conn.fetch(
-            '''
+            await refund_compatible_sql(conn, '''
             WITH paid AS (
-              SELECT "reservationId",COALESCE(SUM("amountKgs") FILTER (WHERE status='RECEIVED'),0)::bigint AS paid_kgs
-              FROM payments WHERE "reservationId" IS NOT NULL GROUP BY "reservationId"
+              SELECT "reservationId",COALESCE(SUM("remainingReceivedKgs"),0)::bigint AS paid_kgs
+              FROM owner_reservation_payment_balances WHERE "reservationId" IS NOT NULL GROUP BY "reservationId"
             )
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",r."totalKgs",
                    COALESCE(p.paid_kgs,0)::bigint AS paid_kgs,
@@ -179,7 +180,7 @@ async def reports_overview(
               AND GREATEST(r."totalKgs"-COALESCE(p.paid_kgs,0),0)>0
             ORDER BY outstanding_kgs DESC,r."checkIn"
             LIMIT 100
-            ''',
+            '''),
             pid,
         )
 

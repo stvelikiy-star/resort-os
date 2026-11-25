@@ -7,6 +7,7 @@ from asyncpg.exceptions import ExclusionViolationError
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, model_validator
 
+from .payment_refund_read_model import refund_compatible_sql
 from .auth import require_roles
 from .guest_identity import resolve_or_create_guest
 from .main import price_room_type
@@ -310,19 +311,19 @@ async def list_groups(request: Request, user: dict[str, Any] = Depends(access)):
     async with request.app.state.db.acquire() as conn:
         prop = await property_context(conn, user)
         rows = await conn.fetch(
-            '''SELECT bg.id,bg.code,bg.name,bg."contactName",bg."contactPhone",bg."checkIn",bg."checkOut",bg.status,bg.notes,
+            await refund_compatible_sql(conn, '''SELECT bg.id,bg.code,bg.name,bg."contactName",bg."contactPhone",bg."checkIn",bg."checkOut",bg.status,bg.notes,
                       count(bgm.id)::int AS room_count,COALESCE(sum(r."totalKgs"),0)::int AS total_kgs,
                       COALESCE(sum(p.paid),0)::int AS paid_kgs
                FROM booking_groups bg
                LEFT JOIN booking_group_members bgm ON bgm."groupId"=bg.id
                LEFT JOIN reservations r ON r.id=bgm."reservationId"
                LEFT JOIN LATERAL (
-                 SELECT COALESCE(sum(pay."amountKgs") FILTER (WHERE pay.status='RECEIVED'),0)::int AS paid
-                 FROM payments pay WHERE pay."reservationId"=r.id
+                 SELECT COALESCE(sum(pay."remainingReceivedKgs"),0)::int AS paid
+                 FROM owner_reservation_payment_balances pay WHERE pay."reservationId"=r.id
                ) p ON true
                WHERE bg."propertyId"=$1
                GROUP BY bg.id
-               ORDER BY bg."checkIn" DESC,bg."createdAt" DESC LIMIT 200''', prop["id"],
+               ORDER BY bg."checkIn" DESC,bg."createdAt" DESC LIMIT 200'''), prop["id"],
         )
     return {"items": [{
         "id": str(row["id"]), "code": row["code"], "name": row["name"],

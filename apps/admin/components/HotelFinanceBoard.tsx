@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type ReservationLedgerItem = {
   reservation_id: string;
@@ -76,6 +76,7 @@ type FinanceResponse = {
   refunded_snapshot_all_time: { amount_kgs: number; payment_count: number };
   /** Present for OWNER only; never returned by Core to MANAGER. */
   /** Source-backed OWNER candidates, never booked or cash-paid amounts as revenue. */
+  owner_ledger_period_coverage?: LedgerCoverage;
   owner_accrual_readiness_snapshot?: {
     documented_source_corrections:{
       recorded_corrections_count:number;
@@ -262,27 +263,184 @@ const reservationStatusLabel: Record<string, string> = {
   CANCELLED: "CANCELLED",
 };
 
+type LedgerCoverage = {
+  scope: "PROPERTY_SCOPED_READ_ONLY_PERIOD_DIAGNOSTIC";
+  period: { from: string; to: string };
+  counts: Record<string, number>;
+  blockers: string[];
+  posted_ledger_subtotals: {
+    posting_line_count: number; revenue_kgs: string; expense_cogs_kgs: string; contribution_kgs: string;
+  };
+  period_completeness_verified: false;
+  recognized_profit_kgs: null;
+};
+
+
+/** QA-only document handoff. The server independently authorizes each OWNER. */
+function PartialRefundPanel({payments, onRecorded}: {
+  payments: FinanceResponse["recent_payments"]; onRecorded: () => void;
+}) {
+  const eligible = payments.filter(p => p.status === "RECEIVED" && p.provider === "MANAGER_MANUAL" && p.reservation_id);
+  const [paymentId, setPaymentId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [reference, setReference] = useState("");
+  const [documentDate, setDocumentDate] = useState("");
+  const [stamp, setStamp] = useState("");
+  const [reason, setReason] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [packet, setPacket] = useState("");
+  const [verifiedPacket, setVerifiedPacket] = useState("");
+  const [documentInfo, setDocumentInfo] = useState("");
+  const [documentLink, setDocumentLink] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [externalDone, setExternalDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const uploadIdentity = useRef<{key:string; id:string; eventId:string} | null>(null);
+  const base = "/core/api/v1/admin/finance/owner";
+  const payment = eligible.find(p => p.id === paymentId);
+  async function json(url: string, payload?: unknown) {
+    const response = await fetch(url, payload === undefined ? {cache:"no-store"} : {
+      method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload), cache:"no-store"
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(typeof body.detail?.code === "string" ? body.detail.code : "HTTP " + response.status);
+    return body;
+  }
+  function invalidate(value: string) {
+    setPacket(value); setVerifiedPacket(""); setDocumentInfo(""); setDocumentLink(""); setConfirmed(false);
+  }
+  async function prepare() {
+    if (busy) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const n = Number(amount);
+      const ref = reference.trim().replace(/\s+/g," ");
+      if (!externalDone || !payment?.reservation_id || !Number.isSafeInteger(n) || n <= 0 || n > payment.amount_kgs ||
+          ref.length < 8 || ref.length > 150 || reason.trim().length < 8 || !documentDate ||
+          !stamp || !/(Z|[+-]\d{2}:\d{2})$/.test(stamp) || !Number.isFinite(Date.parse(stamp)) ||
+          !file || file.size < 16 || file.size > 2*1024*1024 ||
+          !["application/pdf","image/png","image/jpeg"].includes(file.type)) throw new Error("Проверьте сумму, дату, документ и причину");
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)), b => b.toString(16).padStart(2,"0")).join("");
+      const key = JSON.stringify([payment.id,n,ref,documentDate,stamp,reason.trim(),digest,file.name,file.type]);
+      if (uploadIdentity.current?.key !== key) uploadIdentity.current = {key,id:crypto.randomUUID(),eventId:crypto.randomUUID()};
+      const identity = uploadIdentity.current;
+      let binary = "";
+      for (const b of bytes) binary += String.fromCharCode(b);
+      await json(base+"/revenue-evidence", {
+        id:identity.id, document_reference:ref, document_date:documentDate,
+        file_name:file.name, media_type:file.type, sha256:digest, content_base64:btoa(binary)
+      });
+      invalidate(JSON.stringify({id:identity.eventId,reservation_id:payment.reservation_id,payment_id:payment.id,
+        evidence_document_id:identity.id,amount_kgs:n,refunded_at:new Date(stamp).toISOString(),
+        reason:reason.trim(),external_refund_already_completed:true}));
+      setMessage("Документ сохранён. Передайте код проверки второму OWNER защищённым способом.");
+    } catch (e) {setError(e instanceof Error ? e.message : "Ошибка");}
+    finally {setBusy(false);}
+  }
+  function readPacket() {
+    const p = JSON.parse(packet);
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!p || ![p.id,p.reservation_id,p.payment_id,p.evidence_document_id].every(v => typeof v === "string" && uuid.test(v)) ||
+      !Number.isSafeInteger(p.amount_kgs) || p.amount_kgs <= 0 || p.amount_kgs > 2147483647 ||
+      typeof p.reason !== "string" || p.reason.length < 8 || p.reason.length > 500 ||
+      typeof p.refunded_at !== "string" || !/(Z|[+-]\d{2}:\d{2})$/.test(p.refunded_at) ||
+      !Number.isFinite(Date.parse(p.refunded_at)) || p.external_refund_already_completed !== true) throw new Error("Некорректный код проверки");
+    return {id:p.id,reservation_id:p.reservation_id,payment_id:p.payment_id,evidence_document_id:p.evidence_document_id,
+      amount_kgs:p.amount_kgs,reason:p.reason,refunded_at:p.refunded_at,external_refund_already_completed:true};
+  }
+  async function inspect() {
+    if (busy) return;
+    setBusy(true); setError(""); setMessage(""); setVerifiedPacket(""); setConfirmed(false);
+    setDocumentInfo(""); setDocumentLink("");
+    try {
+      const p = readPacket();
+      const doc = await json(base+"/revenue-evidence/"+p.evidence_document_id);
+      const receipt = eligible.find(item => item.id === p.payment_id && item.reservation_id === p.reservation_id);
+      if (!receipt || p.amount_kgs > receipt.amount_kgs) throw new Error("Платёж не найден в текущем списке или сумма неверна");
+      setDocumentInfo([receipt.booking_number || receipt.id,money(p.amount_kgs),p.refunded_at,p.reason,doc.document_reference,doc.document_date,doc.sha256].join(" · "));
+      setDocumentLink(base+"/revenue-evidence/"+p.evidence_document_id+"/content");
+      setVerifiedPacket(packet);
+    } catch (e) {setError(e instanceof Error ? e.message : "Ошибка");}
+    finally {setBusy(false);}
+  }
+  async function approve() {
+    if (busy || !confirmed || verifiedPacket !== packet) return;
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const result = await json(base+"/accounting-journal/partial-refunds",readPacket());
+      setMessage("Возврат зафиксирован. Возвращено: "+money(result.refunded_kgs)+" · Остаток: "+money(result.remaining_received_kgs));
+      invalidate(""); onRecorded();
+    } catch (e) {setError(e instanceof Error ? e.message : "Ошибка");}
+    finally {setBusy(false);}
+  }
+  return <section className="finance-section" data-testid="owner-partial-refund-panel">
+    <div className="section-head"><h2>Частичный возврат · QA</h2></div>
+    <p>Только документальное подтверждение уже выполненного внешнего возврата. Система не переводит деньги.</p>
+    <fieldset disabled={busy}>
+      <legend>OWNER 1 · документ</legend>
+      <label>Платёж <select value={paymentId} onChange={e=>setPaymentId(e.target.value)}>
+        <option value="">Выберите платёж</option>
+        {eligible.map(p=><option key={p.id} value={p.id}>{p.booking_number || p.id} · {money(p.amount_kgs)}</option>)}
+      </select></label>
+      <label>Сумма возврата <input type="number" min="1" step="1" value={amount} onChange={e=>setAmount(e.target.value)}/></label>
+      <label>Номер документа <input maxLength={150} value={reference} onChange={e=>setReference(e.target.value)}/></label>
+      <label>Дата документа (часовой пояс отеля) <input type="date" value={documentDate} onChange={e=>setDocumentDate(e.target.value)}/></label>
+      <label>Время возврата с часовым поясом <input placeholder="2026-11-25T15:30:00+06:00" value={stamp} onChange={e=>setStamp(e.target.value)}/></label>
+      <label>Причина <textarea maxLength={500} value={reason} onChange={e=>setReason(e.target.value)}/></label>
+      <label>PDF, PNG, JPEG · до 2 МБ <input type="file" accept="application/pdf,image/png,image/jpeg" onChange={e=>setFile(e.target.files?.[0] || null)}/></label>
+      <label><input type="checkbox" checked={externalDone} onChange={e=>setExternalDone(e.target.checked)}/>Возврат уже выполнен вне платформы</label>
+      <button type="button" className="btn" disabled={!externalDone} onClick={()=>void prepare()}>Сохранить документ</button>
+    </fieldset>
+    <fieldset disabled={busy}>
+      <legend>OWNER 2 · независимая проверка</legend>
+      <label>Код проверки <textarea value={packet} onChange={e=>invalidate(e.target.value)}/></label>
+      <button type="button" className="btn" onClick={()=>void inspect()}>Проверить документ</button>
+      {verifiedPacket && verifiedPacket===packet && <>
+        <p>{documentInfo}</p><a href={documentLink} target="_blank" rel="noopener noreferrer">Открыть подтверждающий документ</a>
+        <label><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>Я проверил документ и подтверждаю выполненный внешний возврат</label>
+        <button type="button" className="btn primary" disabled={!confirmed} onClick={()=>void approve()}>Подтвердить возврат</button>
+      </>}
+    </fieldset>
+    {error && <p role="alert" className="error-box">{error}</p>}
+    {message && <p role="status">{message}</p>}
+  </section>;
+}
+
 export default function HotelFinanceBoard() {
   const now = useMemo(() => new Date(), []);
   const [fromDate, setFromDate] = useState(() => dateOnly(monthStart(now)));
   const [toDate, setToDate] = useState(() => dateOnly(now));
   const [data, setData] = useState<FinanceResponse | null>(null);
+  const [ledger, setLedger] = useState<LedgerCoverage | null>(null);
+  const loadSequence = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     setLoading(true);
     setError(null);
+    setLedger(null);
     try {
       const params = new URLSearchParams({ from_date: fromDate, to_date: toDate });
       const response = await fetch(`/core/api/v1/admin/finance/summary?${params}`, { cache: "no-store" });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Не удалось загрузить внутренние финансы");
-      setData(body as FinanceResponse);
+      if (sequence !== loadSequence.current) return;
+      const summary = body as FinanceResponse;
+      setData(summary);
+      const result = summary.owner_ledger_period_coverage;
+      if (summary.owner_accrual_readiness_snapshot && result?.scope === "PROPERTY_SCOPED_READ_ONLY_PERIOD_DIAGNOSTIC"
+        && result.period?.from === summary.range.from && result.period?.to === summary.range.to
+        && result.period_completeness_verified === false && result.recognized_profit_kgs === null
+        && result.posted_ledger_subtotals && result.counts) setLedger(result);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Ошибка загрузки внутренних финансов");
+      if (sequence === loadSequence.current) setError(cause instanceof Error ? cause.message : "Ошибка загрузки внутренних финансов");
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
   }, [fromDate, toDate]);
 
@@ -312,12 +470,35 @@ export default function HotelFinanceBoard() {
 
     {error && <div className="error-box">{error}</div>}
     {loading && !data ? <div className="loading">Загрузка финансов…</div> : data && <>
+      {!loading && !error && ledger && data.owner_accrual_readiness_snapshot && <PartialRefundPanel payments={data.recent_payments} onRecorded={()=>void load()}/>}
       <section className="finance-kpis">
         <article><span>Получено за период</span><strong>{money(data.period_payments.received_kgs)}</strong><small>{data.period_payments.received_count} записей Payment.status=RECEIVED</small></article>
         <article><span>Общий долг</span><strong>{money(data.receivables_snapshot.outstanding_kgs)}</strong><small>{data.receivables_snapshot.debtor_count} броней с остатком</small></article>
         <article><span>Долг после выезда</span><strong>{money(data.receivables_snapshot.checked_out_kgs)}</strong><small>{data.receivables_snapshot.checked_out_count} CHECKED_OUT</small></article>
         <article><span>Стоимость активных броней</span><strong>{money(data.active_reservations_snapshot.booked_total_kgs)}</strong><small>{data.active_reservations_snapshot.reservation_count} GUARANTEED / CHECKED_IN</small></article>
       </section>
+
+      {ledger && data.owner_accrual_readiness_snapshot && ledger.period.from === data.range.from && ledger.period.to === data.range.to &&
+        <section className="finance-split-grid" data-testid="owner-ledger-period-coverage">
+          <article className="finance-section">
+            <div className="section-head"><h2>OWNER · бухгалтерский журнал</h2><span>Период не закрыт</span></div>
+            <div className="finance-state-grid">
+              <div><span>Проведённая выручка</span><strong>{exactSom(ledger.posted_ledger_subtotals.revenue_kgs)}</strong></div>
+              <div><span>Проведённые расходы и себестоимость</span><strong>{exactSom(ledger.posted_ledger_subtotals.expense_cogs_kgs)}</strong></div>
+              <div><span>Промежуточный результат журнала</span><strong>{exactSom(ledger.posted_ledger_subtotals.contribution_kgs)}</strong></div>
+              <div><span>Итоговая прибыль</span><strong>Требуется сверка</strong></div>
+            </div>
+          </article>
+          <article className="finance-section">
+            <div className="section-head"><h2>OWNER · сверка периода</h2><span>Проверенные / ожидаемые</span></div>
+            <div className="finance-state-grid">
+              {([["Проживание","lodging"],["Ресторан","dining"],["Дополнительные услуги","other_service"],["Расходы","expense"],["Себестоимость","cogs"],["Возвраты","refund_payment"]] as const).map(([label,key]) =>
+                <div key={key}><span>{label}</span><strong>{ledger.counts[key+"_verified"] ?? "—"} / {ledger.counts[key+"_expected"] ?? "—"}</strong></div>)}
+              <div><span>Права на включённое питание</span><strong>{ledger.counts.package_entitlement_count ?? "—"}</strong></div>
+              <div><span>Возвраты без подтверждённой даты</span><strong>{ledger.counts.refund_undated_count ?? "—"}</strong></div>
+            </div>
+          </article>
+        </section>}
 
       {data.owner_supplier_stock_snapshot &&
         data.owner_supplier_stock_snapshot.financial_truth.recognized_profit_kgs === null &&

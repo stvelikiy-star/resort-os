@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .auth import require_roles, trusted_property_id
+from .payment_refund_read_model import refund_compatible_sql
 
 router = APIRouter(prefix="/api/v1/admin/reception", tags=["admin-reception"])
 reception_access = require_roles("OWNER", "MANAGER", "RECEPTION")
@@ -31,7 +32,7 @@ async def list_reception_reservations(
     async with request.app.state.db.acquire() as conn:
         prop, local_today = await property_context(conn, user)
         rows = await conn.fetch(
-            '''
+            await refund_compatible_sql(conn, '''
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",
                    r.adults,r.children,r."totalKgs",g."firstName",g.phone,
                    selected.room_code,selected.room_type_name,selected.room_state,
@@ -70,8 +71,8 @@ async def list_reception_reservations(
                 AND ib2."blockType"='RESERVATION'
             ) seg ON true
             LEFT JOIN LATERAL (
-              SELECT COALESCE(SUM(p."amountKgs") FILTER (WHERE p.status='RECEIVED'),0)::bigint AS paid_kgs
-              FROM payments p
+              SELECT COALESCE(SUM(p."remainingReceivedKgs"),0)::bigint AS paid_kgs
+              FROM owner_reservation_payment_balances p
               WHERE p."reservationId"=r.id
             ) pay ON true
             WHERE r."propertyId"=$1
@@ -79,7 +80,7 @@ async def list_reception_reservations(
               CASE r.status::text WHEN 'CHECKED_IN' THEN 0 WHEN 'GUARANTEED' THEN 1 ELSE 2 END,
               r."checkIn",r."createdAt" DESC
             LIMIT $3
-            ''',
+            '''),
             prop["id"],
             local_today,
             limit,
@@ -191,15 +192,16 @@ async def reception_reservation_detail(
         display_segment = choose_display_segment(row["status"], schedule, local_today)
 
         payments = await conn.fetch(
-            '''
-            SELECT id,"amountKgs",method,status::text AS status,provider,"externalRef","paidAt","createdAt"
-            FROM payments
-            WHERE "reservationId"=$1
-            ORDER BY "createdAt" ASC
-            ''',
+            await refund_compatible_sql(conn, '''
+            SELECT p.id,p."amountKgs",p.method,p.status::text AS status,p.provider,p."externalRef",p."paidAt",p."createdAt",
+                   b."remainingReceivedKgs",b."refundedKgs"
+            FROM payments p JOIN owner_reservation_payment_balances b ON b."paymentId"=p.id
+            WHERE p."reservationId"=$1
+            ORDER BY p."createdAt" ASC
+            '''),
             reservation_id,
         )
-        total_paid = sum(int(item["amountKgs"]) for item in payments if item["status"] == "RECEIVED")
+        total_paid = sum(int(item["remainingReceivedKgs"]) for item in payments)
         remaining = max(int(row["totalKgs"]) - total_paid, 0)
 
         audit_ids = [str(reservation_id)]
@@ -284,6 +286,8 @@ async def reception_reservation_detail(
                 {
                     "id": str(item["id"]),
                     "amount_kgs": int(item["amountKgs"]),
+                    "refunded_kgs": int(item["refundedKgs"]),
+                    "remaining_received_kgs": int(item["remainingReceivedKgs"]),
                     "method": item["method"],
                     "status": item["status"],
                     "provider": item["provider"],
