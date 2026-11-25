@@ -973,3 +973,28 @@ async def create_invoice_preview(payload: InvoicePreviewRequest,request: Request
             saved=await conn.fetchrow("INSERT INTO flex_non_issuable_invoice_previews(hotel_id,agreement_version_id,preview_sha256,quote_sha256,period_start,period_end,amount_before_unresolved_taxes) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",
                 payload.hotel_id,payload.agreement_id,digest,row["terms_digest"],row["period_start"],row["period_end_exclusive"]-timedelta(days=1),amount)
             return dict(saved)
+
+
+@app.get("/v1/platform/financial-reconciliation")
+async def financial_reconciliation(request: Request,hotel_id: uuid.UUID=Query(...),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await conn.execute("SELECT set_config('flex.authorized_hotel_id',$1,true)",str(hotel_id))
+            await conn.execute("SET LOCAL ROLE flex_platform_admin_reader")
+            if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_hotels WHERE id=$1)",hotel_id):
+                raise HTTPException(404,detail="Commercial hotel unavailable")
+            # Issued invoices only; NON_ISSUABLE previews are never receivables.
+            rows=await conn.fetch("SELECT b.* FROM flex_refund_adjusted_invoice_balances b WHERE b.hotel_id=$1 ORDER BY b.invoice_id",hotel_id)
+            fields=("amount_due","net_confirmed_cash","net_applied_to_lines","outstanding","unapplied_cash_credit")
+            totals={key:sum((r[key] for r in rows),Decimal("0.00")) for key in fields}
+            def reconciled(r):
+                return (r["amount_due"]==r["net_applied_to_lines"]+r["outstanding"]
+                    and r["net_confirmed_cash"]==r["net_applied_to_lines"]+r["unapplied_cash_credit"]
+                    and all(r[key]>=0 for key in fields))
+            return {"hotel_id":str(hotel_id),"currency":"KGS","invoice_count":len(rows),
+                    "totals":{k:str(v) for k,v in totals.items()},
+                    "reconciled":all(reconciled(r) for r in rows),
+                    "invoices":[{**dict(r),**{k:str(r[k]) for k in fields}} for r in rows],
+                    "payments_enabled":False,"payouts_enabled":False}
