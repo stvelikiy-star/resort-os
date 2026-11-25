@@ -74,6 +74,11 @@ class ScopedCommercialParticipants(unittest.TestCase):
         self.assertEqual(b.json()["reversed_kg"],"0.00")
         self.assertEqual(a.json()["data_provenance"],"QA_ONLY_NOT_BANK_RECONCILED")
         self.assertIsNone(a.json()["actual_paid_kg"])
+        self.assertIsNone(a.json()["outstanding_payable_kg"])
+        self.assertEqual(len(a.json()["history"]),2)
+        self.assertEqual(len(b.json()["history"]),1)
+        self.assertTrue(set(x["id"] for x in a.json()["history"]).isdisjoint(x["id"] for x in b.json()["history"]))
+        self.assertEqual(a.json()["contracts"],[])
 
     def test_investors_require_mfa_and_never_view_other_investor(self):
         no_mfa=self.get("/v1/partner/me/earnings","investor-1")
@@ -85,6 +90,8 @@ class ScopedCommercialParticipants(unittest.TestCase):
         self.assertEqual(a.json()["net_accrued_kg"],"24.00")
         self.assertEqual(b.json()["net_accrued_kg"],"50.00")
         self.assertEqual(a.json()["payout_status"],"NOT_IMPLEMENTED")
+        self.assertEqual(a.json()["assigned_hotels"],[])
+        self.assertTrue(set(x["id"] for x in a.json()["contracts"]).isdisjoint(x["id"] for x in b.json()["contracts"]))
         self.assertIsNone(a.json()["actual_paid_kg"])
 
     def test_roles_from_token_ignored_and_hotel_owner_forbidden(self):
