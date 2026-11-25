@@ -17,7 +17,7 @@ class NeonProbePolicy(unittest.TestCase):
         names = (
             "flex_control_plane.py", "flex_foundation.py",
             "flex_partner_portal.py", "flex_onboarding.py",
-            "flex_catalog_admin.py",
+            "flex_catalog_admin.py", "flex_finance_simulation.py",
         )
         for name in names:
             with self.subTest(name=name):
@@ -93,6 +93,29 @@ class NeonProbePolicy(unittest.TestCase):
                        cwd=Path(__file__).resolve().parents[1],
                        env={**os.environ, "FLEX_ENVIRONMENT": "qa",
                             "FLEX_ENABLE_QA_CATALOG_DRAFTS": "true"})
+
+    def test_synthetic_routes_are_only_registered_in_enabled_qa(self):
+        import subprocess
+        paths = ("/v1/platform/finance-simulation", "/v1/platform/synthetic-cash-journal",
+                 "/v1/platform/customer-agreement-acceptances")
+        for environment, flag in (("qa", "false"), ("production", "true"), ("qa", "true")):
+            expected = environment == "qa" and flag == "true"
+            check = f"""from index import app
+routes = {{(m, r.path) for r in app.routes for m in getattr(r, 'methods', ())}}
+paths = {paths!r}
+expected = {expected!r}
+assert (('POST', paths[0]) in routes) == expected
+for path in paths[1:]:
+    assert (('POST', path) in routes) == expected
+    assert (('GET', path) in routes) == expected
+assert not any(p.startswith(('/v1/payments', '/v1/payouts', '/v1/settlement')) for _, p in routes)
+"""
+            with self.subTest(environment=environment, flag=flag):
+                subprocess.run([sys.executable, "-c", check], check=True,
+                               cwd=Path(__file__).resolve().parents[1],
+                               env={**os.environ, "FLEX_ENVIRONMENT": environment,
+                                    "FLEX_ENABLE_QA_CATALOG_DRAFTS": flag,
+                                    "FLEX_ENABLE_QA_ONBOARDING": "false"})
 
     def test_core_identity_without_token_fails_closed(self):
         r = TestClient(app).get("/v1/me")
