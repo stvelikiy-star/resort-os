@@ -17,6 +17,10 @@ DECLARE
   price_ai uuid;
   pay_a uuid;
   pay_b uuid;
+  refund_id uuid;
+  allocation_b uuid;
+  subscription_a uuid;
+  ledger record;
 BEGIN
   -- Independently signed test contract, trusted deployment link and
   -- explicit CI-only fictional 12% ADDED tax policy.
@@ -161,6 +165,43 @@ BEGIN
   IF (SELECT amount FROM flex_confirmed_payments WHERE id=pay_b) -
      (SELECT sum(amount) FROM flex_payment_allocations WHERE payment_id=pay_b) <> 20.80 THEN
     RAISE EXCEPTION 'CI_FAILURE_OVERPAYMENT_CREDIT';
+  END IF;
+
+  -- One financial chain on the actual issued invoice, rather than unrelated fixtures.
+  -- The older 0007-only test remains usable before refund migration 0008.
+  IF to_regclass('flex_refund_adjusted_invoice_balances') IS NOT NULL THEN
+    SELECT id INTO allocation_b FROM flex_payment_allocations
+      WHERE payment_id=pay_b AND invoice_line_id=line_ai;
+    SELECT * INTO ledger FROM flex_refund_adjusted_invoice_balances WHERE invoice_id=invoice_a;
+    IF ledger.amount_due IS DISTINCT FROM 179.20 OR ledger.net_confirmed_cash IS DISTINCT FROM 200.00
+       OR ledger.net_applied_to_lines IS DISTINCT FROM 179.20 OR ledger.outstanding IS DISTINCT FROM 0.00
+       OR ledger.unapplied_cash_credit IS DISTINCT FROM 20.80 THEN
+      RAISE EXCEPTION 'FLEX_CHAIN_INITIAL_RECONCILIATION_FAILED';
+    END IF;
+    -- Synthetic 30.00 reversal: first consume 20.80 unused credit,
+    -- then reverse 9.20 of the line allocation from the same receipt.
+    SET CONSTRAINTS flex_refund_cash_capacity, flex_refund_allocated_capacity, flex_post_refund_allocation_capacity DEFERRED;
+    INSERT INTO flex_payment_reversals(payment_id,external_reversal_key,amount,reason)
+      VALUES(pay_b,'CI-ISSUED-CHAIN-REFUND-001',30.00,'Synthetic credit and allocated line refund')
+      RETURNING id INTO refund_id;
+    INSERT INTO flex_allocation_reversals(reversal_id,allocation_id,amount)
+      VALUES(refund_id,allocation_b,9.20);
+    SET CONSTRAINTS flex_refund_cash_capacity, flex_refund_allocated_capacity, flex_post_refund_allocation_capacity IMMEDIATE;
+    SELECT * INTO ledger FROM flex_refund_adjusted_invoice_balances WHERE invoice_id=invoice_a;
+    IF ledger.amount_due IS DISTINCT FROM 179.20 OR ledger.net_confirmed_cash IS DISTINCT FROM 170.00
+       OR ledger.net_applied_to_lines IS DISTINCT FROM 170.00 OR ledger.outstanding IS DISTINCT FROM 9.20
+       OR ledger.unapplied_cash_credit IS DISTINCT FROM 0.00
+       OR ledger.amount_due <> ledger.net_applied_to_lines+ledger.outstanding
+       OR ledger.net_confirmed_cash <> ledger.net_applied_to_lines+ledger.unapplied_cash_credit THEN
+      RAISE EXCEPTION 'FLEX_CHAIN_REFUND_RECONCILIATION_FAILED';
+    END IF;
+    -- Record lifecycle evidence only; never mutate the actual subscription or PMS.
+    SELECT id INTO subscription_a FROM flex_subscriptions WHERE hotel_id=hotel_a LIMIT 1;
+    IF subscription_a IS NULL THEN RAISE EXCEPTION 'FLEX_CHAIN_SUBSCRIPTION_MISSING'; END IF;
+    INSERT INTO flex_subscription_lifecycle_events(hotel_id,subscription_id,prior_state,next_state,
+      transition_code,source_invoice_id,event_digest)
+      VALUES(hotel_a,subscription_a,'ACTIVE','PAYMENT_DUE','MARK_PAYMENT_DUE',invoice_a,repeat('9',64));
+    RAISE NOTICE 'PASS FLEX issued invoice 179.20, cash 200.00, refund 30.00, applied 170.00, debt 9.20, credit 0.00, discrepancy 0.00; lifecycle evidence only';
   END IF;
 
   -- Misplaced cross-hotel cash may not be attributed to this invoice.
