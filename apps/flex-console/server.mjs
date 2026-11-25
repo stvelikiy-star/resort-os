@@ -296,7 +296,7 @@ const catalogSkuAction=/^\/api\/actions\/catalog\/skus$/;
 const catalogPriceAction=/^\/api\/actions\/catalog\/skus\/([A-Z][A-Z0-9_]{1,79})\/prices$/;
 const configurationDraftAction=/^\/api\/actions\/subscription-drafts$/;
 const tariffPackageAction=/^\/api\/actions\/tariff-packages$/;
-const customerActions=new Map([['/api/actions/customer-profile','customer-profile'],['/api/actions/agreement-drafts','agreement-drafts'],['/api/actions/invoice-previews','invoice-previews'],['/api/actions/agreement-internal-approvals','agreement-internal-approvals'],['/api/actions/customer-agreement-acceptances','customer-agreement-acceptances']]);
+const customerActions=new Map([['/api/actions/customer-profile','customer-profile'],['/api/actions/agreement-drafts','agreement-drafts'],['/api/actions/invoice-previews','invoice-previews'],['/api/actions/agreement-internal-approvals','agreement-internal-approvals'],['/api/actions/customer-agreement-acceptances','customer-agreement-acceptances'],['/api/actions/finance-simulation','finance-simulation']]);
 const installationTrialPath='/api/actions/installation-trial';
 const commercialPolicyPath='/api/actions/commercial-policy';
 const tariffTemplatePath='/api/actions/tariff-templates';
@@ -307,6 +307,10 @@ function validateCatalogAdminAction(kind,body) {
   if(!body || typeof body!=='object'||Array.isArray(body))return null;
   const keys=Object.keys(body);
   const exact=allowed=>keys.length===allowed.length && allowed.every(k=>keys.includes(k));
+  if(kind==='finance-simulation'){
+    const keyPattern=/^[a-zA-Z0-9_-]{1,64}$/;
+    return exact(['hotel_id','agreement_id','events'])&&[body.hotel_id,body.agreement_id].every(v=>typeof v==='string'&&flexUuidRe.test(v))&&Array.isArray(body.events)&&body.events.length<=100&&body.events.every(e=>e&&typeof e==='object'&&!Array.isArray(e)&&Object.keys(e).every(k=>['kind','event_id','amount','payment_id'].includes(k))&&['PAYMENT','REFUND'].includes(e.kind)&&typeof e.event_id==='string'&&keyPattern.test(e.event_id)&&typeof e.amount==='string'&&amountPattern.test(e.amount)&&(e.kind==='PAYMENT'?e.payment_id==null:typeof e.payment_id==='string'&&keyPattern.test(e.payment_id)))?body:null;
+  }
   if(kind==='customer-profile'){
     const fields={contact_name:180,contact_email:254,contact_phone:40,responsible_name:180};
     return exact(['hotel_id','expected_version',...Object.keys(fields)])&&typeof body.hotel_id==='string'&&flexUuidRe.test(body.hotel_id)&&Number.isInteger(body.expected_version)&&body.expected_version>=0&&body.expected_version<=2147483646&&Object.entries(fields).every(([k,n])=>typeof body[k]==='string'&&body[k].length<=n)?body:null;
@@ -423,6 +427,7 @@ async function catalogAdminPost(req,res,url) {
   try{result=JSON.parse(response)}catch{return json(res,502,{error:'UPSTREAM_INVALID_JSON'})}
   if(!upstream.ok)return json(res,upstream.status,{error:'FLEX_QA_ADMIN_REJECTED',detail:
     typeof result.detail==='string'?result.detail:'Backend rejected the request'});
+  if(kind==='finance-simulation' && !(result.hotel_id===payload.hotel_id&&result.agreement_id===payload.agreement_id&&result.mode==='SYNTHETIC_ONLY'&&result.persisted===false&&result.payments_enabled===false&&result.subscription_activated===false&&result.launch_offer_finalized===false))return json(res,502,{error:'UNEXPECTED_SIMULATION_STATE'});
   if(kind==='customer-profile' && !(result.hotel_id===payload.hotel_id&&result.version===payload.expected_version+1))return json(res,502,{error:'UNEXPECTED_PROFILE_STATE'});
   if(kind==='customer-agreement-acceptances' && !(result.hotel_id===payload.hotel_id&&result.agreement_id===payload.agreement_id&&result.terms_digest===payload.terms_digest&&result.state==='CUSTOMER_ACCEPTED'&&result.client_signed===false&&result.subscription_activated===false&&result.payments_enabled===false))return json(res,502,{error:'UNEXPECTED_CUSTOMER_ACCEPTANCE_STATE'});
   if(kind==='agreement-internal-approvals' && !(result.hotel_id===payload.hotel_id&&result.agreement_id===payload.agreement_id&&result.terms_digest===payload.terms_digest&&result.state==='INTERNALLY_APPROVED'&&result.client_signed===false&&result.subscription_activated===false&&result.payments_enabled===false))return json(res,502,{error:'UNEXPECTED_APPROVAL_STATE'});
