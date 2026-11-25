@@ -169,6 +169,7 @@ async def health() -> dict:
             "status": "ok",
             "mode": "QA_MANAGEMENT_READ_ONLY" if not (_ENABLE_ONBOARDING or _ENABLE_CATALOG) else "QA_MANAGEMENT_DRAFTS",
             "database": "disposable_postgresql" if urlsplit(dsn).hostname == "127.0.0.1" else "isolated_neon",
+            "build_sha": (os.environ.get("VERCEL_GIT_COMMIT_SHA") if len(os.environ.get("VERCEL_GIT_COMMIT_SHA", "")) == 40 and all(c in "0123456789abcdef" for c in os.environ.get("VERCEL_GIT_COMMIT_SHA", "")) else None),
             "least_privilege": True,
             "payments_enabled": False,
             "payouts_enabled": False,
