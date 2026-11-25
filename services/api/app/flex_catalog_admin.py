@@ -1035,7 +1035,7 @@ async def subscription_plans(request: Request,hotel_id: uuid.UUID=Query(...),
     principal: PlatformPrincipal=Depends(resolve_platform_principal)):
     require_admin(principal)
     async with request.app.state.flex_pool.acquire() as conn:
-        async with conn.transaction(readonly=True):
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
             await as_writer(conn,principal)
             rows=await conn.fetch("""SELECT a.id AS agreement_id,a.hotel_id,a.version,a.terms_digest,
                 p.id AS offer_id,p.package_kind,p.commercial_policy_version,p.term_months,p.period_start,
@@ -1048,14 +1048,20 @@ async def subscription_plans(request: Request,hotel_id: uuid.UUID=Query(...),
                 LEFT JOIN flex_customer_agreement_acceptances c ON c.agreement_id=a.id AND c.hotel_id=a.hotel_id AND c.terms_digest=a.terms_digest
                 LEFT JOIN flex_installation_completions i ON i.hotel_id=a.hotel_id
                 WHERE a.hotel_id=$1 AND a.state='DRAFT' ORDER BY a.version DESC""",hotel_id)
+            from .flex_finance_simulation import simulate_cash
+            events=await conn.fetch("""SELECT agreement_id,kind,event_id,amount,payment_id
+                FROM flex_qa_cash_events WHERE hotel_id=$1 ORDER BY agreement_id,sequence""",hotel_id)
+            by_agreement={}
+            for event in events:
+                by_agreement.setdefault(event["agreement_id"],[]).append(synthetic_cash_event(event))
             result=[]
+            today=datetime.now(ZoneInfo("Asia/Bishkek")).date()
             for row in rows:
                 data=dict(row)
                 if isinstance(data["sku_snapshot"],str):
                     data["sku_snapshot"]=json.loads(data["sku_snapshot"])
                 for k in ("subscription_term_total","implementation_total"):
                     data[k]=str(data[k])
-                today=datetime.now(ZoneInfo("Asia/Bishkek")).date()
                 start,end=data["trial_start"],data["trial_end_exclusive"]
                 trial_state=("NOT_STARTED" if start is None or today<start else
                              "ACTIVE" if today<end else "EXPIRED")
@@ -1064,6 +1070,27 @@ async def subscription_plans(request: Request,hotel_id: uuid.UUID=Query(...),
                     trial_state=trial_state,
                     trial_days_remaining=max(0,(end-today).days) if trial_state=="ACTIVE" else 0,
                     subscription_activated=False,payments_enabled=False)
+                data.update(test_finance=None,renewal_preview=None)
+                if data["accepted_at"]:
+                    events_for_plan=by_agreement.get(data["agreement_id"],[])
+                    total=Decimal(data["subscription_term_total"])+Decimal(data["implementation_total"])
+                    if total==0 and not events_for_plan:
+                        balance={"outstanding":"0.00","credit":"0.00","net_simulated_cash":"0.00","subscription_outstanding":"0.00"}
+                    else:
+                        balance=simulate_cash(data["subscription_term_total"],data["implementation_total"],events_for_plan)
+                    outstanding=Decimal(balance["outstanding"])
+                    credit=Decimal(balance["credit"])
+                    data["test_finance"]={k:balance[k] for k in ("outstanding","credit","net_simulated_cash","subscription_outstanding")}
+                    data["test_finance"].update(mode="SYNTHETIC_ONLY",
+                        state="TEST_SETTLED" if outstanding==0 else "TEST_OUTSTANDING",
+                        unapplied_credit_with_debt=outstanding>0 and credit>0)
+                    next_start=data["period_end_exclusive"]
+                    year,month0=divmod(next_start.year*12+next_start.month-1+data["term_months"],12)
+                    if year<=9999:
+                        next_end=date(year,month0+1,min(next_start.day,monthrange(year,month0+1)[1]))
+                        data["renewal_preview"]={"period_start":next_start,"period_end_exclusive":next_end,
+                            "term_months":data["term_months"],"state":"PROPOSAL_ONLY",
+                            "requires_new_offer":True,"bank_authorized":False}
                 result.append(data)
             return result
 
