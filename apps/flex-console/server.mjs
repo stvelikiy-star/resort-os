@@ -439,11 +439,11 @@ async function catalogAdminPost(req,res,url) {
 
 function routeAllowed(path, search) {
   if(search && [...search.keys()].some(k=>!['period','hotel_id'].includes(k)))return null;
-  if(search.has('hotel_id')&&!['/v1/platform/subscription-drafts','/v1/platform/tariff-packages','/v1/platform/installation-trial','/v1/platform/customer-profile','/v1/platform/agreement-drafts'].includes(path))return null;
+  if(search.has('hotel_id')&&!['/v1/platform/subscription-drafts','/v1/platform/tariff-packages','/v1/platform/installation-trial','/v1/platform/customer-profile','/v1/platform/agreement-drafts','/v1/platform/financial-reconciliation'].includes(path))return null;
   if(search.has('period')&&!['/v1/partner/me/earnings','/v1/platform/partner-earnings-summary'].includes(path))return null;
   if(['/v1/me','/v1/hotels','/v1/catalog'].includes(path) && !search.size) return 'core';
   if((path==='/v1/platform/catalog'||path==='/v1/platform/commercial-policy'||path==='/v1/platform/launch-offer'||path==='/v1/platform/tariff-templates'||catalogVersionsRead.test(path))&&!search.size)return 'catalog_admin';
-  if((path==='/v1/platform/tariff-packages'||path==='/v1/platform/installation-trial'||path==='/v1/platform/customer-profile'||path==='/v1/platform/agreement-drafts')&&search.size===1&&
+  if((path==='/v1/platform/tariff-packages'||path==='/v1/platform/installation-trial'||path==='/v1/platform/customer-profile'||path==='/v1/platform/agreement-drafts'||path==='/v1/platform/financial-reconciliation')&&search.size===1&&
      flexUuidRe.test(search.get('hotel_id')||''))return 'catalog_admin';
   if(path==='/v1/platform/subscription-drafts'&&
      (!search.size||(search.size===1&&flexUuidRe.test(search.get('hotel_id')||''))))

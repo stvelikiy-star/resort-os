@@ -542,5 +542,22 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         asyncio.run(verify())
 
 
+    def test_13_financial_reconciliation_excludes_drafts_and_denies_other_roles(self):
+        path="/v1/platform/financial-reconciliation?hotel_id="
+        self.assertEqual(self.get(path+HOTEL_A,who="owner-a").status_code,403)
+        self.assertEqual(self.get(path+HOTEL_A,mfa=False).status_code,403)
+        for hotel in (HOTEL_A,HOTEL_B):
+            reply=self.get(path+hotel)
+            self.assertEqual(reply.status_code,200,reply.text)
+            data=reply.json()
+            self.assertEqual(data["hotel_id"],hotel)
+            self.assertEqual(data["invoice_count"],0)
+            self.assertEqual(data["invoices"],[])
+            self.assertTrue(data["reconciled"])
+            self.assertFalse(data["payments_enabled"])
+            self.assertFalse(data["payouts_enabled"])
+            self.assertTrue(all(Decimal(v)==0 for v in data["totals"].values()))
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)

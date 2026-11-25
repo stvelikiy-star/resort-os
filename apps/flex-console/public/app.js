@@ -675,6 +675,12 @@ async function submitCustomerOperation(form,kind){
  }catch(e){status.textContent=e.message;button.disabled=false;}
 }
 
+async function financeReconciliationPanel(){
+ const l=({ru:{title:'Финансовая сверка',amount_due:'Выставлено',net_confirmed_cash:'Получено за вычетом возвратов',net_applied_to_lines:'Зачтено',outstanding:'Задолженность',unapplied_cash_credit:'Переплата',ok:'Сверка пройдена',bad:'Расхождение',note:'Только выставленные счета с подтверждённым выпуском. Черновики не являются задолженностью.'},kg:{title:'Каржылык салыштыруу',amount_due:'Эсептелген',net_confirmed_cash:'Кайтаруулардан кийинки түшүм',net_applied_to_lines:'Эсепке алынган',outstanding:'Карыз',unapplied_cash_credit:'Ашыкча төлөм',ok:'Салыштыруу ийгиликтүү',bad:'Айырма бар',note:'Ырасталган эсептер гана. Долбоорлор карыз болуп эсептелбейт.'},en:{title:'Financial reconciliation',amount_due:'Issued total',net_confirmed_cash:'Net confirmed cash',net_applied_to_lines:'Applied',outstanding:'Outstanding',unapplied_cash_credit:'Unapplied credit',ok:'Reconciled',bad:'Discrepancy',note:'Only invoices with issuance evidence. Drafts are not receivables.'}})[state.lang];
+ const r=await api('/v1/platform/financial-reconciliation?hotel_id='+state.hotelId),keys=['amount_due','net_confirmed_cash','net_applied_to_lines','outstanding','unapplied_cash_credit'];
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+'<div class="grid three">'+keys.map(k=>kv(l[k],money(r.totals[k],r.currency))).join('')+'</div>'+
+ (r.invoice_count?info(r.reconciled?l.ok:l.bad,r.reconciled?'info':'error')+table([t('invoice'),...keys.map(k=>l[k])],r.invoices.map(x=>'<tr><td>'+safe(x.invoice_id)+'</td>'+keys.map(k=>'<td>'+money(x[k],x.currency)+'</td>').join('')+'</tr>')):empty(t('noInvoices')))+'</section>';
+}
 function hotelCardTabs(){
  const admin=state.me?.role==='SUPER_ADMIN';
  const sections=[['overview','hotelTabOverview'],['subscription','subscription'],['finance','hotelTabFinance'],['usage','hotelTabUsage']];
@@ -736,7 +742,7 @@ async function hotelDetail(){
    '<tr><td>'+safe(i.number||i.id)+'</td><td><span class="chip">'+safe(i.status)+
    '</span></td><td>'+money(i.total,i.currency)+'</td><td>'+safe(date(i.due_at))+'</td></tr>')):
    empty(t('noInvoices')))+'</section>';
- if(state.hotelTab==='finance')return metadata+invoicesInfo+info(t('warning'),'info');
+ if(state.hotelTab==='finance')return metadata+invoicesInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await financeReconciliationPanel().catch(e=>info(e.message,'error')):'')+info(t('warning'),'info');
  if(state.hotelTab==='subscription')return metadata+summary+subscriptionInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await installationTrialPanel().catch(e=>info(e.message,'error'))+await commercialHotelOfferForm().catch(e=>info(e.message,'error')):'')+draftHistory+info(t('draftOnly'),'info');
  return metadata+await hotelNameForm(id)+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await customerProfilePanel().catch(e=>info(e.message,'error')):'')+summary+subscriptionInfo+info(t('warning'),'info');
 }
