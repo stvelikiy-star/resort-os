@@ -234,6 +234,19 @@ def run():
         saved=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
         assert saved=={"profiles":2,"agreement":contract["id"],"source":launch["id"],"state":"DRAFT","preview":doc["id"],"amount":61000,"payments":0},saved
         print("PASS browser customer profile revisions, unsigned agreement and non-issuable 61000 KGS preview match PostgreSQL")
+        page.locator('[data-hotel-tab="finance"]').click()
+        panel=page.locator("section.panel").filter(has=page.get_by_role("heading",name="Financial reconciliation",exact=True))
+        expect(panel).to_be_visible()
+        expect(panel).to_contain_text("Outstanding")
+        expect(panel).to_contain_text("Unapplied credit")
+        stats=page.request.get(ORIGIN+"/api/data/v1/platform/financial-reconciliation?hotel_id="+HOTEL_A,ignore_https_errors=True)
+        assert stats.status==200, ("financial reconciliation",stats.status,stats.text()[:250])
+        data=stats.json()
+        assert data["invoice_count"]==0 and data["reconciled"]
+        assert all(Decimal(v)==0 for v in data["totals"].values())
+        assert not data["payments_enabled"] and not data["payouts_enabled"]
+        expect(panel).not_to_contain_text("61,000 KGS")
+        print("PASS browser financial reconciliation excludes non-issuable 61000 KGS preview")
         browser.close()
 
 
