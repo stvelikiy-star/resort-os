@@ -721,6 +721,35 @@ async function submitFinanceSimulation(form){
   result.innerHTML='<div class="grid two">'+kv(l.cash,money(r.net_simulated_cash,'KGS'))+kv(l.debt,money(r.outstanding,'KGS'))+kv(l.credit,money(r.credit,'KGS'))+kv(l.diff,money(r.discrepancy,'KGS'))+'</div>'+table([l.kind,l.amount,l.cash,l.applied,l.debt,l.credit],r.history.map(x=>'<tr><td>'+safe(x.kind==='PAYMENT'?l.payment:l.reversal)+'</td>'+['amount','cash','applied','outstanding','credit'].map(k=>'<td>'+money(x[k],'KGS')+'</td>').join('')+'</tr>'));
  }catch(e){status.textContent=e.message;}finally{button.disabled=false;}
 }
+function journalLabels(){
+ return ({ru:{title:'Тестовый финансовый журнал',note:'Сохраняемые синтетические операции. Не являются реальными поступлениями или счетами.',open:'Открыть журнал',append:'Добавить тестовую операцию',id:'ID операции',source:'ID исходной оплаты',state:'Тестовый остаток',settled:'Погашен в тесте',due:'Остаток в тесте'},kg:{title:'Тесттик каржы журналы',note:'Сакталган синтетикалык операциялар. Чыныгы түшүм же эсеп эмес.',open:'Журналды ачуу',append:'Тесттик операция кошуу',id:'Операциянын ID',source:'Баштапкы төлөмдүн ID',state:'Тесттик калдык',settled:'Тестте төлөндү',due:'Тесттик карыз'},en:{title:'Synthetic cash journal',note:'Persistent synthetic events, never actual receipts or invoices.',open:'Open journal',append:'Append test event',id:'Event ID',source:'Original payment ID',state:'Test balance',settled:'Settled in test',due:'Outstanding in test'}})[state.lang];
+}
+async function syntheticJournalPanel(){
+ const l=journalLabels(),r=await api('/v1/platform/agreement-drafts?hotel_id='+state.hotelId),ids=new Set((r.acceptances||[]).map(x=>x.agreement_id)),rows=r.agreements.filter(a=>ids.has(a.id));
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+(rows.length?'<form id="synthetic-journal-open"><label>'+safe(customerLabels().agreements)+'<select name="agreement_id">'+rows.map(a=>'<option value="'+safe(a.id)+'">'+safe(a.terms?.package_kind)+' · v'+safe(a.version)+'</option>').join('')+'</select></label><button type="submit" class="outline">'+safe(l.open)+'</button><div role="status"></div><div class="journal-result"></div></form>':empty(t('noData')))+'</section>';
+}
+function renderSyntheticJournal(container,r){
+ const l=journalLabels(),m=simulationLabels();
+ container.innerHTML='<div class="grid two">'+kv(l.state,r.test_balance_state==='TEST_SETTLED'?l.settled:l.due)+kv(m.cash,money(r.net_simulated_cash,'KGS'))+kv(m.debt,money(r.outstanding,'KGS'))+kv(m.credit,money(r.credit,'KGS'))+kv(m.diff,money(r.discrepancy,'KGS'))+'</div>'+
+ table([l.id,m.kind,m.amount,l.source],r.events.map(e=>'<tr><td>'+safe(e.event_id)+'</td><td>'+safe(e.kind==='PAYMENT'?m.payment:m.reversal)+'</td><td>'+money(e.amount,'KGS')+'</td><td>'+safe(e.payment_id||'—')+'</td></tr>'))+
+ (r.sequence<100?'<div class="admin-form journal-append"><input type="hidden" name="journal_agreement_id" value="'+safe(r.agreement_id)+'"><input type="hidden" name="expected_sequence" value="'+safe(r.sequence)+'"><label>'+safe(m.kind)+'<select name="event_kind"><option value="PAYMENT">'+safe(m.payment)+'</option><option value="REFUND">'+safe(m.reversal)+'</option></select></label><label>'+safe(l.id)+'<input name="event_id" value="'+safe('event-'+(r.sequence+1))+'" maxlength="64"></label><label>'+safe(m.amount)+'<input name="event_amount" inputmode="decimal" maxlength="15"></label><label>'+safe(l.source)+'<input name="payment_id" maxlength="64"></label><button type="button" class="primary" data-journal-append>'+safe(l.append)+'</button></div>':'');
+}
+async function openSyntheticJournal(form){
+ const d=new FormData(form),status=form.querySelector('[role=status]');
+ status.textContent='';
+ try{const r=await api('/v1/platform/synthetic-cash-journal?hotel_id='+state.hotelId+'&agreement_id='+d.get('agreement_id'));renderSyntheticJournal(form.querySelector('.journal-result'),r);}
+ catch(e){status.textContent=e.message;}
+}
+async function appendSyntheticJournal(button){
+ const form=button.closest('form'),d=new FormData(form),status=form.querySelector('[role=status]');
+ button.disabled=true;status.textContent='';
+ try{
+  const event={kind:d.get('event_kind'),event_id:d.get('event_id'),amount:d.get('event_amount')};
+  if(event.kind==='REFUND')event.payment_id=d.get('payment_id');
+  const r=await saveQaCatalogAction('synthetic-cash-journal',{hotel_id:state.hotelId,agreement_id:d.get('journal_agreement_id'),expected_sequence:Number(d.get('expected_sequence')),event});
+  renderSyntheticJournal(form.querySelector('.journal-result'),r);
+ }catch(e){status.textContent=e.message;button.disabled=false;}
+}
 async function financeReconciliationPanel(){
  const l=({ru:{title:'Финансовая сверка',amount_due:'Выставлено',net_confirmed_cash:'Получено за вычетом возвратов',net_applied_to_lines:'Зачтено',outstanding:'Задолженность',unapplied_cash_credit:'Переплата',ok:'Сверка пройдена',bad:'Расхождение',note:'Только выставленные счета с подтверждённым выпуском. Черновики не являются задолженностью.'},kg:{title:'Каржылык салыштыруу',amount_due:'Эсептелген',net_confirmed_cash:'Кайтаруулардан кийинки түшүм',net_applied_to_lines:'Эсепке алынган',outstanding:'Карыз',unapplied_cash_credit:'Ашыкча төлөм',ok:'Салыштыруу ийгиликтүү',bad:'Айырма бар',note:'Ырасталган эсептер гана. Долбоорлор карыз болуп эсептелбейт.'},en:{title:'Financial reconciliation',amount_due:'Issued total',net_confirmed_cash:'Net confirmed cash',net_applied_to_lines:'Applied',outstanding:'Outstanding',unapplied_cash_credit:'Unapplied credit',ok:'Reconciled',bad:'Discrepancy',note:'Only invoices with issuance evidence. Drafts are not receivables.'}})[state.lang];
  const r=await api('/v1/platform/financial-reconciliation?hotel_id='+state.hotelId),keys=['amount_due','net_confirmed_cash','net_applied_to_lines','outstanding','unapplied_cash_credit'];
@@ -788,7 +817,7 @@ async function hotelDetail(){
    '<tr><td>'+safe(i.number||i.id)+'</td><td><span class="chip">'+safe(i.status)+
    '</span></td><td>'+money(i.total,i.currency)+'</td><td>'+safe(date(i.due_at))+'</td></tr>')):
    empty(t('noInvoices')))+'</section>';
- if(state.hotelTab==='finance')return metadata+invoicesInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await financeReconciliationPanel().catch(e=>info(e.message,'error'))+await financeSimulationPanel().catch(e=>info(e.message,'error')):'')+info(t('warning'),'info');
+ if(state.hotelTab==='finance')return metadata+invoicesInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await financeReconciliationPanel().catch(e=>info(e.message,'error'))+await financeSimulationPanel().catch(e=>info(e.message,'error'))+await syntheticJournalPanel().catch(e=>info(e.message,'error')):'')+info(t('warning'),'info');
  if(state.hotelTab==='subscription')return metadata+summary+subscriptionInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await installationTrialPanel().catch(e=>info(e.message,'error'))+await commercialHotelOfferForm().catch(e=>info(e.message,'error'))+await subscriptionPlanPanel().catch(e=>info(e.message,'error')):state.me?.role==='HOTEL_OWNER'&&state.status?.qa_catalog_admin_enabled?await customerAcceptancePanel().catch(e=>info(e.message,'error')):'')+draftHistory+info(t('draftOnly'),'info');
  return metadata+await hotelNameForm(id)+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await customerProfilePanel().catch(e=>info(e.message,'error')):'')+summary+subscriptionInfo+info(t('warning'),'info');
 }
@@ -921,6 +950,7 @@ async function submitCommercialPrice(form){
 main.addEventListener('submit',e=>{
  if(e.target.id==='customer-profile-form'){e.preventDefault();submitCustomerOperation(e.target,'customer-profile');return;}
  if(e.target.id==='agreement-draft-form'){e.preventDefault();submitCustomerOperation(e.target,'agreement-drafts');return;}
+ if(e.target.id==='synthetic-journal-open'){e.preventDefault();openSyntheticJournal(e.target);return;}
  if(e.target.id==='finance-simulation-form'){e.preventDefault();submitFinanceSimulation(e.target);return;}
  if(e.target.classList.contains('customer-acceptance-form')){e.preventDefault();submitCustomerOperation(e.target,'customer-agreement-acceptances');return;}
  if(e.target.classList.contains('agreement-approval-form')){e.preventDefault();submitCustomerOperation(e.target,'agreement-internal-approvals');return;}
