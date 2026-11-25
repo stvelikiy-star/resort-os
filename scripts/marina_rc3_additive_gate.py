@@ -74,7 +74,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/owner_ledger_policy.py": "4dc0694917e9bb9d7a80786a265a87d7480beead",
     "services/api/app/owner_accounting_postings.py": "6aec328b7106e116dea51647b56692925d4c6c6b",
     "scripts/test_owner_ledger_policy.py": "cbf493b03dafafc33b6a035df674736cd3978be9",
-    "scripts/marina_owner_posting_api_ci.py": "7ef3f506a8142895a39cc819891066d953d6f04a",
+    "scripts/marina_owner_posting_api_ci.py": "4204f347d1d077be73ed29c8831c654beb4837fb",
     "services/api/app/owner_revenue_source_journal.py": "9041de7df7ae429248b3c9877cd626cc4b5cb2ba",
     "scripts/marina_owner_expense_posting_ci.py": "3c5879734d3bff96269559b1aa08e25adfe937c2",
     "scripts/marina_owner_served_cogs_posting_ci.py": "75bb2cc1fb85ff6379ec0b8010115a4aad6b290b",

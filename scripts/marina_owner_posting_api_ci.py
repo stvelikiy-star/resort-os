@@ -225,3 +225,177 @@ async def verify():
 
 asyncio.run(verify())
 print("MARINA_OWNER_TWO_HOTEL_LEDGER_API_PASS",checks)
+
+# Actual competing SQL writers against the existing immutable journal.
+# Fixtures use only the disposable CI database, and winning postings are
+# exactly reversed before later financial tests run.
+async def race_fixture(conn):
+    sid,qid,did=uuid.uuid4(),uuid.uuid4(),uuid.uuid4()
+    reviewer=await conn.fetchval(
+        """SELECT id FROM staff_users WHERE "propertyId"=$1 AND username='accounting_reviewer'""",p)
+    await conn.execute(
+        """INSERT INTO owner_revenue_source_events
+           (id,"propertyId","sourceType","sourceId","serviceDate",action,
+            "faceValueKgs","sourceSnapshot",reason,"createdById")
+           SELECT $1,"propertyId","sourceType",$2,"serviceDate",action,
+                  "faceValueKgs","sourceSnapshot",'Concurrent isolated source fixture',"createdById"
+           FROM owner_revenue_source_events WHERE id=$3 AND "propertyId"=$4""",
+        sid,uuid.uuid4(),source,p)
+    await conn.execute(
+        """INSERT INTO owner_accounting_journal_proposals
+           (id,"propertyId","sourceType","sourceId","accountingDate","policyVersion",reason,"payloadHash","createdById")
+           SELECT $1,"propertyId","sourceType",$2,"accountingDate","policyVersion",
+                  'Concurrent isolated proposal fixture',$3,"createdById"
+           FROM owner_accounting_journal_proposals WHERE id=$4 AND "propertyId"=$5""",
+        qid,sid,hashlib.sha256(str(qid).encode()).hexdigest(),proposal,p)
+    await conn.execute(
+        """INSERT INTO owner_accounting_journal_proposal_lines
+           ("proposalId","propertyId","lineNo","accountCode",side,"amountKgs")
+           SELECT $1,"propertyId","lineNo","accountCode",side,"amountKgs"
+           FROM owner_accounting_journal_proposal_lines WHERE "proposalId"=$2 AND "propertyId"=$3""",
+        qid,proposal,p)
+    await conn.execute(
+        """INSERT INTO owner_accounting_journal_decisions
+           (id,"propertyId","proposalId",action,"actorId",reason)
+           VALUES($1,$2,$3,'APPROVE',$4,'Concurrent isolated approval fixture')""",
+        did,p,qid,reviewer)
+    await conn.execute(
+        """INSERT INTO owner_revenue_accounting_certifications
+           (id,"propertyId","sourceEventId","evidenceDocumentId","reviewedById",
+            "grossAmountKgs","taxAmountKgs","netRevenueKgs","policyVersion",reason)
+           SELECT $1,"propertyId",$2,"evidenceDocumentId","reviewedById",
+                  "grossAmountKgs","taxAmountKgs","netRevenueKgs","policyVersion",
+                  'Concurrent isolated document certification'
+           FROM owner_revenue_accounting_certifications
+           WHERE "propertyId"=$3 AND "sourceEventId"=$4""",
+        uuid.uuid4(),sid,p,source)
+    return sid,qid,did,reviewer
+
+async def race_post(conn,fixture):
+    sid,qid,did,reviewer=fixture
+    post_id=uuid.uuid4()
+    await conn.execute(
+        """INSERT INTO owner_accounting_postings
+           (id,"propertyId","proposalId","decisionId",action,"accountingDate",
+            "policyVersion","postedById","sourceCompletenessAttested",reason)
+           SELECT $1,"propertyId",id,$2,'POST',"accountingDate","policyVersion",$3,true,
+                  'Concurrent isolated accounting posting'
+           FROM owner_accounting_journal_proposals WHERE id=$4 AND "propertyId"=$5""",
+        post_id,did,reviewer,qid,p)
+    await conn.execute(
+        """INSERT INTO owner_accounting_posting_lines
+           ("postingId","propertyId","lineNo","accountCode",side,"amountKgs")
+           SELECT $1,"propertyId","lineNo","accountCode",side,"amountKgs"
+           FROM owner_accounting_journal_proposal_lines WHERE "proposalId"=$2 AND "propertyId"=$3""",
+        post_id,qid,p)
+
+async def race_reverse(conn,fixture):
+    await conn.execute(
+        """INSERT INTO owner_revenue_source_events
+           (id,"propertyId","sourceType","sourceId","serviceDate",action,
+            "faceValueKgs","sourceSnapshot","reversesId",reason,"createdById")
+           SELECT $1,"propertyId","sourceType","sourceId","serviceDate",'REVERSE_SOURCE',
+                  "faceValueKgs","sourceSnapshot",id,'Concurrent isolated source reversal',"createdById"
+           FROM owner_revenue_source_events WHERE id=$2 AND "propertyId"=$3""",
+        uuid.uuid4(),fixture[0],p)
+
+async def clean_race_post(conn,fixture):
+    sid,qid,did,reviewer=fixture
+    original=await conn.fetchval(
+        """SELECT id FROM owner_accounting_postings
+           WHERE "propertyId"=$1 AND "proposalId"=$2 AND action='POST'""",p,qid)
+    rd,rid=uuid.uuid4(),uuid.uuid4()
+    await conn.execute(
+        """INSERT INTO owner_accounting_journal_decisions
+           (id,"propertyId","proposalId",action,"approvalId","actorId",reason)
+           VALUES($1,$2,$3,'REVERSE',$4,$5,'Concurrent fixture exact reversal')""",
+        rd,p,qid,did,reviewer)
+    await conn.execute(
+        """INSERT INTO owner_accounting_postings
+           (id,"propertyId","proposalId","decisionId",action,"reversesId",
+            "accountingDate","policyVersion","postedById","sourceCompletenessAttested",reason)
+           SELECT $1,"propertyId","proposalId",$2,'REVERSE',id,
+                  "accountingDate","policyVersion",$3,true,'Concurrent fixture exact reversal'
+           FROM owner_accounting_postings WHERE id=$4 AND "propertyId"=$5""",
+        rid,rd,reviewer,original,p)
+    await conn.execute(
+        """INSERT INTO owner_accounting_posting_lines
+           ("postingId","propertyId","lineNo","accountCode",side,"amountKgs")
+           SELECT $1,"propertyId","lineNo","accountCode",
+                  CASE WHEN side='DEBIT' THEN 'CREDIT' ELSE 'DEBIT' END,"amountKgs"
+           FROM owner_accounting_posting_lines WHERE "postingId"=$2 AND "propertyId"=$3""",
+        rid,original,p)
+    await race_reverse(conn,fixture)
+
+async def verify_concurrency():
+    setup=await asyncpg.connect(parsed.geturl())
+    a=await asyncpg.connect(parsed.geturl())
+    b=await asyncpg.connect(parsed.geturl())
+    try:
+        for isolation in ("read_committed","repeatable_read"):
+            for post_first in (True,False):
+                async with setup.transaction():
+                    fixture=await race_fixture(setup)
+                first,second=(race_post,race_reverse) if post_first else (race_reverse,race_post)
+                ta=a.transaction(isolation=isolation)
+                tb=b.transaction(isolation=isolation)
+                await ta.start()
+                await tb.start()
+                contender=None
+                try:
+                    await b.fetchval("SELECT count(*) FROM owner_revenue_source_events")
+                    await first(a,fixture)
+                    contender=asyncio.create_task(second(b,fixture))
+                    for _ in range(200):
+                        if a.get_server_pid() in await setup.fetchval(
+                            "SELECT pg_blocking_pids($1)",b.get_server_pid()):
+                            break
+                        if contender.done():
+                            await contender
+                            raise AssertionError("Contender completed without waiting")
+                        await asyncio.sleep(0.025)
+                    else:
+                        raise AssertionError("Expected PostgreSQL contention not observed")
+                    check(True,True,"contender blocked on actual transaction")
+                    await ta.commit()
+                    try:
+                        await asyncio.wait_for(contender,10)
+                    except asyncpg.PostgresError as exc:
+                        expected=("OWNER_REVENUE_ACTIVE_POSTING_REQUIRES_REVERSAL"
+                                  if post_first else "OWNER_REVENUE_SOURCE_ALREADY_REVERSED")
+                        check((isolation=="repeatable_read" and exc.sqlstate=="40001") or
+                              (exc.sqlstate=="23514" and expected in str(exc)),True,
+                              "conflicting operation rejected after winner commits")
+                    else:
+                        raise AssertionError("Conflicting operation succeeded")
+                finally:
+                    if contender is not None and not contender.done():
+                        contender.cancel()
+                        await asyncio.gather(contender,return_exceptions=True)
+                    if b.is_in_transaction():
+                        await tb.rollback()
+                    if a.is_in_transaction():
+                        await ta.rollback()
+                sid=fixture[0]
+                check(await setup.fetchval("SELECT owner_revenue_has_active_posting($1,$2)",p,sid),
+                      post_first,"only winning ledger state")
+                check(await setup.fetchval(
+                    """SELECT EXISTS(SELECT 1 FROM owner_revenue_source_events
+                       WHERE "propertyId"=$1 AND "reversesId"=$2 AND action='REVERSE_SOURCE')""",p,sid),
+                    not post_first,"only winning source state")
+                if post_first:
+                    async with setup.transaction():
+                        await clean_race_post(setup,fixture)
+                check(await setup.fetchval("SELECT owner_revenue_has_active_posting($1,$2)",p,sid),
+                      False,"race fixture has no outstanding ledger")
+        check(await setup.fetchval(
+            """SELECT count(*) FROM owner_accounting_postings WHERE "propertyId"=$1""",pb),
+            0,"concurrent fixtures preserve hotel B")
+    finally:
+        await a.close()
+        await b.close()
+        await setup.close()
+
+before_concurrency=checks
+asyncio.run(verify_concurrency())
+print("MARINA_OWNER_CONCURRENT_POST_REVERSE_PASS",checks-before_concurrency)
