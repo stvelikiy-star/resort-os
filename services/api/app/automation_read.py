@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from .payment_refund_read_model import refund_compatible_sql
 from .service_auth import require_automation_service
 
 PROPERTY_CODE = os.environ.get("PROPERTY_CODE", "THREE_CROWNS")
@@ -137,10 +138,10 @@ async def reservation_request_status(
         if not row:
             raise HTTPException(status_code=404, detail="Reservation request not found")
         payment = await conn.fetchrow(
-            '''SELECT
-                 COALESCE(SUM(CASE WHEN status='RECEIVED' THEN "amountKgs" ELSE 0 END),0)::int AS received_kgs,
-                 COALESCE(SUM(CASE WHEN status='PENDING' THEN "amountKgs" ELSE 0 END),0)::int AS pending_kgs
-               FROM payments WHERE "requestId"=$1 OR "reservationId"=$2''',
+            await refund_compatible_sql(conn, '''SELECT
+                 COALESCE(SUM(CASE WHEN p.status='RECEIVED' THEN COALESCE(b."remainingReceivedKgs",p."amountKgs") ELSE 0 END),0)::int AS received_kgs,
+                 COALESCE(SUM(CASE WHEN p.status='PENDING' THEN p."amountKgs" ELSE 0 END),0)::int AS pending_kgs
+               FROM payments p LEFT JOIN owner_reservation_payment_balances b ON b."paymentId"=p.id WHERE p."requestId"=$1 OR p."reservationId"=$2'''),
             request_id, row["reservation_id"],
         )
 
@@ -195,10 +196,10 @@ async def reservation_status(
         if not row:
             raise HTTPException(status_code=404, detail="Reservation not found")
         payment = await conn.fetchrow(
-            '''SELECT
-                 COALESCE(SUM(CASE WHEN status='RECEIVED' THEN "amountKgs" ELSE 0 END),0)::int AS received_kgs,
-                 COALESCE(SUM(CASE WHEN status='PENDING' THEN "amountKgs" ELSE 0 END),0)::int AS pending_kgs
-               FROM payments WHERE "reservationId"=$1''',
+            await refund_compatible_sql(conn, '''SELECT
+                 COALESCE(SUM(CASE WHEN p.status='RECEIVED' THEN COALESCE(b."remainingReceivedKgs",p."amountKgs") ELSE 0 END),0)::int AS received_kgs,
+                 COALESCE(SUM(CASE WHEN p.status='PENDING' THEN p."amountKgs" ELSE 0 END),0)::int AS pending_kgs
+               FROM payments p LEFT JOIN owner_reservation_payment_balances b ON b."paymentId"=p.id WHERE p."reservationId"=$1'''),
             row["id"],
         )
     received = payment["received_kgs"]

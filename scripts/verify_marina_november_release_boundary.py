@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "eb7e1dcd8b3f5c4a3b805d88a6c0bcaf42907a29",
+    "scripts/marina_rc3_additive_gate.py": "2ebfb3105fede7bc0678273982af17952877dd40",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -67,6 +67,15 @@ APPROVED_P0_BLOBS = {
     "services/api/app/payment_refund_read_model.py": "74327ded78a70f4834b097b40effc34b5ef554ed",
     "scripts/payment_idempotency_helper_test.py": "83bda70f156a44451865302b1f618f799598b3b2",
     ".github/workflows/payment-idempotency-ci.yml": "2eb5c186bbad8654dd61da429fe1491366ad6efd",
+    "services/api/app/crm_sync.py": "018ffcc71249dd42fae2d127b09c49b28b108150",
+    "services/api/app/analytics_reports.py": "ce57b5ef996317e97beab13e0f64ccf23c5a00a0",
+    "services/api/app/owner_intelligence.py": "4cc4594b2eb5b0b548740733abdf6a8eb698d3f2",
+    "services/api/app/automation_read.py": "bf8e1b508c4a9415c23958b7a30b7340cb2a6a3e",
+    "services/api/app/owner_pace.py": "c1d8115d91ae8422c2b1713a07d2d53ccae973b7",
+    "services/api/app/pms_control_snapshot.py": "5b7516ef7be557fc1d7ae848a3e34fc7fbd9378e",
+    "services/api/app/group_bookings.py": "8f4e7a1628218a847db989552633944936abbe51",
+    "services/api/app/owner_corrections.py": "057d2cf46e9ad91f3da497bbb6f920e538e87ea0",
+    "apps/admin/components/ChannelMappings.tsx": "13a0405bdea21b98f85b02bf5695eb0e75bbe710",
     "services/api/app/reservation_payments.py": "b1102d8ddcf22479ed53b1d31022234885b90772",
     "services/api/app/pms_reservation_create.py": "f068836d615409443f1742fc492f27886f9d6aee",
     "scripts/marina_shared_manual_refund_evidence_ci.py": "f52d7947e64e935497617834e17535def9a59042",
