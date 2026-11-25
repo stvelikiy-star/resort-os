@@ -72,6 +72,7 @@ EXPECTED_MIGRATIONS = (
     "zz135_marina_owner_certified_tax_correction_20261125",
     "zz136_marina_owner_certified_revenue_reductions_20261125",
     "zz137_marina_owner_certified_refund_cash_evidence_20261125",
+    "zz138_marina_owner_full_cancellation_certificate_20261125",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make

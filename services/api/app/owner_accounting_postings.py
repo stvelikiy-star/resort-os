@@ -131,8 +131,12 @@ async def certify_revenue_source(body:RevenueSourceCertification,request:Request
                 raise HTTPException(409,detail={"code":"REVENUE_GUEST_SERVICE_NOT_QUALIFIED"})
             gross=Decimal(ev["faceValueKgs"])
             net=gross-body.tax_amount_kgs-body.reduction_amount_kgs
-            if net<=0:
+            if net<0 or (net==0 and body.tax_amount_kgs!=0):
                 raise HTTPException(409,detail={"code":"REVENUE_TAX_COMPONENT_INVALID"})
+            if net==0 and not await conn.fetchval(
+                "SELECT owner_full_cancellation_proof($1,$2,$3,$4)",
+                pid,body.source_event_id,gross,ids):
+                raise HTTPException(409,detail={"code":"OWNER_FULL_CANCELLATION_PROOF_REQUIRED"})
             row=await conn.fetchrow(
                 """INSERT INTO owner_revenue_accounting_certifications
                    (id,"propertyId","sourceEventId","evidenceDocumentId",
@@ -476,12 +480,14 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
                   p."accountingDate" AS posting_date,
                   c.id AS certification_id,
                   c."grossAmountKgs" AS certified_gross,
-                  owner_revenue_certificate_current(c) AS certificate_current
+                  owner_revenue_certificate_current(c) AS certificate_current,
+                  owner_zero_revenue_certificate_current(c) AS zero_current
            FROM sources e
            LEFT JOIN active_post p ON p."sourceType"='REVENUE_SOURCE' AND p."sourceId"=e.id
            LEFT JOIN owner_revenue_accounting_certifications c
              ON c."propertyId"=$1 AND c."sourceEventId"=e.id
-             AND c."policyVersion"=p."policyVersion"
+             AND (c."policyVersion"=p."policyVersion" OR
+                  (p.id IS NULL AND c."netRevenueKgs"=0))
            ORDER BY e.id""",pid,from_date,to_date)
     by_key={(r["sourceType"],str(r["sourceId"]),r["serviceDate"].isoformat()):r for r in rows}
     matched=set()
@@ -492,10 +498,11 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
         if row is None:
             return False
         matched.add(key)
-        return (row["posting_id"] is not None and row["certification_id"] is not None
+        return (row["certification_id"] is not None
                 and row["certificate_current"] is True
-                and row["posting_date"]==row["serviceDate"]
-                and row["certified_gross"]==row["faceValueKgs"]==Decimal(str(gross)))
+                and row["certified_gross"]==row["faceValueKgs"]==Decimal(str(gross))
+                and ((row["posting_id"] is not None and row["posting_date"]==row["serviceDate"])
+                     or (row["posting_id"] is None and row["zero_current"] is True)))
     def observe_night(reservation_id,service_date,gross):
         if match("ROOM_NIGHT",reservation_id,service_date,gross):
             counts["lodging_verified"]+=1
@@ -575,13 +582,14 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
                  AND NOT EXISTS(SELECT 1 FROM owner_revenue_correction_events r
                    WHERE r."propertyId"=$1 AND r."reversesId"=c.id AND r.action='REVERSE')
                  AND NOT EXISTS(SELECT 1 FROM owner_revenue_accounting_certifications cert
-                   JOIN active_post p ON p."sourceType"='REVENUE_SOURCE'
+                   LEFT JOIN active_post p ON p."sourceType"='REVENUE_SOURCE'
                      AND p."sourceId"=cert."sourceEventId"
                      AND p."accountingDate"=e."serviceDate"
                    WHERE cert."propertyId"=$1 AND cert."sourceEventId"=e.id
                      AND (c.id=ANY(cert."correctionEventIds") OR
                        (cert."correctionEventIds" IS NULL AND cert."taxCorrectionEventId"=c.id))
-                     AND owner_revenue_certificate_current(cert))
+                     AND owner_revenue_certificate_current(cert)
+                     AND (p.id IS NOT NULL OR owner_zero_revenue_certificate_current(cert)))
              ) AS active_corrections""",pid,from_date,to_date,tz)
     counts.update(dict(coverage))
     # Entitlements are rights to meals, not proof of delivered paid value.

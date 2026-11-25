@@ -793,3 +793,45 @@ def verify_combined_revenue_reductions():
 before_combined=checks
 verify_combined_revenue_reductions()
 print("MARINA_OWNER_COMBINED_REDUCTIONS_PASS",checks-before_combined)
+
+def verify_full_cancellation():
+    _,_,sid,_,doc_id=asyncio.run(seed())
+    event_id=uuid.uuid4()
+    base="/api/v1/admin/finance/owner/accounting-journal"
+    corr="/api/v1/admin/finance/owner/revenue-corrections"
+    doc_bytes=b"%PDF-1.4\\n% Synthetic accounting source certification\\n%%EOF\\n"
+    with TestClient(app,base_url="https://ledger-qa.invalid") as client:
+        check(client.post("/api/v1/auth/login",json={"username":"owner","password":PASSWORD}).status_code,200,"full cancellation maker")
+        check(client.post(corr,json={
+            "id":str(event_id),"approval_id":str(sid),"kind":"CANCELLATION",
+            "component":"DINING","amount_kgs":"700","document_reference":"CI-TAX-REVIEW-700",
+            "document_date":date.today().isoformat(),"document_sha256":hashlib.sha256(doc_bytes).hexdigest(),
+            "evidence_document_id":str(doc_id),"evidence_reference":"Synthetic complete waiver",
+            "reason":"Full cancellation of the independently documented charge"
+        }).status_code,201,"record full cancellation")
+        client.post("/api/v1/auth/logout")
+        check(client.post("/api/v1/auth/login",json={"username":"accounting_reviewer","password":PASSWORD}).status_code,200,"full cancellation independent reviewer")
+        cert={"id":str(uuid.uuid4()),"source_event_id":str(sid),"evidence_document_id":str(doc_id),
+            "tax_amount_kgs":"0","reduction_amount_kgs":"700","reduction_basis":"ADDITIONAL_TO_APPROVED_FACE",
+            "correction_event_ids":[str(event_id)],"policy_version":"CI-LEDGER-POLICY-1",
+            "reason":"Independently certified full cancellation without invented posting"}
+        check(client.post(base+"/revenue-certifications",json={**cert,"tax_amount_kgs":"1"}).status_code,409,"reject tax on full cancellation")
+        check(client.post(base+"/revenue-certifications",json=cert).status_code,201,"certify full zero-value cancellation")
+        check(client.post(base+"/revenue-certifications",json=cert).json()["already_processed"],True,"zero certification replay")
+        async def proof(expected):
+            conn=await asyncpg.connect(parsed.geturl())
+            try:
+                check(await conn.fetchval("""SELECT owner_zero_revenue_certificate_current(c)
+                    FROM owner_revenue_accounting_certifications c WHERE "propertyId"=$1 AND "sourceEventId"=$2""",p,sid),expected,"zero certificate validity")
+                check(await conn.fetchval("SELECT owner_revenue_has_active_posting($1,$2)",p,sid),False,"no fake revenue posting")
+            finally:
+                await conn.close()
+        asyncio.run(proof(True))
+        check(client.post(corr+"/"+str(event_id)+"/reverse",json={"id":str(uuid.uuid4()),
+            "reason":"Reverse synthetic cancellation evidence"}).status_code,201,"reverse cancellation evidence")
+        asyncio.run(proof(False))
+        check(client.post("/api/v1/admin/finance/owner/revenue-source-events/"+str(sid)+"/reverse",
+            json={"id":str(uuid.uuid4()),"reason":"Close synthetic cancellation source"}).status_code,201,"reverse cancelled source fixture")
+before_full=checks
+verify_full_cancellation()
+print("MARINA_OWNER_FULL_CANCELLATION_PASS",checks-before_full)

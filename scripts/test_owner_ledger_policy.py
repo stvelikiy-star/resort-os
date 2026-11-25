@@ -61,6 +61,18 @@ class OwnerLedgerPolicyTests(unittest.TestCase):
                {"account_code":"1300","side":"CREDIT","amount_kgs":"84.0000"}]
         self.assertEqual(validate_posting(lines,source_type="STOCK_CONSUMPTION",
                          evidence_complete=True,source_amount="84"),"84.0000")
+    def test_balanced_wrong_side_cannot_distort_profit(self):
+        for kind,dr,cr,pattern,service in (
+            ("OPERATING_EXPENSE","5200","2200","OPERATING_EXPENSE_PATTERN_INVALID",None),
+            ("STOCK_CONSUMPTION","5100","1300","COGS_PATTERN_INVALID",None),
+            ("REVENUE_SOURCE","1100","4200","REVENUE_DOUBLE_ENTRY_PATTERN_INVALID","DINING_ORDER"),
+        ):
+            with self.subTest(kind=kind),self.assertRaisesRegex(ValueError,pattern):
+                validate_posting([
+                    {"account_code":dr,"side":"DEBIT","amount_kgs":"90"},
+                    {"account_code":cr,"side":"DEBIT","amount_kgs":"10"},
+                    {"account_code":cr,"side":"CREDIT","amount_kgs":"100"},
+                ],source_type=kind,evidence_complete=True,source_amount="100",revenue_service_type=service)
     def test_incomplete_period_remains_null(self):
         r=posted_totals(self.revenue,completeness_verified=False)
         self.assertEqual(r["status"],"NOT_READY")
