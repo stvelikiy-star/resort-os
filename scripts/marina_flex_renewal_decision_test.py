@@ -100,6 +100,31 @@ class RenewalEvidenceRules(unittest.TestCase):
             with self.subTest(change=changes), self.assertRaises(ValueError):
                 self.run_decision(replace(self.paid(), **changes))
 
+    def test_signed_terms_cross_year_and_leap_day(self):
+        for months, end in ((1,date(2026,12,31)),(3,date(2027,2,28)),
+                            (6,date(2027,5,31)),(12,date(2027,11,30))):
+            with self.subTest(months=months):
+                evidence=replace(self.paid(),term_months=months,invoice_period_end=end)
+                result=self.run_decision(evidence)
+                self.assertTrue(result.can_prepare)
+                self.assertFalse(result.bank_authorized)
+                self.assertEqual(result.new_period_end,end)
+                self.assertEqual(result.execution_state,"PROPOSAL_ONLY_NO_MUTATION")
+                self.assertFalse(self.run_decision(replace(evidence,
+                    refunded_net_allocated_kg=Decimal("9999.99"),
+                    outstanding_kg=Decimal("0.01"))).can_prepare)
+                with self.assertRaises(ValueError):
+                    self.run_decision(replace(evidence,invoice_period_end=end+timedelta(days=1)))
+        leap=replace(self.paid(),current_period_end=date(2027,11,30),
+                     invoice_period_start=date(2027,12,1),invoice_period_end=date(2028,2,29),
+                     term_months=3)
+        self.assertEqual(self.run_decision(leap).new_period_end,date(2028,2,29))
+
+    def test_invalid_signed_terms_are_rejected(self):
+        for term in (0,2,4,13,True,"12",None):
+            with self.subTest(term=term),self.assertRaises(ValueError):
+                self.run_decision(replace(self.paid(),term_months=term))
+
     def test_inconsistent_revenue_after_refund_denied(self):
         for change in (
             {"refunded_net_allocated_kg": Decimal("11000.00")},
