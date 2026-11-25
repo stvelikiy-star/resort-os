@@ -58,7 +58,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",
     # MARINA-specific 52nd migration, exact batch-to-served item ledger.
     "scripts/release_contract.py": "bfdb8323c32c41f295f2b00a7ce24445aa0eaa7b",
-    "scripts/release_contract_test.py": "e742318b6f71e991b5e4c4eba80e0b6e3739e8fa",
+    "scripts/release_contract_test.py": "e112d48efb1ad5821d46a1d595e23dc92f31cb21",
     ".github/workflows/marina-zz113-rollback-ci.yml": "4991514eab51828905f85b70b404978a9106e734",
     "scripts/marina_disposable_upgrade_acceptance_ci.py": "b877c5976def9451853953b86ec48b6804ab16b0",
     ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "9bf375ac39d02cf78122dbe4544f1d69d3335cb6",
