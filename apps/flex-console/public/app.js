@@ -675,6 +675,12 @@ async function submitCustomerOperation(form,kind){
  }catch(e){status.textContent=e.message;button.disabled=false;}
 }
 
+async function financeReconciliationPanel(){
+ const l=({ru:{title:'Финансовая сверка',amount_due:'Выставлено',net_confirmed_cash:'Получено за вычетом возвратов',net_applied_to_lines:'Зачтено',outstanding:'Задолженность',unapplied_cash_credit:'Переплата',ok:'Сверка пройдена',bad:'Расхождение',note:'Только выставленные счета с подтверждённым выпуском. Черновики не являются задолженностью.'},kg:{title:'Каржылык салыштыруу',amount_due:'Эсептелген',net_confirmed_cash:'Кайтаруулардан кийинки түшүм',net_applied_to_lines:'Эсепке алынган',outstanding:'Карыз',unapplied_cash_credit:'Ашыкча төлөм',ok:'Салыштыруу ийгиликтүү',bad:'Айырма бар',note:'Ырасталган эсептер гана. Долбоорлор карыз болуп эсептелбейт.'},en:{title:'Financial reconciliation',amount_due:'Issued total',net_confirmed_cash:'Net confirmed cash',net_applied_to_lines:'Applied',outstanding:'Outstanding',unapplied_cash_credit:'Unapplied credit',ok:'Reconciled',bad:'Discrepancy',note:'Only invoices with issuance evidence. Drafts are not receivables.'}})[state.lang];
+ const r=await api('/v1/platform/financial-reconciliation?hotel_id='+state.hotelId),keys=['amount_due','net_confirmed_cash','net_applied_to_lines','outstanding','unapplied_cash_credit'];
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+'<div class="grid three">'+keys.map(k=>kv(l[k],money(r.totals[k],r.currency))).join('')+'</div>'+
+ (r.invoice_count?info(r.reconciled?l.ok:l.bad,r.reconciled?'info':'error')+table([t('invoice'),...keys.map(k=>l[k])],r.invoices.map(x=>'<tr><td>'+safe(x.invoice_id)+'</td>'+keys.map(k=>'<td>'+money(x[k],x.currency)+'</td>').join('')+'</tr>')):empty(t('noInvoices')))+'</section>';
+}
 function hotelCardTabs(){
  const admin=state.me?.role==='SUPER_ADMIN';
  const sections=[['overview','hotelTabOverview'],['subscription','subscription'],['finance','hotelTabFinance'],['usage','hotelTabUsage']];
@@ -685,12 +691,6 @@ function hotelCardTabs(){
    '<button type="button" data-hotel-tab="'+key+'" class="'+(state.hotelTab===key?'primary':'outline')+'" aria-current="'+(state.hotelTab===key?'page':'false')+'">'+safe(t(label))+'</button>').join('')+'</nav>';
 }
 
-async function financeReconciliationPanel(){
- const l=({ru:{title:'Финансовая сверка',amount_due:'Выставлено',net_confirmed_cash:'Получено за вычетом возвратов',net_applied_to_lines:'Зачтено',outstanding:'Задолженность',unapplied_cash_credit:'Переплата',ok:'Сверка пройдена',bad:'Расхождение',note:'Только выставленные счета с подтверждённым выпуском. Черновики не являются задолженностью.'},kg:{title:'Каржылык салыштыруу',amount_due:'Эсептелген',net_confirmed_cash:'Кайтаруулардан кийинки түшүм',net_applied_to_lines:'Эсепке алынган',outstanding:'Карыз',unapplied_cash_credit:'Ашыкча төлөм',ok:'Салыштыруу ийгиликтүү',bad:'Айырма бар',note:'Ырасталган эсептер гана. Долбоорлор карыз болуп эсептелбейт.'},en:{title:'Financial reconciliation',amount_due:'Issued total',net_confirmed_cash:'Net confirmed cash',net_applied_to_lines:'Applied',outstanding:'Outstanding',unapplied_cash_credit:'Unapplied credit',ok:'Reconciled',bad:'Discrepancy',note:'Only invoices with issuance evidence. Drafts are not receivables.'}})[state.lang];
- const r=await api('/v1/platform/financial-reconciliation?hotel_id='+state.hotelId),keys=['amount_due','net_confirmed_cash','net_applied_to_lines','outstanding','unapplied_cash_credit'];
- return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+'<div class="grid three">'+keys.map(k=>kv(l[k],money(r.totals[k],r.currency))).join('')+'</div>'+
- (r.invoice_count?info(r.reconciled?l.ok:l.bad,r.reconciled?'info':'error')+table([t('invoice'),...keys.map(k=>l[k])],r.invoices.map(x=>'<tr><td>'+safe(x.invoice_id)+'</td>'+keys.map(k=>'<td>'+money(x[k],x.currency)+'</td>').join('')+'</tr>')):empty(t('noInvoices')))+'</section>';
-}
 async function hotelDetail(){
  const id=state.hotelId;
  if(!/^[0-9a-fA-F-]{36}$/.test(id||'')) return heading(t('noSelected'))+empty(t('noSelected'));
