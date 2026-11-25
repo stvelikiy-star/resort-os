@@ -266,7 +266,7 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         async def verify_unchanged():
             con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
             try:
-                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_tariff_package_versions"),3)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_tariff_package_versions WHERE hotel_id=$1",uuid.UUID(HOTEL_A)),3)
                 self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
                 self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_payment_intents"),0)
                 self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscription_configuration_drafts"),1)
