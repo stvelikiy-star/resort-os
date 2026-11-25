@@ -247,6 +247,31 @@ def run():
         assert not data["payments_enabled"] and not data["payouts_enabled"]
         expect(panel).not_to_contain_text("61,000 KGS")
         print("PASS browser financial reconciliation excludes non-issuable 61000 KGS preview")
+        page.locator('[data-hotel-tab="history"]').click()
+        form=page.locator(".agreement-approval-form")
+        expect(form).to_be_visible()
+        form.locator('[name="acknowledged"]').check()
+        with page.expect_response(ORIGIN+"/api/actions/agreement-internal-approvals") as submitted:
+            form.locator('button[type="submit"]').click()
+        response=submitted.value
+        assert response.status==201, ("internal approval",response.status,response.text()[:250])
+        approval=response.json()
+        assert approval["terms_digest"]==contract["terms_digest"]
+        assert approval["agreement_id"]==contract["id"] and approval["state"]=="INTERNALLY_APPROVED"
+        assert not approval["client_signed"] and not approval["subscription_activated"]
+        expect(page.get_by_text("Internally approved",exact=False)).to_be_visible()
+        page.locator('[data-hotel-tab="subscription"]').click()
+        panel=page.locator("section.panel").filter(has=page.get_by_role("heading",name="Subscription plan",exact=True))
+        expect(panel).to_be_visible()
+        expect(panel).to_contain_text("36,000 KGS")
+        expect(panel).to_contain_text("25,000 KGS")
+        expect(panel).to_contain_text("PLAN_ONLY")
+        query="""SELECT json_build_object('approvals',count(*),'signed',(SELECT count(*) FROM flex_private.flex_commercial_agreement_versions WHERE state='SIGNED'),
+            'payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments),'subscriptions',(SELECT count(*) FROM flex_private.flex_subscriptions))
+            FROM flex_private.flex_agreement_internal_approvals"""
+        evidence=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
+        assert evidence=={"approvals":1,"signed":0,"payments":0,"subscriptions":2},evidence
+        print("PASS browser internal agreement approval and subscription plan; client signature, payment and activation remain disabled")
         browser.close()
 
 
