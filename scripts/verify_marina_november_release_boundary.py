@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "25119102b9920f4df415333a7ab75b1fc6b87f0a",
+    "scripts/marina_rc3_additive_gate.py": "e670683a99392225b10e8ad615d160e6dc442f25",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -75,6 +75,10 @@ APPROVED_P0_BLOBS = {
     "apps/admin/components/AdminExperienceRuntime.tsx": "aeecbcd54bd3479ba80e541e31f884cf7ba2870d",
     "services/api/app/hotel_finance.py": "f11fba20ea217fea3b2f075f39ddb4f2de907e6a",
     "apps/mobile/scripts/verify-backend-contract.mjs": "b4f6b3bf7b59b574a7ed31b2217805c6a21af740",
+    "apps/mobile/app/finance.tsx": "4434075da2ed4f891d7d238d606e03783dd9b1dc",
+    "apps/mobile/src/api/liveModules.ts": "3b953a3a9caafb85397fe2ea5d8425bc737e9b86",
+    "apps/mobile/src/api/contractValidation.ts": "bb4b0325bac08c6a362181e6e58a4306fd4d7dfc",
+    "apps/mobile/__tests__/owner-accrual-readiness.test.ts": "70f981613d914bf8b9c433ce2b2cbfd771d88059",
     "apps/admin/components/HotelFinanceBoard.tsx": "eea0633c6fb63c600ebca4bd290ec52cf994f56f",
     "apps/staff/components/CookBatchAssignments.tsx": "884a3290e678f8777167999e5aceaa60d470902b",
     "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",

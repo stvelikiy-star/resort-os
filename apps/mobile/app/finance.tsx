@@ -57,6 +57,13 @@ const KITCHEN_REPORT_COPY={
   notice:'Қойма құны тіркелген қозғалыстарға негізделген; өтінімдер бағалау ғана. Бұл расталған пайда емес.'},
 } as const;
 
+const LEDGER_COPY={
+ ru:{title:'OWNER · бухгалтерский журнал',revenue:'Проведённая выручка',expenses:'Проведённые расходы и себестоимость',result:'Промежуточный результат',notice:'Период не закрыт. Итоговая прибыль не подтверждена.',coverage:'Проверено / ожидается',lodging:'Проживание',dining:'Ресторан',other_service:'Дополнительные услуги',expense:'Расходы',cogs:'Себестоимость',refund_payment:'Возвраты',packages:'Права на включённое питание',undated:'Возвраты без даты'},
+ kg:{title:'ЭЭСИ · бухгалтердик журнал',revenue:'Катталган киреше',expenses:'Катталган чыгашалар жана өздүк нарк',result:'Аралык жыйынтык',notice:'Мезгил жабылган жок. Жыйынтык пайда тастыкталган эмес.',coverage:'Текшерилди / күтүлөт',lodging:'Жашоо',dining:'Ресторан',other_service:'Кошумча кызматтар',expense:'Чыгашалар',cogs:'Өздүк нарк',refund_payment:'Кайтаруулар',packages:'Камтылган тамактануу укуктары',undated:'Датасы жок кайтаруулар'},
+ en:{title:'OWNER · accounting journal',revenue:'Posted revenue',expenses:'Posted expenses and cost of sales',result:'Interim ledger result',notice:'Period not closed. Final profit is unverified.',coverage:'Verified / expected',lodging:'Accommodation',dining:'Dining',other_service:'Additional services',expense:'Expenses',cogs:'Cost of sales',refund_payment:'Refunds',packages:'Included meal entitlements',undated:'Undated refunds'},
+ kz:{title:'ИЕСІ · бухгалтерлік журнал',revenue:'Тіркелген түсім',expenses:'Тіркелген шығындар және өзіндік құн',result:'Аралық нәтиже',notice:'Кезең жабылған жоқ. Қорытынды пайда расталмаған.',coverage:'Тексерілді / күтіледі',lodging:'Тұру',dining:'Мейрамхана',other_service:'Қосымша қызметтер',expense:'Шығындар',cogs:'Өзіндік құн',refund_payment:'Қайтарымдар',packages:'Қамтылған тамақтану құқықтары',undated:'Күні жоқ қайтарымдар'},
+} as const;
+
 const ACCRUAL_READINESS_COPY={
  ru:{
   docBytes:'Файлов со сверенным SHA-256',docMissing:'Корректировки без файла',
@@ -141,6 +148,7 @@ export default function Finance() {
   const extra = OWNER_FINANCE_COPY[locale];
   const kitchenCopy = KITCHEN_REPORT_COPY[locale];
   const accrualCopy = ACCRUAL_READINESS_COPY[locale];
+  const ledgerCopy = LEDGER_COPY[locale];
   const cashCopy = CASH_RECONCILIATION_COPY[locale];
   const { c } = useTheme();
   const router = useRouter();
@@ -171,6 +179,7 @@ export default function Finance() {
     if (focused.current) void refreshFinancialSnapshots(); else focused.current = true;
   }, [refreshFinancialSnapshots]));
   if (!allowed) return <FutureScreen><Empty text={copy.denied}/></FutureScreen>;
+  const ledger = user?.role==='OWNER' && data?.owner_ledger_period_coverage?.period.from===from && data.owner_ledger_period_coverage.period.to===to ? data.owner_ledger_period_coverage : null;
   const money = (v: number) => Number(v).toLocaleString('ru-RU') + ' ' + (data?.range.currency || 'KGS');
   const line = (label: string, amount: string, caption?: string) =>
     <View key={label} style={{ flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,paddingVertical:8,
@@ -293,6 +302,22 @@ export default function Finance() {
             {kitchenCopy.notice}
           </Text>
         </GlassCard>:null}
+      </>:null}
+      {ledger ? <>
+        <SectionLabel>{ledgerCopy.title}</SectionLabel>
+        <GlassCard style={{gap:space.sm}}>
+          {line(ledgerCopy.revenue,ledger.posted_ledger_subtotals.revenue_kgs+' KGS')}
+          {line(ledgerCopy.expenses,ledger.posted_ledger_subtotals.expense_cogs_kgs+' KGS')}
+          {line(ledgerCopy.result,ledger.posted_ledger_subtotals.contribution_kgs+' KGS')}
+          <Text style={[font.small,{color:c.textMuted}]}>{ledgerCopy.notice}</Text>
+        </GlassCard>
+        <SectionLabel>{ledgerCopy.coverage}</SectionLabel>
+        <GlassCard style={{gap:space.sm}}>
+          {(['lodging','dining','other_service','expense','cogs','refund_payment'] as const).map(key =>
+            line(ledgerCopy[key],ledger.counts[key+'_verified']+' / '+ledger.counts[key+'_expected']))}
+          {line(ledgerCopy.packages,String(ledger.counts.package_entitlement_count))}
+          {line(ledgerCopy.undated,String(ledger.counts.refund_undated_count))}
+        </GlassCard>
       </>:null}
       {user?.role==='OWNER' && data.owner_accrual_readiness_snapshot ? <>
         <SectionLabel>{accrualCopy.title}</SectionLabel>
