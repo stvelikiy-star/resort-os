@@ -655,13 +655,26 @@ async function customerProfilePanel(historyOnly=false){
  (historyOnly?(r.history.length?table([t('skuVersion'),...fields.map(k=>l[k]),t('periodStart')],r.history.map(x=>'<tr><td>'+safe(x.version)+'</td>'+fields.map(k=>'<td>'+safe(x[k]||'—')+'</td>').join('')+'<td>'+safe(date(x.created_at))+'</td></tr>')):empty(t('noData'))):
  '<form id="customer-profile-form" class="admin-form"><input type="hidden" name="expected_version" value="'+safe(p.version||0)+'">'+fields.map(k=>'<label>'+safe(l[k])+'<input name="'+k+'" type="'+(k==='contact_email'?'email':k==='contact_phone'?'tel':'text')+'" maxlength="'+({contact_name:180,contact_email:254,contact_phone:40,responsible_name:180}[k])+'" value="'+safe(p[k]||'')+'"></label>').join('')+'<button class="primary" type="submit">'+safe(l.save)+'</button><div role="status" aria-live="polite"></div></form>')+'</section>';
 }
+function approvalLabels(){
+ return ({ru:{title:'Внутреннее согласование',approve:'Согласовать условия',check:'Подтверждаю проверку условий; это не подпись клиента.',approved:'Согласовано внутри FLEX',plan:'План подписки',note:'Только план. Договор не подписан клиентом, подписка и платежи не активированы.',setup:'Внедрение',term:'Месяцев'},kg:{title:'Ички макулдашуу',approve:'Шарттарды макулдашуу',check:'Шарттарды текшердим; бул кардардын кол тамгасы эмес.',approved:'FLEX ичинде макулдашылды',plan:'Жазылуу планы',note:'План гана. Кардар кол койгон жок, жазылуу жана төлөмдөр иштетилген жок.',setup:'Орнотуу',term:'Ай'},en:{title:'Internal review',approve:'Approve terms internally',check:'I reviewed the terms; this is not the client’s signature.',approved:'Internally approved',plan:'Subscription plan',note:'Plan only. No client signature, subscription activation or payment.',setup:'Implementation',term:'Months'}})[state.lang];
+}
+function agreementApprovalForm(a,approvals){
+ const l=approvalLabels(),existing=approvals.find(x=>x.agreement_id===a.id);
+ if(existing)return '<p>'+safe(l.approved)+' · '+safe(date(existing.approved_at))+'</p>';
+ if(a.state!=='DRAFT'||!a.source_offer_id)return '';
+ return '<form class="agreement-approval-form"><input type="hidden" name="agreement_id" value="'+safe(a.id)+'"><input type="hidden" name="terms_digest" value="'+safe(a.terms_digest)+'"><label class="check-row"><input type="checkbox" name="acknowledged" required>'+safe(l.check)+'</label><button type="submit" class="outline">'+safe(l.approve)+'</button><div role="status"></div></form>';
+}
+async function subscriptionPlanPanel(){
+ const l=approvalLabels(),rows=await api('/v1/platform/subscription-plans?hotel_id='+state.hotelId);
+ return '<section class="panel"><h2>'+safe(l.plan)+'</h2>'+info(l.note,'info')+(rows.length?table([t('packageType'),t('skuVersion'),l.term,t('period'),t('total'),l.setup,t('status')],rows.map(x=>'<tr><td>'+safe(x.package_kind)+'</td><td>v'+safe(x.version)+'</td><td>'+safe(x.term_months)+'</td><td>'+safe(x.period_start)+' — '+safe(x.period_end_exclusive)+'</td><td>'+money(x.subscription_term_total,'KGS')+'</td><td>'+money(x.implementation_total,'KGS')+'</td><td>PLAN_ONLY · OFF</td></tr>')):empty(t('noData')))+'</section>';
+}
 async function agreementPanel(){
  const l=customerLabels(),id=state.hotelId;
  const [r,offers]=await Promise.all([api('/v1/platform/agreement-drafts?hotel_id='+id),api('/v1/platform/tariff-packages?hotel_id='+id)]);
  const usable=offers.filter(x=>x.commercial_policy_version&&x.term_months&&!r.agreements.some(a=>a.source_offer_id===x.id));
  return '<section class="panel"><h2>'+safe(l.agreements)+'</h2>'+info(l.note,'info')+
  (usable.length?'<form id="agreement-draft-form" class="admin-form"><label>'+safe(l.offer)+'<select name="offer_id">'+usable.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.package_kind)+' · v'+safe(x.version)+' · '+money(x.subscription_term_total,'KGS')+'</option>').join('')+'</select></label><button type="submit" class="primary">'+safe(l.draft)+'</button><div role="status" aria-live="polite"></div></form>':'')+
- (r.agreements.length?table([t('skuVersion'),t('packageType'),t('status'),t('total'),t('actions')],r.agreements.map(a=>'<tr><td>'+safe(a.version)+'</td><td>'+safe(a.terms?.package_kind||'—')+'</td><td>'+safe(a.state)+'</td><td>'+money(a.terms?.subscription_term_total||0,'KGS')+'</td><td>'+(a.state==='DRAFT'&&a.source_offer_id&&!r.previews.some(p=>p.agreement_version_id===a.id)?'<form class="invoice-preview-form"><input type="hidden" name="agreement_id" value="'+safe(a.id)+'"><button type="submit" class="outline">'+safe(l.preview)+'</button><div role="status"></div></form>':'—')+'</td></tr>')):empty(t('noData')))+
+ (r.agreements.length?table([t('skuVersion'),t('packageType'),t('status'),t('total'),t('actions')],r.agreements.map(a=>'<tr><td>'+safe(a.version)+'</td><td>'+safe(a.terms?.package_kind||'—')+'</td><td>'+safe(a.state)+agreementApprovalForm(a,r.approvals||[])+'</td><td>'+money(a.terms?.subscription_term_total||0,'KGS')+'</td><td>'+(a.state==='DRAFT'&&a.source_offer_id&&!r.previews.some(p=>p.agreement_version_id===a.id)?'<form class="invoice-preview-form"><input type="hidden" name="agreement_id" value="'+safe(a.id)+'"><button type="submit" class="outline">'+safe(l.preview)+'</button><div role="status"></div></form>':'—')+'</td></tr>')):empty(t('noData')))+
  '<h3>'+safe(l.previews)+'</h3>'+(r.previews.length?table([t('period'),t('total'),t('status')],r.previews.map(x=>'<tr><td>'+safe(x.period_start)+' — '+safe(x.period_end)+'</td><td>'+money(x.amount_before_unresolved_taxes,'KGS')+'</td><td>'+safe(x.status)+'</td></tr>')):empty(t('noData')))+'</section>';
 }
 async function submitCustomerOperation(form,kind){
@@ -670,6 +683,7 @@ async function submitCustomerOperation(form,kind){
  try{
   const payload={hotel_id:state.hotelId,...Object.fromEntries(d)};
   if(kind==='customer-profile')payload.expected_version=Number(payload.expected_version);
+  if(kind==='agreement-internal-approvals')payload.acknowledged=d.has('acknowledged');
   await saveQaCatalogAction(kind,payload);
   await render();
  }catch(e){status.textContent=e.message;button.disabled=false;}
@@ -743,7 +757,7 @@ async function hotelDetail(){
    '</span></td><td>'+money(i.total,i.currency)+'</td><td>'+safe(date(i.due_at))+'</td></tr>')):
    empty(t('noInvoices')))+'</section>';
  if(state.hotelTab==='finance')return metadata+invoicesInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await financeReconciliationPanel().catch(e=>info(e.message,'error')):'')+info(t('warning'),'info');
- if(state.hotelTab==='subscription')return metadata+summary+subscriptionInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await installationTrialPanel().catch(e=>info(e.message,'error'))+await commercialHotelOfferForm().catch(e=>info(e.message,'error')):'')+draftHistory+info(t('draftOnly'),'info');
+ if(state.hotelTab==='subscription')return metadata+summary+subscriptionInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await installationTrialPanel().catch(e=>info(e.message,'error'))+await commercialHotelOfferForm().catch(e=>info(e.message,'error'))+await subscriptionPlanPanel().catch(e=>info(e.message,'error')):'')+draftHistory+info(t('draftOnly'),'info');
  return metadata+await hotelNameForm(id)+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await customerProfilePanel().catch(e=>info(e.message,'error')):'')+summary+subscriptionInfo+info(t('warning'),'info');
 }
 
@@ -875,6 +889,7 @@ async function submitCommercialPrice(form){
 main.addEventListener('submit',e=>{
  if(e.target.id==='customer-profile-form'){e.preventDefault();submitCustomerOperation(e.target,'customer-profile');return;}
  if(e.target.id==='agreement-draft-form'){e.preventDefault();submitCustomerOperation(e.target,'agreement-drafts');return;}
+ if(e.target.classList.contains('agreement-approval-form')){e.preventDefault();submitCustomerOperation(e.target,'agreement-internal-approvals');return;}
  if(e.target.classList.contains('invoice-preview-form')){e.preventDefault();submitCustomerOperation(e.target,'invoice-previews');return;}
  if(e.target.id==='hotel-installation-trial'){e.preventDefault();saveInstallationTrial(e.target);return;}
  if(e.target.id==='hotel-commercial-offer'){e.preventDefault();saveCommercialHotelOffer(e.target);return;}
