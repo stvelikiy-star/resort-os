@@ -82,10 +82,12 @@ def command(args,env=None) -> None:
     subprocess.run(args,env=env,check=True,stdout=subprocess.DEVNULL)
 
 
-async def verify_ledger(target: str) -> None:
+async def verify_ledger(target: str) -> int:
     conn=await asyncpg.connect(target)
     try:
-        assert len(await verify_committed_ledger(conn,ROOT)) == len(EXPECTED_MIGRATIONS)
+        verified=await verify_committed_ledger(conn,ROOT)
+        assert len(verified) == len(EXPECTED_MIGRATIONS)
+        return len(verified)
     finally:
         await conn.close()
 
@@ -111,11 +113,11 @@ def full_restore() -> None:
         command(["pg_restore",*dstargs,"--exit-on-error","--no-owner","--no-acl",str(archive)],dstenv)
         assert asyncio.run(snapshot(target))==pre,"Restored 3-hotel rows/constraints differ"
         assert asyncio.run(public_schema_metadata(target))==schema_before, "Restored indexes/columns drifted"
-        asyncio.run(verify_ledger(target))
+        restored_migrations=asyncio.run(verify_ledger(target))
         assert asyncio.run(snapshot(source))==pre,"Original populated source was modified by dump/restore"
         print("MARINA_SHARED_THREE_HOTEL_RESTORE_DATA_PASS: "
               f"tables={len(pre['tables'])} indexes={len(schema_before['indexes'])} "
-              "migrations=39 source_unchanged=true sha256="+digest[:16]+"...",flush=True)
+              f"migrations={restored_migrations} source_unchanged=true sha256="+digest[:16]+"...",flush=True)
     env=dict(os.environ)
     env["MARINA_SHARED_ORIGINAL_DATABASE_URL"]=source
     env["DATABASE_URL"]=target

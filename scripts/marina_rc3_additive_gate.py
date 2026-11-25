@@ -59,6 +59,7 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "apps/staff/components/CookBatchAssignments.tsx": "884a3290e678f8777167999e5aceaa60d470902b",
     "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",
     # MARINA-specific 52nd migration, exact batch-to-served item ledger.
+    "scripts/marina_shared_three_hotel_restore_ci.py": "0f00022721637c58d3897f5164496af7173e37dd",
     "scripts/release_contract.py": "ef9a742872bd0f991e941ab31389428e68eaf4ec",
     "scripts/release_contract_test.py": "73f7f815d92b89ae84b9a68e13f70b618b0b0937",
     ".github/workflows/marina-zz113-rollback-ci.yml": "994f3a3b4937c35024e774448a331ff7d23368e1",
