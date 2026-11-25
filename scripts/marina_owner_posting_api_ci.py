@@ -93,6 +93,12 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
     response=client.post(base+"/proposals",json=propose)
     check(response.status_code,201,"balanced proposal")
     check(response.json()["accounting_posted"],False,"proposal is unposted")
+    owner_self=client.post(base+"/revenue-certifications",json={
+        "id":str(uuid.uuid4()),"source_event_id":str(source),
+        "evidence_document_id":str(document_id),"tax_amount_kgs":"50.0000",
+        "policy_version":"CI-LEDGER-POLICY-1",
+        "reason":"Unlawful self confirmation of own source"})
+    check(owner_self.status_code,409,"source creator cannot certify own document")
     login("accounting_reviewer")
     foreign_resp=client.post(base+"/proposals/"+str(foreign)+"/post",
        json={"id":str(uuid.uuid4()),"reason":"Cross-property access must fail"})
@@ -111,6 +117,13 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
         "evidence_document_id":str(document_id),
         "tax_amount_kgs":"50.0000","policy_version":"CI-LEDGER-POLICY-1",
         "reason":"Independent synthetic invoice tax verification"}
+    missing_doc={**certificate,"id":str(uuid.uuid4()),
+                 "evidence_document_id":str(uuid.uuid4())}
+    check(client.post(base+"/revenue-certifications",json=missing_doc).status_code,
+          409,"unknown or foreign document denied")
+    over_tax={**certificate,"id":str(uuid.uuid4()),"tax_amount_kgs":"900.0000"}
+    check(client.post(base+"/revenue-certifications",json=over_tax).status_code,
+          409,"certified tax cannot exceed source amount")
     certified=client.post(base+"/revenue-certifications",json=certificate)
     check(certified.status_code,201,"independent source certification")
     check(certified.json()["accounting_posted"],False,"certificate not posting")
