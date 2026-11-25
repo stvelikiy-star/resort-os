@@ -393,6 +393,11 @@ async function saveInstallationTrial(form){
  try{await saveQaCatalogAction('installation-trial',{hotel_id:String(new FormData(form).get('hotel_id'))});await render();}
  catch(e){status.textContent=e.message;button.disabled=false;}
 }
+async function launchOfferPanel(){
+ const l=({ru:{title:'Стартовая акция',reserved:'Зарезервировано',available:'Свободно',slot:'Место',hotel:'Гостиница',note:'Резервация не подтверждает оплату или активацию.',annual:'Подписка за год',setup:'Внедрение'},kg:{title:'Баштапкы акция',reserved:'Ээлеген орундар',available:'Бош орундар',slot:'Орун',hotel:'Мейманкана',note:'Орун ээлөө төлөмдү же активдештирүүнү ырастабайт.',annual:'Жылдык жазылуу',setup:'Орнотуу'},en:{title:'Launch offer',reserved:'Reserved',available:'Available',slot:'Slot',hotel:'Hotel',note:'Reservation does not confirm payment or activation.',annual:'Annual subscription',setup:'Implementation'}})[state.lang];
+ const r=await api('/v1/platform/launch-offer');
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2><div class="grid two">'+kv(l.reserved,r.reserved+' / '+r.capacity)+kv(l.available,r.available)+'</div>'+info(l.note,'info')+(r.reservations.length?table([l.slot,l.hotel,t('packageType'),l.annual,l.setup,t('periodStart')],r.reservations.map(x=>'<tr><td>'+safe(x.slot)+'</td><td>'+safe(x.display_name)+'</td><td>'+safe(x.package_kind)+'</td><td>'+money(x.subscription_term_total,'KGS')+'</td><td>'+money(x.implementation_total,'KGS')+'</td><td>'+safe(date(x.created_at))+'</td></tr>')):empty(t('noData')))+'</section>';
+}
 async function commercialHotelOfferForm(){
  const r=await api('/v1/platform/commercial-policy'), p=r.policy;
  const labels={ru:{title:'Коммерческий тариф',note:'Предложение без активации подписки',extras:'Дополнительные модули'},kg:{title:'Коммерциялык тариф',note:'Жазылууну активдештирбеген сунуш',extras:'Кошумча модулдар'},en:{title:'Commercial tariff',note:'Offer without subscription activation',extras:'Additional modules'}};
@@ -725,7 +730,7 @@ async function catalog(){
  if(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled){
   const items=await api('/v1/platform/catalog');
   state.catalogItems=items;
-  return heading(t('adminCatalog'),t('helpQa'))+toolbar()+adminCatalogButtons()+await commercialPolicyPanel()+
+  return heading(t('adminCatalog'),t('helpQa'))+toolbar()+adminCatalogButtons()+await commercialPolicyPanel()+await launchOfferPanel().catch(e=>info(e.message,'error'))+
     '<div class="grid three">'+metric(t('activeSku'),items.length,'cyan-text')+
     metric(t('currency'),'KGS')+metric(t('readOnly'),'QA')+'</div>'+
     '<section class="panel">'+(items.length?table([t('sku'),t('skuTitle'),t('status'),t('price'),t('actions')],
