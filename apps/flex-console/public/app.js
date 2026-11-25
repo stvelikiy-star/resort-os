@@ -675,9 +675,16 @@ function agreementApprovalForm(a,approvals){
  if(a.state!=='DRAFT'||!a.source_offer_id)return '';
  return '<form class="agreement-approval-form"><input type="hidden" name="agreement_id" value="'+safe(a.id)+'"><input type="hidden" name="terms_digest" value="'+safe(a.terms_digest)+'"><label class="check-row"><input type="checkbox" name="acknowledged" required>'+safe(l.check)+'</label><button type="submit" class="outline">'+safe(l.approve)+'</button><div role="status"></div></form>';
 }
+function subscriptionLifecycleLabels(){
+ return ({ru:{ACCEPTED:'Условия подтверждены',AWAITING_CUSTOMER:'Ожидает подтверждения',NOT_STARTED:'Пробный период не начат',ACTIVE:'Пробный период',EXPIRED:'Пробный период завершён',days:'дн.',off:'Подписка не активирована'},kg:{ACCEPTED:'Шарттар ырасталды',AWAITING_CUSTOMER:'Ырастоо күтүлүүдө',NOT_STARTED:'Сыноо мөөнөтү баштала элек',ACTIVE:'Сыноо мөөнөтү',EXPIRED:'Сыноо мөөнөтү аяктады',days:'күн',off:'Жазылуу иштетиле элек'},en:{ACCEPTED:'Terms accepted',AWAITING_CUSTOMER:'Awaiting acceptance',NOT_STARTED:'Trial not started',ACTIVE:'Trial active',EXPIRED:'Trial ended',days:'days',off:'Subscription not activated'}})[state.lang];
+}
+function subscriptionLifecycleCell(x){
+ const l=subscriptionLifecycleLabels(), trial=l[x.trial_state]||l.NOT_STARTED;
+ return safe(l[x.customer_acceptance_state]||l.AWAITING_CUSTOMER)+'<br>'+safe(trial)+(x.trial_state==='ACTIVE'?' · '+safe(x.trial_days_remaining)+' '+safe(l.days):'')+'<br>'+safe(l.off);
+}
 async function subscriptionPlanPanel(){
  const l=approvalLabels(),rows=await api('/v1/platform/subscription-plans?hotel_id='+state.hotelId);
- return '<section class="panel"><h2>'+safe(l.plan)+'</h2>'+info(l.note,'info')+(rows.length?table([t('packageType'),t('skuVersion'),l.term,t('period'),t('total'),l.setup,t('status')],rows.map(x=>'<tr><td>'+safe(x.package_kind)+'</td><td>v'+safe(x.version)+'</td><td>'+safe(x.term_months)+'</td><td>'+safe(x.period_start)+' — '+safe(x.period_end_exclusive)+'</td><td>'+money(x.subscription_term_total,'KGS')+'</td><td>'+money(x.implementation_total,'KGS')+'</td><td>PLAN_ONLY · OFF</td></tr>')):empty(t('noData')))+'</section>';
+ return '<section class="panel"><h2>'+safe(l.plan)+'</h2>'+info(l.note,'info')+(rows.length?table([t('packageType'),t('skuVersion'),l.term,t('period'),t('total'),l.setup,t('status')],rows.map(x=>'<tr><td>'+safe(x.package_kind)+'</td><td>v'+safe(x.version)+'</td><td>'+safe(x.term_months)+'</td><td>'+safe(x.period_start)+' — '+safe(x.period_end_exclusive)+'</td><td>'+money(x.subscription_term_total,'KGS')+'</td><td>'+money(x.implementation_total,'KGS')+'</td><td>'+subscriptionLifecycleCell(x)+'</td></tr>')):empty(t('noData')))+'</section>';
 }
 async function agreementPanel(){
  const l=customerLabels(),id=state.hotelId;
