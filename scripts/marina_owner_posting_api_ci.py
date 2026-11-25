@@ -495,3 +495,75 @@ async def verify_period_guards():
 before_period=checks
 asyncio.run(verify_period_guards())
 print("MARINA_OWNER_PERIOD_SQL_GUARDS_PASS",checks-before_period)
+
+# Actual task/folio, independent certificate and exact SQL posting; rolled
+# back after checking deferred constraints. No production connections.
+async def verify_guest_service_ledger():
+    from datetime import timedelta
+    conn=await asyncpg.connect(parsed.geturl())
+    tx=conn.transaction()
+    await tx.start()
+    try:
+        maker=await conn.fetchval("""SELECT id FROM staff_users WHERE "propertyId"=$1 AND username='owner'""",p)
+        reviewer=await conn.fetchval("""SELECT id FROM staff_users WHERE "propertyId"=$1 AND username='accounting_reviewer'""",p)
+        stay=await conn.fetchrow("""SELECT id,"reservationId","guestId" FROM stays WHERE "propertyId"=$1 AND "reservationId" IS NOT NULL LIMIT 1""",p)
+        assert stay, "CI requires a real stay fixture"
+        day=await conn.fetchval("SELECT (now() AT TIME ZONE timezone)::date FROM properties WHERE id=$1",p)
+        tid,fid,sid,qid,did=([uuid.uuid4() for _ in range(5)])
+        await conn.execute("""INSERT INTO operational_tasks
+          (id,"propertyId","reservationId","stayId","serviceCode","serviceDate",type,status,priority,
+           title,"createdByType","createdById","completedAt","createdAt","updatedAt",
+           "chargeKgs","chargeStatus","chargeSource")
+          VALUES($1,$2,$3,$4,'LINEN',$5,'GUEST_REQUEST','DONE','NORMAL',
+           'Synthetic guest service accounting','STAFF',$6,now() AT TIME ZONE 'UTC',now(),now(),700,'POSTED','FOLIO')""",
+          tid,p,stay["reservationId"],stay["id"],day,str(maker))
+        await conn.execute("""INSERT INTO guest_folio_charges
+          (id,"propertyId","reservationId","stayId","guestId","sourceType","sourceId",code,
+           description,"amountKgs",status,"serviceDate","createdByType","createdById")
+          VALUES($1,$2,$3,$4,$5,'GUEST_SERVICE',$6,'LINEN','Synthetic matched service',700,'OPEN',$7,'STAFF',$8)""",
+          fid,p,stay["reservationId"],stay["id"],stay["guestId"],tid,day,str(maker))
+        proof="SELECT owner_guest_service_revenue_proof($1,$2,$3)"
+        check(await conn.fetchval(proof,p,tid,day),700,"matched completed guest service")
+        check(await conn.fetchval(proof,pb,tid,day),None,"foreign guest service rejected")
+        check(await conn.fetchval(proof,p,tid,day-timedelta(days=1)),None,"wrong service date rejected")
+        await conn.execute('UPDATE guest_folio_charges SET "amountKgs"=701 WHERE id=$1',fid)
+        check(await conn.fetchval(proof,p,tid,day),None,"folio amount mismatch rejected")
+        await conn.execute('UPDATE guest_folio_charges SET "amountKgs"=700 WHERE id=$1',fid)
+        await conn.execute("""INSERT INTO owner_revenue_source_events
+          (id,"propertyId","sourceType","sourceId","serviceDate",action,"faceValueKgs","sourceSnapshot",reason,"createdById")
+          VALUES($1,$2,'OTHER_SERVICE',$3,$4,'APPROVE_SOURCE',700,'{}'::jsonb,'Synthetic completed service evidence',$5)""",
+          sid,p,tid,day,maker)
+        await conn.execute("""INSERT INTO owner_accounting_journal_proposals
+          (id,"propertyId","sourceType","sourceId","accountingDate","policyVersion",reason,"payloadHash","createdById")
+          SELECT $1,"propertyId","sourceType",$2,$3,"policyVersion",
+                 'Synthetic other service proposal',$4,"createdById"
+          FROM owner_accounting_journal_proposals WHERE id=$5 AND "propertyId"=$6""",
+          qid,sid,day,hashlib.sha256(str(qid).encode()).hexdigest(),proposal,p)
+        await conn.execute("""INSERT INTO owner_accounting_journal_proposal_lines
+          ("proposalId","propertyId","lineNo","accountCode",side,"amountKgs")
+          SELECT $1,"propertyId","lineNo",CASE WHEN "accountCode"='4200' THEN '4300' ELSE "accountCode" END,side,"amountKgs"
+          FROM owner_accounting_journal_proposal_lines WHERE "proposalId"=$2 AND "propertyId"=$3""",qid,proposal,p)
+        await conn.execute("""INSERT INTO owner_accounting_journal_decisions
+          (id,"propertyId","proposalId",action,"actorId",reason)
+          VALUES($1,$2,$3,'APPROVE',$4,'Independent other service decision')""",did,p,qid,reviewer)
+        await conn.execute("""INSERT INTO owner_revenue_accounting_certifications
+          (id,"propertyId","sourceEventId","evidenceDocumentId","reviewedById","grossAmountKgs","taxAmountKgs","netRevenueKgs","policyVersion",reason)
+          SELECT $1,"propertyId",$2,"evidenceDocumentId","reviewedById","grossAmountKgs","taxAmountKgs","netRevenueKgs","policyVersion",
+                 'Independent other service document review'
+          FROM owner_revenue_accounting_certifications WHERE "propertyId"=$3 AND "sourceEventId"=$4""",uuid.uuid4(),sid,p,source)
+        await race_post(conn,(sid,qid,did,reviewer))
+        await conn.execute("SET CONSTRAINTS ALL IMMEDIATE")
+        check(await conn.fetchval("""SELECT l."amountKgs" FROM owner_accounting_posting_lines l
+          JOIN owner_accounting_postings po ON po.id=l."postingId" AND po."propertyId"=l."propertyId"
+          WHERE po."proposalId"=$1 AND l."accountCode"='4300' AND l.side='CREDIT'""",qid),650,"service net revenue to 4300")
+        check(await conn.fetchval("SELECT owner_revenue_has_active_posting($1,$2)",p,sid),True,"guest service posting is active")
+        await conn.execute("SET CONSTRAINTS ALL DEFERRED")
+        await clean_race_post(conn,(sid,qid,did,reviewer))
+        await conn.execute("SET CONSTRAINTS ALL IMMEDIATE")
+        check(await conn.fetchval("SELECT owner_revenue_has_active_posting($1,$2)",p,sid),False,"exact guest service reversal")
+    finally:
+        await tx.rollback()
+        await conn.close()
+before_guest=checks
+asyncio.run(verify_guest_service_ledger())
+print("MARINA_OWNER_GUEST_SERVICE_LEDGER_PASS",checks-before_guest)

@@ -17,6 +17,17 @@ class OwnerLedgerPolicyTests(unittest.TestCase):
     def test_valid_net_of_tax(self):
         self.assertEqual(validate_posting(self.revenue,source_type="REVENUE_SOURCE",revenue_service_type="DINING_ORDER",
                          evidence_complete=True,source_amount="700"),"700.0000")
+    def test_other_service_uses_only_4300(self):
+        other=[{**r,"account_code":"4300" if r["account_code"]=="4200" else r["account_code"]}
+               for r in self.revenue]
+        self.assertEqual(validate_posting(other,source_type="REVENUE_SOURCE",
+            revenue_service_type="OTHER_SERVICE",evidence_complete=True,source_amount="700"),"700.0000")
+        for code in ("4100","4200"):
+            wrong=[{**r,"account_code":code if r["account_code"]=="4300" else r["account_code"]}
+                   for r in other]
+            with self.assertRaisesRegex(ValueError,"SOURCE_ACCOUNT_MISMATCH"):
+                validate_posting(wrong,source_type="REVENUE_SOURCE",
+                    revenue_service_type="OTHER_SERVICE",evidence_complete=True,source_amount="700")
     def test_missing_tax_confirmation_blocks(self):
         with self.assertRaisesRegex(ValueError,"SOURCE_INCOMPLETE"):
             validate_posting(self.revenue,source_type="REVENUE_SOURCE",revenue_service_type="DINING_ORDER",

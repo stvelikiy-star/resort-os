@@ -84,7 +84,7 @@ async def certify_revenue_source(body:RevenueSourceCertification,request:Request
                 return {"id":str(prior["id"]),"already_processed":True,
                         "accounting_posted":False,"recognized_profit_kgs":None}
             ev=await conn.fetchrow(
-                """SELECT e."faceValueKgs",e."createdById",e."sourceType",
+                """SELECT e."faceValueKgs",e."createdById",e."sourceType",e."sourceId",
                           e."serviceDate"
                    FROM owner_revenue_source_events e
                    WHERE e.id=$1 AND e."propertyId"=$2 AND e.action='APPROVE_SOURCE'
@@ -94,7 +94,7 @@ async def certify_revenue_source(body:RevenueSourceCertification,request:Request
             doc=await conn.fetchrow(
                 """SELECT "uploadedById","documentDate" FROM owner_revenue_evidence_documents
                    WHERE id=$1 AND "propertyId"=$2""",body.evidence_document_id,pid)
-            if (not ev or not doc or ev["sourceType"] not in ("ROOM_NIGHT","DINING_ORDER")
+            if (not ev or not doc or ev["sourceType"] not in ("ROOM_NIGHT","DINING_ORDER","OTHER_SERVICE")
                 or ev["createdById"]==actor or doc["uploadedById"]==actor
                 or doc["documentDate"]>date.today()):
                 raise HTTPException(409,detail={"code":"REVENUE_INDEPENDENT_DOCUMENT_REVIEW_REQUIRED"})
@@ -106,6 +106,9 @@ async def certify_revenue_source(body:RevenueSourceCertification,request:Request
                        WHERE r."propertyId"=$1 AND r."reversesId"=c.id))""",
                 pid,body.source_event_id):
                 raise HTTPException(409,detail={"code":"REVENUE_CORRECTIONS_UNRECONCILED"})
+            if ev["sourceType"]=="OTHER_SERVICE" and await conn.fetchval(
+                "SELECT owner_guest_service_revenue_proof($1,$2,$3)",pid,ev["sourceId"],ev["serviceDate"])!=ev["faceValueKgs"]:
+                raise HTTPException(409,detail={"code":"REVENUE_GUEST_SERVICE_NOT_QUALIFIED"})
             gross=Decimal(ev["faceValueKgs"])
             net=gross-body.tax_amount_kgs
             if net<=0:
@@ -162,7 +165,7 @@ async def qualified_posting_source(conn,pid,proposal):
         raise HTTPException(409,detail={"code":"ACCOUNTING_POSTING_SOURCE_TYPE_NOT_SUPPORTED"})
     await conn.execute("SELECT owner_lock_revenue_posting($1,$2)",pid,proposal["sourceId"])
     row=await conn.fetchrow(
-        """SELECT e."faceValueKgs",e."sourceType",e."sourceSnapshot",e."serviceDate"
+        """SELECT e."faceValueKgs",e."sourceType",e."sourceSnapshot",e."serviceDate",e."sourceId"
            FROM owner_revenue_source_events e
            WHERE e.id=$1 AND e."propertyId"=$2 AND e.action='APPROVE_SOURCE'
              AND NOT EXISTS(SELECT 1 FROM owner_revenue_source_events rev
@@ -172,6 +175,9 @@ async def qualified_posting_source(conn,pid,proposal):
         raise HTTPException(409,detail={"code":"ACCOUNTING_SOURCE_UNVERIFIED_OR_REVERSED"})
     if row["serviceDate"]!=proposal["accountingDate"]:
         raise HTTPException(409,detail={"code":"ACCOUNTING_REVENUE_SERVICE_DATE_MISMATCH"})
+    if row["sourceType"]=="OTHER_SERVICE" and await conn.fetchval(
+        "SELECT owner_guest_service_revenue_proof($1,$2,$3)",pid,row["sourceId"],row["serviceDate"])!=row["faceValueKgs"]:
+        raise HTTPException(409,detail={"code":"REVENUE_GUEST_SERVICE_NOT_QUALIFIED"})
     cert=await conn.fetchrow(
         """SELECT "grossAmountKgs","taxAmountKgs","netRevenueKgs"
            FROM owner_revenue_accounting_certifications
@@ -243,7 +249,7 @@ async def post_approved_proposal(proposal_id:uuid.UUID,body:PostingAction,
                                  source_amount=source["faceValueKgs"],
                                  revenue_service_type=source["sourceType"])
                 if proposal["sourceType"]=="REVENUE_SOURCE":
-                    rev_code="4100" if source["sourceType"]=="ROOM_NIGHT" else "4200"
+                    rev_code={"ROOM_NIGHT":"4100","DINING_ORDER":"4200","OTHER_SERVICE":"4300"}[source["sourceType"]]
                     sums=lambda code,side:sum(
                         (Decimal(r["amount_kgs"]) for r in lines
                           if r["account_code"]==code and r["side"]==side),
@@ -494,6 +500,18 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
         if classify_served_order(order) is None and match(
             "DINING_ORDER",order["id"],order["served_local_date"],order["totalKgs"]):
             counts["dining_verified"]+=1
+    other=await conn.fetch(
+        """SELECT f."sourceType",f."sourceId",f."serviceDate",f."amountKgs",
+                  CASE WHEN f."sourceType"='GUEST_SERVICE' THEN
+                    owner_guest_service_revenue_proof($1,f."sourceId",f."serviceDate")
+                  END AS qualified_amount
+           FROM guest_folio_charges f WHERE f."propertyId"=$1
+             AND f."sourceType"<>'KITCHEN_ORDER' AND f.status IN ('OPEN','PAID')
+             AND f."serviceDate" BETWEEN $2 AND $3""",pid,from_date,to_date)
+    counts["other_service_expected"]=len(other)
+    counts["other_service_verified"]=sum(
+        1 for item in other if item["qualified_amount"] is not None and match(
+            "OTHER_SERVICE",item["sourceId"],item["serviceDate"],item["qualified_amount"]))
     coverage=await conn.fetchrow(
         """WITH active_post AS (
              SELECT q."sourceType",q."sourceId",p."accountingDate",p.id
@@ -541,7 +559,7 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
     counts["cogs_expected"]=len(orders)
     counts["unmatched_approved_sources"]=len(set(by_key)-matched)
     blockers=[]
-    for category in ("lodging","dining","expense","cogs"):
+    for category in ("lodging","dining","other_service","expense","cogs"):
         if counts[category+"_expected"]!=counts[category+"_verified"]:
             blockers.append(category.upper()+"_SOURCE_COVERAGE_INCOMPLETE")
     if lodging["excluded_reservations_count"] or dining["excluded_orders_count"]:
@@ -550,7 +568,7 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
         blockers.append("APPROVED_SOURCE_NOT_MATCHED_TO_DELIVERY")
     if counts["active_corrections"]:
         blockers.append("ACTIVE_CORRECTIONS_REQUIRE_ACCOUNTING_POLICY")
-    if dining["non_dining_active_folio_charges"] or dining["non_dining_undated_folio_count"]:
+    if counts["other_service_expected"]!=counts["other_service_verified"] or dining["non_dining_undated_folio_count"]:
         blockers.append("OTHER_SERVICE_REVENUE_NOT_RECONCILED")
     # Even a perfect match of these supported source categories does not prove
     # legal document contents, completeness of all operations, or a sealed period.

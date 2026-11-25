@@ -29,6 +29,7 @@ on:
       - 'packages/database/prisma/migrations/zz130_marina_owner_revenue_accounting_certification_20261125/migration.sql'
       - 'packages/database/prisma/migrations/zz131_marina_owner_source_reversal_integrity_20261125/migration.sql'
       - 'packages/database/prisma/migrations/zz132_marina_owner_revenue_period_integrity_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz133_marina_owner_guest_service_revenue_20261125/migration.sql'
       - 'services/api/app/owner_revenue_source_journal.py'
       - 'packages/database/prisma/migrations/zz128_marina_owner_accounting_decision_evidence_20261124/migration.sql'
       - 'services/api/app/kitchen_batch_allocation.py'
