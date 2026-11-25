@@ -1040,10 +1040,13 @@ async def subscription_plans(request: Request,hotel_id: uuid.UUID=Query(...),
             rows=await conn.fetch("""SELECT a.id AS agreement_id,a.hotel_id,a.version,a.terms_digest,
                 p.id AS offer_id,p.package_kind,p.commercial_policy_version,p.term_months,p.period_start,
                 p.period_end_exclusive,p.sku_snapshot,p.subscription_term_total,p.implementation_total,
-                r.approved_at
+                r.approved_at,c.accepted_at,
+                i.trial_start,i.trial_end_exclusive
                 FROM flex_agreement_internal_approvals r
                 JOIN flex_commercial_agreement_versions a ON a.id=r.agreement_id AND a.hotel_id=r.hotel_id AND a.terms_digest=r.terms_digest
                 JOIN flex_tariff_package_versions p ON p.id=a.source_offer_id AND p.hotel_id=a.hotel_id
+                LEFT JOIN flex_customer_agreement_acceptances c ON c.agreement_id=a.id AND c.hotel_id=a.hotel_id AND c.terms_digest=a.terms_digest
+                LEFT JOIN flex_installation_completions i ON i.hotel_id=a.hotel_id
                 WHERE a.hotel_id=$1 AND a.state='DRAFT' ORDER BY a.version DESC""",hotel_id)
             result=[]
             for row in rows:
@@ -1052,7 +1055,14 @@ async def subscription_plans(request: Request,hotel_id: uuid.UUID=Query(...),
                     data["sku_snapshot"]=json.loads(data["sku_snapshot"])
                 for k in ("subscription_term_total","implementation_total"):
                     data[k]=str(data[k])
+                today=datetime.now(ZoneInfo("Asia/Bishkek")).date()
+                start,end=data["trial_start"],data["trial_end_exclusive"]
+                trial_state=("NOT_STARTED" if start is None or today<start else
+                             "ACTIVE" if today<end else "EXPIRED")
                 data.update(state="PLAN_ONLY",enforcement="OFF",client_signed=False,
+                    customer_acceptance_state="ACCEPTED" if data["accepted_at"] else "AWAITING_CUSTOMER",
+                    trial_state=trial_state,
+                    trial_days_remaining=max(0,(end-today).days) if trial_state=="ACTIVE" else 0,
                     subscription_activated=False,payments_enabled=False)
                 result.append(data)
             return result
