@@ -17,6 +17,14 @@ BEGIN
  THEN RAISE EXCEPTION 'FLEX_0015_DRIFT'; END IF;
 END
 $verify$;
+-- Legacy registry was capped at 13. Replace only that exact check; the
+-- runner validates contiguous IDs, file identities and the frozen disposition.
+DO $registry$
+BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='flex_schema_migrations'::regclass AND conname='flex_schema_migrations_migration_id_check' AND pg_get_constraintdef(oid)='CHECK (((migration_id >= 1) AND (migration_id <= 13)))') THEN RAISE EXCEPTION 'FLEX_LEGACY_REGISTRY_CHECK_DRIFT'; END IF;
+END
+$registry$;
+ALTER TABLE flex_schema_migrations DROP CONSTRAINT flex_schema_migrations_migration_id_check, ADD CONSTRAINT flex_schema_migrations_migration_id_check CHECK (migration_id >= 1);
 INSERT INTO flex_schema_migrations(migration_id,filename,git_blob_sha,release_sha,disposition) VALUES
 (14,'0014_flex_hotel_name_edit_preview.sql','948f5c1be3e83ceefa55a3d6f5e5df62656fe6ff','fb001961ba6c9220926ffb8f3197e822c887c9c8','APPLIED'),
 (15,'0015_flex_commercial_policy_preview.sql','32e353b2affd3f6708ec6a20a13ab89aad0de929','fb001961ba6c9220926ffb8f3197e822c887c9c8','APPLIED');
