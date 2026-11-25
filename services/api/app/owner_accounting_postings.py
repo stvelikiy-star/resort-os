@@ -109,9 +109,10 @@ async def certify_revenue_source(body:RevenueSourceCertification,request:Request
             doc=await conn.fetchrow(
                 """SELECT "uploadedById","documentDate" FROM owner_revenue_evidence_documents
                    WHERE id=$1 AND "propertyId"=$2""",body.evidence_document_id,pid)
+            property_day=await conn.fetchval("SELECT owner_finance_property_day($1)",pid)
             if (not ev or not doc or ev["sourceType"] not in ("ROOM_NIGHT","DINING_ORDER","OTHER_SERVICE")
                 or ev["createdById"]==actor or doc["uploadedById"]==actor
-                or doc["documentDate"]>date.today()):
+                or property_day is None or doc["documentDate"]>property_day):
                 raise HTTPException(409,detail={"code":"REVENUE_INDEPENDENT_DOCUMENT_REVIEW_REQUIRED"})
             await conn.execute("SELECT owner_lock_revenue_posting($1,$2)",pid,body.source_event_id)
             if ((body.reduction_amount_kgs>0 and

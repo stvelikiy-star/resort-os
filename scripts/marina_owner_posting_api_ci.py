@@ -756,6 +756,28 @@ before_guest=checks
 asyncio.run(verify_guest_service_ledger())
 asyncio.run(verify_guest_service_ledger(mutation_checks=True))
 print("MARINA_OWNER_GUEST_SERVICE_LEDGER_PASS",checks-before_guest)
+async def verify_property_calendar_boundary():
+    conn=await asyncpg.connect(parsed.geturl())
+    try:
+        async with conn.transaction():
+            await conn.execute("SET LOCAL TIME ZONE 'UTC'")
+            from datetime import datetime, timezone, timedelta
+            # Both sides of local midnight, independent of actual CI clock.
+            tz=await conn.fetchval("SELECT timezone FROM properties WHERE id=$1",p)
+            from zoneinfo import ZoneInfo
+            midnight=datetime(2026,11,26,tzinfo=ZoneInfo(tz)).astimezone(timezone.utc)
+            for instant,expected in ((midnight-timedelta(seconds=1),date(2026,11,25)),
+                                     (midnight,date(2026,11,26))):
+                check(await conn.fetchval("SELECT owner_finance_property_day($1,$2)",p,instant),
+                      expected,"property-local financial evidence day at midnight")
+            check(await conn.fetchval("SELECT owner_finance_property_day($1)",uuid.uuid4()),
+                  None,"unknown hotel does not have a financial day")
+    finally:
+        await conn.close()
+
+before_calendar=checks
+asyncio.run(verify_property_calendar_boundary())
+print("MARINA_OWNER_PROPERTY_CALENDAR_PASS",checks-before_calendar)
 before_refund=checks
 asyncio.run(verify_guest_service_ledger(refund_checks=True))
 print("MARINA_OWNER_CERTIFIED_REFUND_PASS",checks-before_refund)

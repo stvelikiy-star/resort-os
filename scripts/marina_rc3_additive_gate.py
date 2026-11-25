@@ -2,7 +2,7 @@
 """Source gate for a NEW additive release without rewriting immutable RC3 evidence.
 
 RC2/RC3 manifests remain 39-migration history. The current release must
-preserve all 39 original SQL hashes and include pinned zz115 through zz139 SQL.
+preserve all 39 original SQL hashes and include pinned zz115 through zz140 SQL.
 """
 from __future__ import annotations
 import hashlib
@@ -37,7 +37,8 @@ NEW_MIGRATIONS = {
     "zz136_marina_owner_certified_revenue_reductions_20261125": "e9c640033403f30b80be77a7aeede6caec3ce01d034f83bbf171603dd5c14b67",
     "zz137_marina_owner_certified_refund_cash_evidence_20261125": "0f1b18a74bf2cecea5cecf301dea4dc8835bdc3b20e6d300b95f443aafec2837",
     "zz138_marina_owner_full_cancellation_certificate_20261125": "4e0a5290a5bd96167bf1db12cf9e436af2fdcb6427b395b6f8a6d593fc6774b4",
-    "zz139_marina_partial_refund_evidence_foundation_20261125": "8fa7d2833def337a09a418a802a0be18df0a61114e85b27d888934f498afc3e8"
+    "zz139_marina_partial_refund_evidence_foundation_20261125": "8fa7d2833def337a09a418a802a0be18df0a61114e85b27d888934f498afc3e8",
+    "zz140_marina_owner_finance_property_calendar_20261126": "fbb37beed614c3f7686e060e340f58c3608a92e3108b20287e366dda9a82e16a"
 }
 # Reviewed tightening: summary is trimmed and whitespace-only reports are rejected.
 # Keep the historical RC3 manifest immutable; pin this additive source exactly.
@@ -88,9 +89,9 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",
     # MARINA-specific 52nd migration, exact batch-to-served item ledger.
     "scripts/marina_shared_three_hotel_restore_ci.py": "0f00022721637c58d3897f5164496af7173e37dd",
-    "scripts/release_contract.py": "2fc2f2600f986cab46021a19e2e724ceba43af0a",
-    "scripts/release_contract_test.py": "7cce748427fbfe7b9c256c4ffd7bad0c7ed5307f",
-    ".github/workflows/marina-zz113-rollback-ci.yml": "326d65e9fdb48a837d0712ace2c30b6baedc7c1b",
+    "scripts/release_contract.py": "7871d08dee2d4a0ddba216404635fbffd8161be0",
+    "scripts/release_contract_test.py": "5df07b6c5a4f9be21a2e9e3f87ba87d796ad5c5c",
+    ".github/workflows/marina-zz113-rollback-ci.yml": "251b0b6f8a8d682bb58761863cecb895cb4c1afe",
     "scripts/marina_disposable_upgrade_acceptance_ci.py": "b877c5976def9451853953b86ec48b6804ab16b0",
     ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "9bf375ac39d02cf78122dbe4544f1d69d3335cb6",
     "services/api/app/app_entry.py": "8b8e630073ddbe6a8855a5494116c5cac11064ca",
@@ -102,18 +103,18 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/owner_accounting_journal.py": "bfadba59080ec2badb554ee03ed39d964cb04c0e",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
     "services/api/app/owner_ledger_policy.py": "a731aeec650163d590eccc671f950209a9842548",
-    "services/api/app/owner_accounting_postings.py": "116c0c1347cf5f24f4487ed6b46e616c366de82d",
+    "services/api/app/owner_accounting_postings.py": "7e8de0d7a769b741717826d2566f4080ec1e22a5",
     "services/api/app/owner_revenue_corrections.py": "10f52e7f916598620c73fa2d3a61f08bed435aaa",
     "services/api/app/owner_delivered_revenue.py": "1e8881079cd4d4a64f96aaabbb51c1d21e59a035",
     "scripts/test_owner_ledger_policy.py": "169705fb329563a9599657b98f537ab0cfb403ce",
-    "scripts/marina_owner_posting_api_ci.py": "5e2bb487cf11df2313da24ddd5678fbf3ffc7f4b",
+    "scripts/marina_owner_posting_api_ci.py": "9028185d6f1bc009f71084a4374551bc54f00fc5",
     "services/api/app/owner_revenue_source_journal.py": "a748840fcce9904dbb4e52fe20c9ff6163bd9375",
     "scripts/marina_owner_expense_posting_ci.py": "3c5879734d3bff96269559b1aa08e25adfe937c2",
     "scripts/marina_owner_served_cogs_posting_ci.py": "75bb2cc1fb85ff6379ec0b8010115a4aad6b290b",
     "scripts/test_owner_recognition_policy.py": "7a856095b84319c654c9b536f763e1d763cf790a",
     ".github/workflows/marina-owner-recognition-policy-ci.yml": "7965e38127aaf6a9ffe73f0c0ce755425d36d6e1",
     "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "9be689e37a033ccee0a588d4110c99d6416ab83e",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "b07934ef9a5263dcc900192a0c06c10b6963c07f",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
@@ -138,15 +139,15 @@ def validate_additive() -> list[str]:
     pinned = rc2.get("migration_sha256")
     if not isinstance(pinned, dict) or len(pinned) != 39:
         return ["historical RC2 expected 39 pinned migration hashes"]
-    if len(EXPECTED_MIGRATIONS) != 64 or EXPECTED_MIGRATIONS[39:] != tuple(NEW_MIGRATIONS):
-        errors.append("current release must contain exactly 39 historical + zz115 through zz139 migrations")
+    if len(EXPECTED_MIGRATIONS) != 65 or EXPECTED_MIGRATIONS[39:] != tuple(NEW_MIGRATIONS):
+        errors.append("current release must contain exactly 39 historical + zz115 through zz140 migrations")
     expected = set(pinned) | set(NEW_MIGRATIONS)
     actual = {
         p.parent.name: hashlib.sha256(p.read_bytes()).hexdigest()
         for p in (ROOT / "packages/database/prisma/migrations").glob("*/migration.sql")
     }
     if set(actual) != expected or set(EXPECTED_MIGRATIONS) != expected:
-        errors.append("new release migration set is not the approved additive 64")
+        errors.append("new release migration set is not the approved additive 65")
     for name, sha in pinned.items():
         if actual.get(name) != sha:
             errors.append("historical RC2 migration drift: " + name)
@@ -192,4 +193,4 @@ if __name__ == "__main__":
         for message in problems:
             print("MARINA_RC3_ADDITIVE_FAIL:", message)
         raise SystemExit(1)
-    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz139, total=64, original source gate preserved, NO-GO")
+    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz140, total=65, original source gate preserved, NO-GO")
