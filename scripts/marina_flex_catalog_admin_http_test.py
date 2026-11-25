@@ -683,5 +683,51 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         asyncio.run(verify())
 
 
+    def test_17_persistent_synthetic_cash_journal(self):
+        path="/v1/platform/synthetic-cash-journal"
+        contract=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()["agreements"][0]
+        base={"hotel_id":HOTEL_A,"agreement_id":contract["id"]}
+        read=path+"?hotel_id="+HOTEL_A+"&agreement_id="+contract["id"]
+        self.assertEqual(self.get(read,who="owner-a").status_code,403)
+        self.assertEqual(self.get(read).json()["sequence"],0)
+        def append(n,key,amount,kind="PAYMENT",payment_id=None):
+            return self.post(path,{**base,"expected_sequence":n,"event":{
+                "kind":kind,"event_id":key,"amount":amount,"payment_id":payment_id}})
+        first=append(0,"p1","100000")
+        self.assertEqual(first.status_code,201,first.text)
+        self.assertEqual(first.json()["sequence"],1)
+        self.assertEqual(append(0,"p1","100000").json(),first.json())
+        self.assertEqual(append(0,"p1","100001").status_code,409)
+        self.assertEqual(append(0,"p2","40000").status_code,409)
+        second=append(1,"p2","40000")
+        self.assertEqual(second.status_code,201,second.text)
+        self.assertEqual(second.json()["test_balance_state"],"TEST_SETTLED")
+        self.assertEqual(Decimal(second.json()["credit"]),Decimal("7000"))
+        self.assertEqual(append(2,"bad","40001","REFUND","p2").status_code,422)
+        final=append(2,"r1","10000","REFUND","p2")
+        self.assertEqual(final.status_code,201,final.text)
+        data=final.json()
+        self.assertEqual(data["sequence"],3)
+        self.assertEqual(data["test_balance_state"],"TEST_OUTSTANDING")
+        self.assertEqual(Decimal(data["outstanding"]),Decimal("3000"))
+        self.assertEqual(Decimal(data["discrepancy"]),Decimal("0"))
+        self.assertFalse(data["payments_enabled"])
+        self.assertFalse(data["subscription_activated"])
+        self.assertFalse(data["launch_offer_finalized"])
+        self.assertEqual(self.get(read).json(),data)
+        self.assertEqual(self.get(read.replace(HOTEL_A,HOTEL_B)).status_code,404)
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_qa_cash_events"),3)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_payment_reversals"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscriptions"),2)
+                with self.assertRaises(asyncpg.PostgresError):
+                    await con.execute("UPDATE flex_qa_cash_events SET amount=1 WHERE event_id='p1'")
+            finally: await con.close()
+        asyncio.run(verify())
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)
