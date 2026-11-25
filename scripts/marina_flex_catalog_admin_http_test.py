@@ -716,6 +716,16 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         self.assertFalse(data["launch_offer_finalized"])
         self.assertEqual(self.get(read).json(),data)
         self.assertEqual(self.get(read.replace(HOTEL_A,HOTEL_B)).status_code,404)
+        plans=self.get("/v1/platform/subscription-plans?hotel_id="+HOTEL_A).json()
+        plan=next(p for p in plans if p["agreement_id"]==contract["id"])
+        self.assertEqual(plan["customer_acceptance_state"],"ACCEPTED")
+        self.assertEqual(Decimal(plan["test_finance"]["outstanding"]),Decimal("3000"))
+        self.assertEqual(Decimal(plan["test_finance"]["credit"]),Decimal("0"))
+        self.assertEqual(plan["test_finance"]["mode"],"SYNTHETIC_ONLY")
+        self.assertEqual(plan["renewal_preview"]["period_start"],plan["period_end_exclusive"])
+        self.assertTrue(plan["renewal_preview"]["requires_new_offer"])
+        self.assertFalse(plan["renewal_preview"]["bank_authorized"])
+        self.assertFalse(plan["subscription_activated"])
         async def verify():
             con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
             try:
