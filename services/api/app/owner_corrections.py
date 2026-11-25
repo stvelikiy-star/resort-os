@@ -7,6 +7,7 @@ from asyncpg.exceptions import ExclusionViolationError
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
+from .payment_refund_read_model import refund_compatible_sql
 from .auth import password_hasher, require_roles
 
 
@@ -108,7 +109,7 @@ async def list_agents(
     async with request.app.state.db.acquire() as conn:
         property_id = await _property_id(conn, user["property_code"])
         rows = await conn.fetch(
-            '''
+            await refund_compatible_sql(conn, '''
             SELECT a.id,a.name,a."contactName",a.phone,a.whatsapp,a.email,a.notes,a.status,a."createdAt",a."updatedAt",
                    count(r.id)::int AS reservations,
                    coalesce(sum(CASE WHEN r.status NOT IN ('CANCELLED','NO_SHOW') THEN r."totalKgs" ELSE 0 END),0)::bigint AS booked_kgs,
@@ -122,8 +123,8 @@ async def list_agents(
               AND ($4::date IS NULL OR r."checkIn">=$4::date)
               AND ($5::date IS NULL OR r."checkIn"<=$5::date)
             LEFT JOIN LATERAL (
-              SELECT coalesce(sum(p."amountKgs") FILTER (WHERE p.status='RECEIVED'),0)::bigint AS received_kgs
-              FROM payments p WHERE p."reservationId"=r.id
+              SELECT coalesce(SUM(p."remainingReceivedKgs"),0)::bigint AS received_kgs
+              FROM owner_reservation_payment_balances p WHERE p."reservationId"=r.id
             ) pay ON true
             LEFT JOIN LATERAL (
               SELECT su.username,su."isActive"
@@ -140,7 +141,7 @@ async def list_agents(
                    OR coalesce(a.phone,'') LIKE '%'||$3||'%' OR coalesce(a.whatsapp,'') LIKE '%'||$3||'%')
             GROUP BY a.id,access.username,access."isActive"
             ORDER BY a.status,a.name
-            ''',
+            '''),
             property_id,
             include_inactive,
             search.strip(),
@@ -426,7 +427,7 @@ async def agent_report(
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
         reservations = await conn.fetch(
-            '''
+            await refund_compatible_sql(conn, '''
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",r.adults,r.children,r."totalKgs",
                    r."discountPercent",r."discountReason",r."extraBedCount",r."extraBedUnitKgs",
                    trim(concat_ws(' ',g."firstName",g."lastName")) AS guest_name,g.phone,
@@ -437,15 +438,15 @@ async def agent_report(
             LEFT JOIN inventory_blocks ib ON ib."reservationId"=r.id AND ib.active=true AND ib."blockType"='RESERVATION'
             LEFT JOIN rooms room ON room.id=ib."roomId"
             LEFT JOIN LATERAL (
-              SELECT coalesce(sum(p."amountKgs") FILTER (WHERE p.status='RECEIVED'),0)::bigint AS received_kgs
-              FROM payments p WHERE p."reservationId"=r.id
+              SELECT coalesce(SUM(p."remainingReceivedKgs"),0)::bigint AS received_kgs
+              FROM owner_reservation_payment_balances p WHERE p."reservationId"=r.id
             ) pay ON true
             WHERE r."propertyId"=$1 AND r."agentId"=$2
               AND ($3::date IS NULL OR r."checkIn">=$3::date)
               AND ($4::date IS NULL OR r."checkIn"<=$4::date)
             GROUP BY r.id,g.id,pay.received_kgs
             ORDER BY r."checkIn" DESC,r."createdAt" DESC
-            ''',
+            '''),
             property_id,
             agent_id,
             from_date,

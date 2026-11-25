@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from openpyxl.styles import Font
 
+from .payment_refund_read_model import refund_compatible_sql
 from .auth import require_roles
 
 router = APIRouter(prefix="/api/v1/admin/intelligence", tags=["owner-intelligence"])
@@ -45,7 +46,7 @@ def guest_display_name(row) -> str:
 async def fetch_guest_rows(conn, property_id, search: str | None, limit: int, offset: int):
     needle = (search or "").strip()
     return await conn.fetch(
-        '''
+        await refund_compatible_sql(conn, '''
         SELECT g.id,g."firstName",g."lastName",g.phone,g.email,g."createdAt",g."updatedAt",
                COALESCE(stats.reservation_count,0)::int AS reservation_count,
                COALESCE(stats.completed_stays,0)::int AS completed_stays,
@@ -65,9 +66,9 @@ async def fetch_guest_rows(conn, property_id, search: str | None, limit: int, of
               WHERE r.status IN ('GUARANTEED','CHECKED_IN','CHECKED_OUT')
             ),0)::bigint AS booked_value_kgs,
             COALESCE((
-              SELECT SUM(p."amountKgs")
+              SELECT SUM(p."remainingReceivedKgs")
               FROM reservations rp
-              JOIN payments p ON p."reservationId"=rp.id AND p.status='RECEIVED'
+              JOIN owner_reservation_payment_balances p ON p."reservationId"=rp.id
               WHERE rp."primaryGuestId"=g.id
             ),0)::bigint AS received_kgs,
             MAX(r."checkOut") FILTER (WHERE r.status='CHECKED_OUT') AS last_stay,
@@ -87,7 +88,7 @@ async def fetch_guest_rows(conn, property_id, search: str | None, limit: int, of
           )
         ORDER BY COALESCE(stats.next_stay,stats.last_stay,g."createdAt"::date) DESC,g."updatedAt" DESC
         LIMIT $3 OFFSET $4
-        ''',
+        '''),
         property_id,
         needle,
         limit,
@@ -263,10 +264,10 @@ async def guest_detail(
         if not guest:
             raise HTTPException(status_code=404, detail="Guest not found")
         reservations = await conn.fetch(
-            '''
+            await refund_compatible_sql(conn, '''
             WITH paid AS (
-              SELECT "reservationId",COALESCE(SUM("amountKgs") FILTER (WHERE status='RECEIVED'),0)::bigint AS paid_kgs
-              FROM payments WHERE "reservationId" IS NOT NULL GROUP BY "reservationId"
+              SELECT "reservationId",COALESCE(SUM("remainingReceivedKgs"),0)::bigint AS paid_kgs
+              FROM owner_reservation_payment_balances WHERE "reservationId" IS NOT NULL GROUP BY "reservationId"
             )
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",r.adults,r.children,
                    r."totalKgs",r.notes,r."createdAt",r."updatedAt",r."requestId",
@@ -276,7 +277,7 @@ async def guest_detail(
             LEFT JOIN reservation_requests rr ON rr.id=r."requestId"
             WHERE r."propertyId"=$1 AND r."primaryGuestId"=$2
             ORDER BY r."checkIn" DESC,r."createdAt" DESC
-            ''',
+            '''),
             prop["id"],
             guest_id,
         )
@@ -429,10 +430,10 @@ async def export_xlsx(
         prop = await property_context(conn, user["property_code"])
         rooms = await build_occupancy_matrix(conn, prop["id"], from_date, end_exclusive)
         reservations = await conn.fetch(
-            '''
+            await refund_compatible_sql(conn, '''
             WITH paid AS (
-              SELECT "reservationId",COALESCE(SUM("amountKgs") FILTER (WHERE status='RECEIVED'),0)::bigint AS paid_kgs
-              FROM payments WHERE "reservationId" IS NOT NULL GROUP BY "reservationId"
+              SELECT "reservationId",COALESCE(SUM("remainingReceivedKgs"),0)::bigint AS paid_kgs
+              FROM owner_reservation_payment_balances WHERE "reservationId" IS NOT NULL GROUP BY "reservationId"
             )
             SELECT r.id,r."bookingNumber",r.status::text AS status,r."checkIn",r."checkOut",r.adults,r.children,r."totalKgs",
                    g."firstName",g."lastName",g.phone,g.email,COALESCE(p.paid_kgs,0)::bigint AS paid_kgs,rr.source
@@ -442,7 +443,7 @@ async def export_xlsx(
             LEFT JOIN reservation_requests rr ON rr.id=r."requestId"
             WHERE r."propertyId"=$1 AND r."checkOut">$2::date AND r."checkIn"<$3::date
             ORDER BY r."checkIn",r."bookingNumber"
-            ''',
+            '''),
             prop["id"], from_date, end_exclusive,
         )
         guest_rows = await fetch_guest_rows(conn, prop["id"], None, 10000, 0)

@@ -72,7 +72,7 @@ def classify_served_order(row):
     return None
 
 
-async def delivered_sources(conn,pid,from_date:date,to_date:date,tz:str):
+async def delivered_sources(conn,pid,from_date:date,to_date:date,tz:str,*,on_night=None):
     """Only call from a property-checked, REPEATABLE READ, readonly transaction."""
     reservation_rows=await conn.fetch(
         '''SELECT r.id,r."bookingNumber",r.status::text AS reservation_status,
@@ -114,6 +114,8 @@ async def delivered_sources(conn,pid,from_date:date,to_date:date,tz:str):
         for day,amount in nightly:
             night_count+=1
             night_total+=amount
+            if on_night is not None:
+                on_night(row["id"],day,amount)
             if len(preview)<PREVIEW_LIMIT:
                 preview.append({"reservation_id":str(row["id"]),
                                 "service_date":day.isoformat(),

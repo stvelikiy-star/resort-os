@@ -164,6 +164,27 @@ export function verifyOwnerAccrualReadiness(v:unknown):void {
     invalid('owner.accrual.blockers.incomplete');
 }
 
+export function verifyOwnerLedgerCoverage(v:unknown,from:unknown,to:unknown):void {
+  const x=obj(v,'owner.ledger'),period=obj(x.period,'owner.ledger.period');
+  if(x.scope!=='PROPERTY_SCOPED_READ_ONLY_PERIOD_DIAGNOSTIC'||
+    x.period_completeness_verified!==false||x.recognized_profit_kgs!==null||
+    x.currency!=='KGS'||period.from!==from||period.to!==to) invalid('owner.ledger.scope');
+  const counts=obj(x.counts,'owner.ledger.counts');
+  const count=(v:unknown,k:string)=>{const n=num(v,k);if(!Number.isSafeInteger(n)||n<0)invalid(k);return n;};
+  for(const key of ['lodging','dining','other_service','expense','cogs','refund_payment']){
+    const expected=count(counts[key+'_expected'],'owner.ledger.'+key+'.expected');
+    const verified=count(counts[key+'_verified'],'owner.ledger.'+key+'.verified');
+    if(verified>expected)invalid('owner.ledger.'+key+'.coverage');
+  }
+  for(const key of ['package_entitlement_count','package_portions_count','refund_undated_count','active_corrections','unmatched_approved_sources'])
+    count(counts[key],'owner.ledger.'+key);
+  const amounts=obj(x.posted_ledger_subtotals,'owner.ledger.amounts');
+  count(amounts.posting_line_count,'owner.ledger.posting_line_count');
+  for(const key of ['revenue_kgs','expense_cogs_kgs','contribution_kgs'])
+    if(typeof amounts[key]!=='string'||! /^-?\d+\.\d{4}$/.test(amounts[key] as string)) invalid('owner.ledger.'+key);
+  const blockers=arr(x.blockers,'owner.ledger.blockers');
+  if(!blockers.length||blockers.some(b=>typeof b!=='string'||!b)) invalid('owner.ledger.blockers');
+}
 export function financeSummaryResponse(v:unknown):FinanceSummary {
   const x=obj(v,'finance.summary'),range=obj(x.range,'finance.range');
   str(range.from,'finance.from');str(range.to,'finance.to');str(range.currency,'finance.currency');
@@ -239,6 +260,10 @@ export function financeSummaryResponse(v:unknown):FinanceSummary {
   });
   if(x.owner_accrual_readiness_snapshot!==undefined)
     verifyOwnerAccrualReadiness(x.owner_accrual_readiness_snapshot);
+  if(x.owner_ledger_period_coverage!==undefined){
+    if(x.owner_accrual_readiness_snapshot===undefined) invalid('owner.ledger.owner_scope');
+    verifyOwnerLedgerCoverage(x.owner_ledger_period_coverage,range.from,range.to);
+  }
   return v as FinanceSummary;
 }
 export function gridResponse(v:unknown):Grid {

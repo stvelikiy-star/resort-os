@@ -167,6 +167,10 @@ async def record_correction(body:CorrectionWrite,request:Request,user=Depends(ow
                 pid,body.approval_id)
             if reversed_:
                 raise HTTPException(409,detail={"code":"REVENUE_SOURCE_REVERSED"})
+            if await conn.fetchval("SELECT to_regclass('owner_revenue_posting_serialization') IS NOT NULL"):
+                await conn.execute("SELECT owner_lock_revenue_posting($1,$2)",pid,body.approval_id)
+                if await conn.fetchval("SELECT owner_revenue_has_active_posting($1,$2)",pid,body.approval_id):
+                    raise HTTPException(409,detail={"code":"REVENUE_CORRECTION_ACTIVE_POSTING_REQUIRES_REVERSAL"})
             duplicate=await conn.fetchval(
                 '''SELECT id FROM owner_revenue_correction_events
                    WHERE "propertyId"=$1 AND "approvalId"=$2 AND kind=$3
@@ -250,6 +254,10 @@ async def reverse_correction(correction_id:uuid.UUID,body:CorrectionReversal,
                 pid,correction_id)
             if dup:
                 raise HTTPException(409,detail={"code":"REVENUE_CORRECTION_ALREADY_REVERSED"})
+            if await conn.fetchval("SELECT to_regclass('owner_revenue_posting_serialization') IS NOT NULL"):
+                await conn.execute("SELECT owner_lock_revenue_posting($1,$2)",pid,original["approvalId"])
+                if await conn.fetchval("SELECT owner_revenue_has_active_posting($1,$2)",pid,original["approvalId"]):
+                    raise HTTPException(409,detail={"code":"REVENUE_CORRECTION_ACTIVE_POSTING_REQUIRES_REVERSAL"})
             source_snapshot=original["sourceSnapshot"]
             if not isinstance(source_snapshot,str):
                 source_snapshot=json.dumps(source_snapshot,separators=(",",":"))

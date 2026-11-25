@@ -30,3 +30,33 @@ else:
     raise AssertionError("blank normalized payment method must be rejected")
 
 print("PASS: payment idempotency normalization contract")
+
+# Legacy schema is compatible, complete migration is authoritative, and
+# half-installed schemas must not quietly erase refund facts.
+import asyncio
+from app.payment_refund_read_model import refund_compatible_sql
+
+class SchemaState:
+    def __init__(self,balances,events):
+        self.state={"balances":balances,"events":events}
+    async def fetchrow(self,query):
+        return self.state
+
+async def verify_refund_schema():
+    query="SELECT b.* FROM owner_reservation_payment_balances b"
+    assert await refund_compatible_sql(SchemaState(True,True),query)==query
+    legacy=await refund_compatible_sql(SchemaState(False,False),query)
+    assert 'FROM payments p JOIN reservations r' in legacy and '"remainingReceivedKgs"' in legacy
+    assert "owner_reservation_payment_balances" not in legacy
+    empty=await refund_compatible_sql(SchemaState(False,False),'SELECT * FROM owner_partial_refund_events')
+    assert "WHERE false" in empty and '"refundedAt"' in empty
+    for a,b in [(True,False),(False,True)]:
+        try:
+            await refund_compatible_sql(SchemaState(a,b),query)
+        except HTTPException as exc:
+            assert exc.status_code==503 and exc.detail["code"]=="PARTIAL_REFUND_SCHEMA_INCOMPLETE"
+        else:
+            raise AssertionError("Incomplete schema must fail closed")
+
+asyncio.run(verify_refund_schema())
+print("PASS: partial refund schema compatibility")

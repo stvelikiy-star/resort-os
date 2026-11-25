@@ -15,8 +15,8 @@ def main() -> int:
     assert not migration_names_match_exactly([*EXPECTED_MIGRATIONS, "unexpected_migration"])
     assert not migration_names_match_exactly(list(reversed(EXPECTED_MIGRATIONS)))
 
-    assert len(EXPECTED_MIGRATIONS) == 54
-    assert EXPECTED_MIGRATIONS[-34:] == (
+    assert len(EXPECTED_MIGRATIONS) == 64
+    assert EXPECTED_MIGRATIONS[-44:] == (
         "z19_dining_table_status_guard_20260905",
         "z20_dining_active_table_unique_20260906",
         "z21_dining_production_snapshots_20260906",
@@ -51,6 +51,16 @@ def main() -> int:
         "zz127_marina_served_batch_allocation_20261124",
         "zz128_marina_owner_accounting_decision_evidence_20261124",
         "zz129_marina_owner_accounting_postings_20261125",
+        "zz130_marina_owner_revenue_accounting_certification_20261125",
+        "zz131_marina_owner_source_reversal_integrity_20261125",
+        "zz132_marina_owner_revenue_period_integrity_20261125",
+        "zz133_marina_owner_guest_service_revenue_20261125",
+        "zz134_marina_owner_guest_service_posting_lifecycle_20261125",
+        "zz135_marina_owner_certified_tax_correction_20261125",
+        "zz136_marina_owner_certified_revenue_reductions_20261125",
+        "zz137_marina_owner_certified_refund_cash_evidence_20261125",
+        "zz138_marina_owner_full_cancellation_certificate_20261125",
+        "zz139_marina_partial_refund_evidence_foundation_20261125",
     )
     assert len(CRITICAL_CONSTRAINTS) == 119
     assert {

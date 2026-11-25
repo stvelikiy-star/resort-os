@@ -51,7 +51,7 @@ def validate_posting(proposal_lines, *, source_type, evidence_complete, source_a
         if code not in ACCOUNTS or side not in ("DEBIT","CREDIT"):
             raise ValueError("ACCOUNT_OR_SIDE_UNSUPPORTED")
         if source_type=="REVENUE_SOURCE":
-            revenue_code={"ROOM_NIGHT":"4100","DINING_ORDER":"4200"}.get(
+            revenue_code={"ROOM_NIGHT":"4100","DINING_ORDER":"4200","OTHER_SERVICE":"4300"}.get(
                 revenue_service_type)
             if revenue_code is None:
                 raise ValueError("REVENUE_SERVICE_CLASSIFICATION_UNVERIFIED")
@@ -69,15 +69,16 @@ def validate_posting(proposal_lines, *, source_type, evidence_complete, source_a
         raise ValueError("SOURCE_AMOUNT_MISMATCH")
     sides={(r["account_code"],r["side"]) for r in proposal_lines}
     if source_type=="REVENUE_SOURCE":
-        allowed_revenue={"ROOM_NIGHT":"4100","DINING_ORDER":"4200"}[
+        allowed_revenue={"ROOM_NIGHT":"4100","DINING_ORDER":"4200","OTHER_SERVICE":"4300"}[
             revenue_service_type]
-        if ("1100","DEBIT") not in sides or (allowed_revenue,"CREDIT") not in sides:
+        required={("1100","DEBIT"),(allowed_revenue,"CREDIT")}
+        if not required<=sides or not sides<=required|{("2100","CREDIT")}:
             raise ValueError("REVENUE_DOUBLE_ENTRY_PATTERN_INVALID")
     elif source_type=="OPERATING_EXPENSE":
-        if not {("5200","DEBIT"),("2200","CREDIT")}<=sides:
+        if sides!={("5200","DEBIT"),("2200","CREDIT")}:
             raise ValueError("OPERATING_EXPENSE_PATTERN_INVALID")
     elif source_type=="STOCK_CONSUMPTION":
-        if not {("5100","DEBIT"),("1300","CREDIT")}<=sides:
+        if sides!={("5100","DEBIT"),("1300","CREDIT")}:
             raise ValueError("COGS_PATTERN_INVALID")
     else:
         raise ValueError("SOURCE_TYPE_UNSUPPORTED")

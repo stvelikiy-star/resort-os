@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .auth import require_roles, trusted_property_id
+from .payment_refund_read_model import refund_compatible_sql
 
 router = APIRouter(prefix="/api/v1/admin/dashboard", tags=["admin-dashboard"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -115,10 +116,10 @@ async def manager_dashboard(
         )
 
         active_balance = await conn.fetchrow(
-            '''
+            await refund_compatible_sql(conn, '''
             WITH paid AS (
-              SELECT "reservationId", COALESCE(sum("amountKgs") FILTER (WHERE status='RECEIVED'),0)::bigint AS paid_kgs
-              FROM payments
+              SELECT "reservationId", COALESCE(sum("remainingReceivedKgs"),0)::bigint AS paid_kgs
+              FROM owner_reservation_payment_balances
               WHERE "reservationId" IS NOT NULL
               GROUP BY "reservationId"
             )
@@ -129,7 +130,7 @@ async def manager_dashboard(
             FROM reservations r
             LEFT JOIN paid p ON p."reservationId"=r.id
             WHERE r."propertyId"=$1 AND r.status IN ('GUARANTEED','CHECKED_IN')
-            ''',
+            '''),
             pid,
         )
 

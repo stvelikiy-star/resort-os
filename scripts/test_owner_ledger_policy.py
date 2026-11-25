@@ -17,6 +17,17 @@ class OwnerLedgerPolicyTests(unittest.TestCase):
     def test_valid_net_of_tax(self):
         self.assertEqual(validate_posting(self.revenue,source_type="REVENUE_SOURCE",revenue_service_type="DINING_ORDER",
                          evidence_complete=True,source_amount="700"),"700.0000")
+    def test_other_service_uses_only_4300(self):
+        other=[{**r,"account_code":"4300" if r["account_code"]=="4200" else r["account_code"]}
+               for r in self.revenue]
+        self.assertEqual(validate_posting(other,source_type="REVENUE_SOURCE",
+            revenue_service_type="OTHER_SERVICE",evidence_complete=True,source_amount="700"),"700.0000")
+        for code in ("4100","4200"):
+            wrong=[{**r,"account_code":code if r["account_code"]=="4300" else r["account_code"]}
+                   for r in other]
+            with self.assertRaisesRegex(ValueError,"SOURCE_ACCOUNT_MISMATCH"):
+                validate_posting(wrong,source_type="REVENUE_SOURCE",
+                    revenue_service_type="OTHER_SERVICE",evidence_complete=True,source_amount="700")
     def test_missing_tax_confirmation_blocks(self):
         with self.assertRaisesRegex(ValueError,"SOURCE_INCOMPLETE"):
             validate_posting(self.revenue,source_type="REVENUE_SOURCE",revenue_service_type="DINING_ORDER",
@@ -50,6 +61,18 @@ class OwnerLedgerPolicyTests(unittest.TestCase):
                {"account_code":"1300","side":"CREDIT","amount_kgs":"84.0000"}]
         self.assertEqual(validate_posting(lines,source_type="STOCK_CONSUMPTION",
                          evidence_complete=True,source_amount="84"),"84.0000")
+    def test_balanced_wrong_side_cannot_distort_profit(self):
+        for kind,dr,cr,pattern,service in (
+            ("OPERATING_EXPENSE","5200","2200","OPERATING_EXPENSE_PATTERN_INVALID",None),
+            ("STOCK_CONSUMPTION","5100","1300","COGS_PATTERN_INVALID",None),
+            ("REVENUE_SOURCE","1100","4200","REVENUE_DOUBLE_ENTRY_PATTERN_INVALID","DINING_ORDER"),
+        ):
+            with self.subTest(kind=kind),self.assertRaisesRegex(ValueError,pattern):
+                validate_posting([
+                    {"account_code":dr,"side":"DEBIT","amount_kgs":"90"},
+                    {"account_code":cr,"side":"DEBIT","amount_kgs":"10"},
+                    {"account_code":cr,"side":"CREDIT","amount_kgs":"100"},
+                ],source_type=kind,evidence_complete=True,source_amount="100",revenue_service_type=service)
     def test_incomplete_period_remains_null(self):
         r=posted_totals(self.revenue,completeness_verified=False)
         self.assertEqual(r["status"],"NOT_READY")

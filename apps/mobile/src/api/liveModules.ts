@@ -231,7 +231,20 @@ export interface OwnerAccrualReadiness {
     source_candidates_are_recognized:false;
   };
 }
+export interface OwnerLedgerCoverage {
+  scope:'PROPERTY_SCOPED_READ_ONLY_PERIOD_DIAGNOSTIC';
+  period:{from:string;to:string};
+  counts:Record<string,number>;
+  blockers:string[];
+  posted_ledger_subtotals:{
+    posting_line_count:number;revenue_kgs:string;expense_cogs_kgs:string;contribution_kgs:string;
+  };
+  period_completeness_verified:false;
+  recognized_profit_kgs:null;
+  currency:'KGS';
+}
 export interface FinanceSummary {
+  owner_ledger_period_coverage?:OwnerLedgerCoverage;
   owner_accrual_readiness_snapshot?:OwnerAccrualReadiness;
   kitchen_stock_cost?: {real_production_cost_kgs: string; sample_production_cost_kgs: string;
     movement_count: number; basis: 'EXPLICIT_STOCK_CONSUMPTION_NOT_PAYMENT_OR_PROFIT'};
