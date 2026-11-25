@@ -135,4 +135,23 @@ BEGIN
   END IF;
 END
 $test$;
+-- Migration 0022 additionally exposes only the selected hotel's cash to the admin reader.
+SELECT has_table_privilege('flex_platform_admin_reader','flex_refund_adjusted_invoice_balances','SELECT') AS flex_scoped_view_ready \gset
+\if :flex_scoped_view_ready
+SET LOCAL flex.authorized_hotel_id='00000000-0000-0000-0000-00000000000a';
+SET LOCAL ROLE flex_platform_admin_reader;
+DO $scope$
+BEGIN
+ IF (SELECT net_confirmed_cash FROM flex_refund_adjusted_invoice_balances WHERE hotel_id='00000000-0000-0000-0000-00000000000a') IS DISTINCT FROM 60.00 THEN
+  RAISE EXCEPTION 'FLEX_SCOPED_CASH_MISMATCH';
+ END IF;
+ IF (SELECT outstanding FROM flex_refund_adjusted_invoice_balances WHERE hotel_id='00000000-0000-0000-0000-00000000000a') IS DISTINCT FROM 40.00 THEN
+  RAISE EXCEPTION 'FLEX_SCOPED_DEBT_MISMATCH';
+ END IF;
+ IF EXISTS(SELECT 1 FROM flex_confirmed_payments WHERE hotel_id='00000000-0000-0000-0000-00000000000b') THEN
+  RAISE EXCEPTION 'FLEX_CROSS_HOTEL_CASH_EXPOSED';
+ END IF;
+END $scope$;
+RESET ROLE;
+\endif
 ROLLBACK;
