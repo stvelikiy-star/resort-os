@@ -459,6 +459,10 @@ async function catalogAdminPost(req,res,url) {
 }
 
 function routeAllowed(path, search) {
+  if(['/v1/platform/investment-projection','/v1/partner/me/investment-projection'].includes(path)){
+    const valid=search.size===4&&flexUuidRe.test(search.get('plan_id')||'')&&amountPattern.test(search.get('monthly_revenue')||'')&&/^20[0-9]{2}-[0-9]{2}-01$/.test(search.get('start_month')||'')&&/^(0|[1-9][0-9]{0,2})$/.test(search.get('elapsed_months')||'')&&Number(search.get('elapsed_months'))<=120;
+    return valid?(path.startsWith('/v1/platform/')?'catalog_admin':'partner'):null;
+  }
   if(path==='/v1/platform/investor-plans')return !search.size?'catalog_admin':null;
   if(path==='/v1/platform/agent-employment')return !search.size?'catalog_admin':null;
   if(path==='/v1/platform/agent-assignments')return search.size===1&&flexUuidRe.test(search.get('hotel_id')||'')?'catalog_admin':null;
