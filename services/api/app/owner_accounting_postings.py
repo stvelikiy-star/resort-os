@@ -39,6 +39,7 @@ class PostingAction(BaseModel):
 def posting_enabled():
     return (os.getenv("APP_ENV")=="staging"
             and os.getenv("MARINA_SHARED_AUTH_PREVIEW_ENABLED","false").lower()!="true"
+            and os.getenv("MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED","false").lower()=="true"
             and os.getenv("MARINA_ACCOUNTING_POSTING_ENABLED","false").lower()=="true")
 
 

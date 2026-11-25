@@ -7,7 +7,9 @@ from fastapi import HTTPException
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"services/api"))
 from app.owner_ledger_policy import validate_posting,posted_totals
-from app.owner_accounting_postings import posting_guard
+from app.owner_accounting_postings import PostingAction, posting_guard
+from pydantic import ValidationError
+from uuid import uuid4
 
 
 class OwnerLedgerPolicyTests(unittest.TestCase):
@@ -103,15 +105,31 @@ class OwnerLedgerPolicyTests(unittest.TestCase):
         for env,shared in (("production","false"),("staging","true")):
             with patch.dict(os.environ,{"APP_ENV":env,
                   "MARINA_ACCOUNTING_POSTING_ENABLED":"true",
-                  "MARINA_SHARED_AUTH_PREVIEW_ENABLED":shared}):
+                  "MARINA_SHARED_AUTH_PREVIEW_ENABLED":shared,
+                  "MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED":"true"}, clear=True):
                 with self.assertRaises(HTTPException) as ctx:
                     posting_guard()
                 self.assertEqual(ctx.exception.status_code,503)
 
+    def test_independent_decision_feature_required(self):
+        for flag in ("false", ""):
+            with patch.dict(os.environ, {"APP_ENV":"staging",
+                  "MARINA_ACCOUNTING_POSTING_ENABLED":"true",
+                  "MARINA_SHARED_AUTH_PREVIEW_ENABLED":"false",
+                  "MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED":flag}, clear=True):
+                with self.assertRaises(HTTPException) as ctx:
+                    posting_guard()
+                self.assertEqual(ctx.exception.status_code,503)
+
+    def test_whitespace_only_posting_reason_rejected(self):
+        with self.assertRaises(ValidationError):
+            PostingAction(id=uuid4(),reason="        ")
+
     def test_staging_requires_explicit_opt_in(self):
         with patch.dict(os.environ,{"APP_ENV":"staging",
               "MARINA_ACCOUNTING_POSTING_ENABLED":"true",
-              "MARINA_SHARED_AUTH_PREVIEW_ENABLED":"false"}):
+              "MARINA_SHARED_AUTH_PREVIEW_ENABLED":"false",
+              "MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED":"true"}, clear=True):
             self.assertIsNone(posting_guard())
 
     def test_hotel_revenue_cannot_be_posted_as_dining_and_vice_versa(self):
