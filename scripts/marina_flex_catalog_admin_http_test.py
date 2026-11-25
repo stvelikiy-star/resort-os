@@ -360,6 +360,40 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
 
 
 
+    def test_10_launch_offer_atomic_and_admin_only(self):
+        from concurrent.futures import ThreadPoolExecutor
+        path="/v1/platform/tariff-packages"
+        data={"hotel_id":HOTEL_A,"package_kind":"BUSINESS","title":"Launch offer",
+              "period_start":datetime.now(ZoneInfo("Asia/Bishkek")).date().isoformat(),
+              "skus":[],"commercial_policy_version":3,"discount_pct":"0",
+              "trial_days":5,"custom_monthly_price":None,"term_months":12,
+              "standard_term_discount":False,"include_implementation":True,"launch_offer":True}
+        self.assertEqual(self.post(path,data,"owner-a").status_code,403)
+        for bad in ({"term_months":6},{"standard_term_discount":True},{"discount_pct":"10"},
+                    {"package_kind":"CUSTOM"},{"skus":["MULTI_HOTEL"]}):
+            self.assertEqual(self.post(path,{**data,**bad}).status_code,422)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results=list(pool.map(lambda _:self.post(path,data),range(2)))
+        self.assertEqual(sorted(x.status_code for x in results),[201,409])
+        row=next(x.json() for x in results if x.status_code==201)
+        self.assertEqual(Decimal(row["subscription_term_total"]),Decimal("108000"))
+        self.assertEqual(Decimal(row["implementation_total"]),Decimal("25000"))
+        self.assertTrue(row["launch_offer_reserved"])
+        self.assertFalse(row["payments_enabled"])
+        self.assertFalse(row["subscription_activated"])
+        self.assertEqual(self.post(path,data).status_code,409)
+        premium=self.post(path,{**data,"hotel_id":HOTEL_B,"package_kind":"PREMIUM"})
+        self.assertEqual(premium.status_code,201,premium.text)
+        self.assertEqual(Decimal(premium.json()["subscription_term_total"]),Decimal("180000"))
+        self.assertNotEqual(row["launch_offer_slot"],premium.json()["launch_offer_slot"])
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_launch_offer_reservations"),2)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+            finally:await con.close()
+        asyncio.run(verify())
+
     def test_09_installation_trial_is_one_time_and_admin_only(self):
         path="/v1/platform/installation-trial"
         data={"hotel_id":HOTEL_A}
