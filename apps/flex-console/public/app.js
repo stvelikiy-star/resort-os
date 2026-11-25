@@ -682,9 +682,21 @@ function subscriptionLifecycleCell(x){
  const l=subscriptionLifecycleLabels(), trial=l[x.trial_state]||l.NOT_STARTED;
  return safe(l[x.customer_acceptance_state]||l.AWAITING_CUSTOMER)+'<br>'+safe(trial)+(x.trial_state==='ACTIVE'?' · '+safe(x.trial_days_remaining)+' '+safe(l.days):'')+'<br>'+safe(l.off);
 }
+function subscriptionFinanceLabels(){
+ return ({ru:{title:'Тестовый остаток',next:'Следующий период (проект)',pending:'Нужно подтверждение условий',newOffer:'Требуется новое предложение; продление не выполнено',creditWarning:'Есть незачтённая переплата и задолженность'},kg:{title:'Тесттик калдык',next:'Кийинки мөөнөт (долбоор)',pending:'Шарттарды ырастоо керек',newOffer:'Жаңы сунуш керек; мөөнөт узартылган жок',creditWarning:'Эсепке алынбаган ашыкча төлөм жана карыз бар'},en:{title:'Test balance',next:'Next term (proposal)',pending:'Terms acceptance required',newOffer:'New offer required; renewal not executed',creditWarning:'Unapplied credit and outstanding balance coexist'}})[state.lang];
+}
+function subscriptionFinanceCell(x){
+ const l=subscriptionFinanceLabels(),m=simulationLabels(),f=x.test_finance;
+ if(!f)return safe(l.pending);
+ return safe(m.debt)+': '+money(f.outstanding,'KGS')+'<br>'+safe(m.credit)+': '+money(f.credit,'KGS')+(f.unapplied_credit_with_debt?'<br>'+safe(l.creditWarning):'');
+}
+function subscriptionRenewalCell(x){
+ const l=subscriptionFinanceLabels(),r=x.renewal_preview;
+ return r?safe(r.period_start)+' — '+safe(r.period_end_exclusive)+'<br>'+safe(l.newOffer):'—';
+}
 async function subscriptionPlanPanel(){
  const l=approvalLabels(),rows=await api('/v1/platform/subscription-plans?hotel_id='+state.hotelId);
- return '<section class="panel"><h2>'+safe(l.plan)+'</h2>'+info(l.note,'info')+(rows.length?table([t('packageType'),t('skuVersion'),l.term,t('period'),t('total'),l.setup,t('status')],rows.map(x=>'<tr><td>'+safe(x.package_kind)+'</td><td>v'+safe(x.version)+'</td><td>'+safe(x.term_months)+'</td><td>'+safe(x.period_start)+' — '+safe(x.period_end_exclusive)+'</td><td>'+money(x.subscription_term_total,'KGS')+'</td><td>'+money(x.implementation_total,'KGS')+'</td><td>'+subscriptionLifecycleCell(x)+'</td></tr>')):empty(t('noData')))+'</section>';
+ return '<section class="panel"><h2>'+safe(l.plan)+'</h2>'+info(l.note,'info')+(rows.length?table([t('packageType'),t('skuVersion'),l.term,t('period'),t('total'),l.setup,t('status'),subscriptionFinanceLabels().title,subscriptionFinanceLabels().next],rows.map(x=>'<tr><td>'+safe(x.package_kind)+'</td><td>v'+safe(x.version)+'</td><td>'+safe(x.term_months)+'</td><td>'+safe(x.period_start)+' — '+safe(x.period_end_exclusive)+'</td><td>'+money(x.subscription_term_total,'KGS')+'</td><td>'+money(x.implementation_total,'KGS')+'</td><td>'+subscriptionLifecycleCell(x)+'</td><td>'+subscriptionFinanceCell(x)+'</td><td>'+subscriptionRenewalCell(x)+'</td></tr>')):empty(t('noData')))+'</section>';
 }
 async function agreementPanel(){
  const l=customerLabels(),id=state.hotelId;
