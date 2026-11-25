@@ -485,5 +485,62 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A,who="owner-b").status_code,403)
 
 
+    def test_12_customer_profile_contract_and_preview(self):
+        profile="/v1/platform/customer-profile"
+        agreement="/v1/platform/agreement-drafts"
+        preview="/v1/platform/invoice-previews"
+        data={"hotel_id":HOTEL_A,"expected_version":0,"contact_name":"Synthetic contact",
+              "contact_email":"qa@example.test","contact_phone":"+996000000000","responsible_name":"Synthetic responsible"}
+        self.assertEqual(self.get(profile+"?hotel_id="+HOTEL_A,who="owner-a").status_code,403)
+        self.assertEqual(self.post(profile,data,"owner-a").status_code,403)
+        self.assertEqual(self.post(profile,{**data,"contact_email":"bad"}).status_code,422)
+        made=self.post(profile,data)
+        self.assertEqual(made.status_code,201,made.text)
+        self.assertEqual(made.json()["version"],1)
+        self.assertEqual(self.post(profile,data).status_code,409)
+        updated=self.post(profile,{**data,"expected_version":1,"contact_name":"Updated synthetic"})
+        self.assertEqual(updated.status_code,201,updated.text)
+        history=self.get(profile+"?hotel_id="+HOTEL_A).json()
+        self.assertEqual([x["version"] for x in history["history"]],[2,1])
+        self.assertEqual(history["current"]["contact_name"],"Updated synthetic")
+        self.assertIsNone(self.get(profile+"?hotel_id="+HOTEL_B).json()["current"])
+        offers=self.get("/v1/platform/tariff-packages?hotel_id="+HOTEL_A).json()
+        offer=next(x for x in offers if x["commercial_policy_version"]==3 and Decimal(str(x["discount_pct"]))==40)
+        a={"hotel_id":HOTEL_A,"offer_id":offer["id"]}
+        self.assertEqual(self.post(agreement,a,"owner-a").status_code,403)
+        self.assertEqual(self.post(agreement,{**a,"hotel_id":HOTEL_B}).status_code,404)
+        self.assertEqual(self.post(agreement,{**a,"state":"SIGNED"}).status_code,422)
+        made=self.post(agreement,a)
+        self.assertEqual(made.status_code,201,made.text)
+        contract=made.json()
+        self.assertEqual(contract["state"],"DRAFT")
+        self.assertIsNone(contract["signed_at"])
+        self.assertEqual(contract["terms"]["source_offer_id"],offer["id"])
+        self.assertEqual(Decimal(contract["terms"]["subscription_term_total"]),Decimal("108000"))
+        self.assertEqual(self.post(agreement,a).json()["id"],contract["id"])
+        p={"hotel_id":HOTEL_A,"agreement_id":contract["id"]}
+        self.assertEqual(self.post(preview,{**p,"hotel_id":HOTEL_B}).status_code,404)
+        self.assertEqual(self.post(preview,{**p,"amount":1}).status_code,422)
+        made=self.post(preview,p)
+        self.assertEqual(made.status_code,201,made.text)
+        document=made.json()
+        self.assertEqual(document["status"],"NON_ISSUABLE")
+        self.assertEqual(document["tax_status"],"NOT_CALCULATED")
+        self.assertEqual(Decimal(str(document["amount_before_unresolved_taxes"])),Decimal("133000"))
+        self.assertEqual(self.post(preview,p).json()["id"],document["id"])
+        history=self.get(agreement+"?hotel_id="+HOTEL_A).json()
+        self.assertTrue(any(x["id"]==contract["id"] for x in history["agreements"]))
+        self.assertTrue(any(x["id"]==document["id"] for x in history["previews"]))
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscriptions"),2)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_commercial_agreement_versions WHERE source_offer_id=$1",uuid.UUID(offer["id"])),1)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_non_issuable_invoice_previews WHERE agreement_version_id=$1",uuid.UUID(contract["id"])),1)
+            finally: await con.close()
+        asyncio.run(verify())
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)
