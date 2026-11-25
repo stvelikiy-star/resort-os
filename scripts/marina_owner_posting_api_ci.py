@@ -236,6 +236,19 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
     check(coverage.status_code,200,"period coverage diagnostic")
     check(coverage.json()["period_completeness_verified"],False,"coverage cannot close period")
     check(coverage.json()["recognized_profit_kgs"],None,"coverage does not fabricate profit")
+    dates={"from_date":date.today().isoformat(),"to_date":date.today().isoformat()}
+    summary_url="/api/v1/admin/finance/summary"
+    enabled_summary=client.get(summary_url,params=dates)
+    check(enabled_summary.status_code,200,"owner summary with accounting enabled")
+    check(enabled_summary.json()["owner_ledger_period_coverage"],coverage.json(),"summary embeds same period coverage")
+    try:
+        os.environ["MARINA_ACCOUNTING_POSTING_ENABLED"]="false"
+        disabled_summary=client.get(summary_url,params=dates)
+        check(disabled_summary.status_code,200,"legacy finance summary remains available")
+        check("owner_ledger_period_coverage" in disabled_summary.json(),False,"no ledger when guard disabled")
+        check(client.get(base+"/period-coverage",params=dates).status_code,503,"direct API guard preserved")
+    finally:
+        os.environ["MARINA_ACCOUNTING_POSTING_ENABLED"]="true"
     check(coverage.json()["period"],{"from":date.today().isoformat(),"to":date.today().isoformat()},"coverage date range")
     for name in ("package_entitlement_count","package_portions_count","refund_payment_expected",
                  "refund_payment_verified","refund_undated_count"):

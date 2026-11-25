@@ -76,6 +76,7 @@ type FinanceResponse = {
   refunded_snapshot_all_time: { amount_kgs: number; payment_count: number };
   /** Present for OWNER only; never returned by Core to MANAGER. */
   /** Source-backed OWNER candidates, never booked or cash-paid amounts as revenue. */
+  owner_ledger_period_coverage?: LedgerCoverage;
   owner_accrual_readiness_snapshot?: {
     documented_source_corrections:{
       recorded_corrections_count:number;
@@ -297,17 +298,11 @@ export default function HotelFinanceBoard() {
       if (sequence !== loadSequence.current) return;
       const summary = body as FinanceResponse;
       setData(summary);
-      if (summary.owner_accrual_readiness_snapshot) {
-        // Optional, guarded OWNER-only QA ledger. Never substitute zero when unavailable.
-        const ledgerResponse = await fetch(`/core/api/v1/admin/finance/owner/accounting-journal/period-coverage?${params}`, { cache: "no-store" }).catch(() => null);
-        if (ledgerResponse?.ok && sequence === loadSequence.current) {
-          const result = await ledgerResponse.json().catch(() => null) as LedgerCoverage | null;
-          if (sequence === loadSequence.current && result?.scope === "PROPERTY_SCOPED_READ_ONLY_PERIOD_DIAGNOSTIC"
-            && result.period?.from === summary.range.from && result.period?.to === summary.range.to
-            && result.period_completeness_verified === false && result.recognized_profit_kgs === null
-            && result.posted_ledger_subtotals && result.counts) setLedger(result);
-        }
-      }
+      const result = summary.owner_ledger_period_coverage;
+      if (summary.owner_accrual_readiness_snapshot && result?.scope === "PROPERTY_SCOPED_READ_ONLY_PERIOD_DIAGNOSTIC"
+        && result.period?.from === summary.range.from && result.period?.to === summary.range.to
+        && result.period_completeness_verified === false && result.recognized_profit_kgs === null
+        && result.posted_ledger_subtotals && result.counts) setLedger(result);
     } catch (cause) {
       if (sequence === loadSequence.current) setError(cause instanceof Error ? cause.message : "Ошибка загрузки внутренних финансов");
     } finally {

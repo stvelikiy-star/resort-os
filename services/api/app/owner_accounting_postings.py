@@ -34,10 +34,14 @@ class PostingAction(BaseModel):
         return x
 
 
+def posting_enabled():
+    return (os.getenv("APP_ENV")=="staging"
+            and os.getenv("MARINA_SHARED_AUTH_PREVIEW_ENABLED","false").lower()!="true"
+            and os.getenv("MARINA_ACCOUNTING_POSTING_ENABLED","false").lower()=="true")
+
+
 def posting_guard():
-    if (os.getenv("APP_ENV")!="staging"
-            or os.getenv("MARINA_SHARED_AUTH_PREVIEW_ENABLED","false").lower()=="true"
-            or os.getenv("MARINA_ACCOUNTING_POSTING_ENABLED","false").lower()!="true"):
+    if not posting_enabled():
         raise HTTPException(503,detail={"code":"OWNER_ACCOUNTING_POSTING_DISABLED"})
 
 
