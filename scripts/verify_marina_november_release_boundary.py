@@ -49,6 +49,10 @@ APPROVED_NATIVE_QA_BLOBS = {
 }
 
 APPROVED_P0_BLOBS = {
+    # Preserve #497 public endpoint abuse protection; CI must verify isolated PostgreSQL.
+    "services/api/app/public_ai_admin.py": "7f8831aab2dea3788a7878d98181f8552c7fa809",
+    "scripts/verify_public_ai_rate_limit_e2e.py": "5a943a680a218dbbb8fc3b7c3aba5cf231f7ec9a",
+    ".github/workflows/public-ai-abuse-protection-ci.yml": "0d17491f1b69153ce3463d4338b2d232bbb12989",
     "packages/database/prisma/migrations/zz140_marina_owner_finance_property_calendar_20261126/migration.sql": "3ba75fd803e5ae982aaafd1d75e0110664b97f35",
     # Restored #553 regression coverage; exact test source only.
     "apps/mobile/__tests__/owner-expenses-refresh-i18n.test.tsx": "78de45d25fa0898ca345befd1993816ee63de759",

@@ -1,7 +1,8 @@
+import hashlib
+import ipaddress
 import json
 import os
-import time
-from collections import defaultdict, deque
+import uuid
 from datetime import date
 from typing import Any, Literal
 
@@ -9,7 +10,6 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
 
-from .auth import _client_ip
 from .main import check_availability, get_property_id
 
 router = APIRouter(prefix="/api/v1/public/ai-admin", tags=["public-ai-admin"])
@@ -23,9 +23,14 @@ OPENAI_PUBLIC_ASSISTANT_MODEL = (
 OPENAI_API_BASE_URL = os.environ.get("OPENAI_API_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 OPENAI_TIMEOUT_SECONDS = float(os.environ.get("OPENAI_TIMEOUT_SECONDS", "30"))
 AI_ADMIN_MAX_MESSAGES = int(os.environ.get("AI_ADMIN_MAX_MESSAGES", "12"))
-AI_ADMIN_RATE_LIMIT_PER_MINUTE = int(os.environ.get("AI_ADMIN_RATE_LIMIT_PER_MINUTE", "20"))
+AI_ADMIN_RATE_LIMIT_PER_MINUTE = max(1, int(os.environ.get("AI_ADMIN_RATE_LIMIT_PER_MINUTE", "20")))
+AI_ADMIN_DAILY_REQUEST_LIMIT = max(1, int(os.environ.get("AI_ADMIN_DAILY_REQUEST_LIMIT", "1000")))
+# No forwarded header is trusted unless the immediate TCP peer is explicitly trusted.
+# Default allows local loopback proxy only; configure the actual proxy subnet explicitly.
+AI_ADMIN_TRUSTED_PROXY_CIDRS = os.environ.get(
+    "AI_ADMIN_TRUSTED_PROXY_CIDRS", "127.0.0.1/32,::1/128"
+)
 
-_rate_windows: dict[str, deque[float]] = defaultdict(deque)
 
 
 class AssistantMessage(BaseModel):
@@ -62,26 +67,64 @@ class PublicAiAdminRequest(BaseModel):
 
 
 def _client_key(request: Request) -> str:
-    # Reuse Core auth's trusted-proxy policy; untrusted X-Forwarded-For is
-    # attacker-controlled and must never select a fresh AI rate-limit bucket.
-    # AUTH_TRUST_PROXY_HEADERS is safe only behind an enforced trusted proxy.
-    return _client_ip(request)
+    """Trust forwarding only for authenticated infrastructure topology, never raw caller input."""
+    from .auth import AUTH_TRUST_PROXY_HEADERS
+    direct = request.client.host if request.client and request.client.host else "unknown"
+    if not AUTH_TRUST_PROXY_HEADERS:
+        return direct
+    try:
+        peer = ipaddress.ip_address(direct)
+        networks = [ipaddress.ip_network(entry.strip(), strict=False)
+                    for entry in AI_ADMIN_TRUSTED_PROXY_CIDRS.split(",") if entry.strip()]
+        if not any(peer in network for network in networks):
+            return direct
+        candidate = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
+        return str(ipaddress.ip_address(candidate)) if candidate else direct
+    except ValueError:
+        return direct
 
 
-def _enforce_rate_limit(request: Request) -> None:
-    if AI_ADMIN_RATE_LIMIT_PER_MINUTE <= 0:
-        return
-    now = time.monotonic()
-    window = _rate_windows[_client_key(request)]
-    while window and now - window[0] >= 60:
-        window.popleft()
-    if len(window) >= AI_ADMIN_RATE_LIMIT_PER_MINUTE:
-        raise HTTPException(status_code=429, detail="AI administrator rate limit exceeded")
-    window.append(now)
-    if len(_rate_windows) > 5000:
-        stale = [key for key, values in _rate_windows.items() if not values or now - values[-1] >= 300]
-        for key in stale[:1000]:
-            _rate_windows.pop(key, None)
+async def _enforce_rate_limit(request: Request) -> None:
+    """Cross-worker atomic PostgreSQL limit; no OpenAI call after a denied request."""
+    client_hash = hashlib.sha256(_client_key(request).encode("utf8")).hexdigest()
+    async with request.app.state.db.acquire() as conn:
+        pid = await get_property_id(conn)
+        async with conn.transaction():
+            # PostgreSQL transaction advisory locks coordinate every API replica. Daily is
+            # taken first to serialize the global budget before each per-IP check.
+            await conn.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                f"PUBLIC_AI_DAY:{pid}"
+            )
+            await conn.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                f"PUBLIC_AI_IP:{pid}:{client_hash}"
+            )
+            minute = await conn.fetchval(
+                '''SELECT COUNT(*)::int FROM audit_logs
+                   WHERE "propertyId"=$1 AND action='PUBLIC_AI_REQUEST'
+                     AND resource='PublicAiThrottle' AND "resourceId"=$2
+                     AND "createdAt" > (now() AT TIME ZONE 'UTC') - interval '60 seconds' ''',
+                pid, client_hash
+            )
+            daily = await conn.fetchval(
+                '''SELECT COUNT(*)::int FROM audit_logs
+                   WHERE "propertyId"=$1 AND action='PUBLIC_AI_REQUEST'
+                     AND resource='PublicAiThrottle'
+                     AND "createdAt" >= date_trunc('day',now() AT TIME ZONE 'UTC')''',
+                pid
+            )
+            if minute >= AI_ADMIN_RATE_LIMIT_PER_MINUTE or daily >= AI_ADMIN_DAILY_REQUEST_LIMIT:
+                raise HTTPException(status_code=429, detail="AI administrator rate limit exceeded")
+            # A request consumes quota before contacting OpenAI. Errors are not refunded:
+            # otherwise a failing upstream could enable repeated abusive paid requests.
+            await conn.execute(
+                '''INSERT INTO audit_logs
+                   (id,"propertyId","actorType","actorId",action,resource,"resourceId",source,result,"createdAt")
+                   VALUES ($1,$2,'SYSTEM',NULL,'PUBLIC_AI_REQUEST','PublicAiThrottle',
+                           $3,'PUBLIC_AI_RATE_LIMIT','ACCEPTED',now() AT TIME ZONE 'UTC')''',
+                uuid.uuid4(), pid, client_hash
+            )
 
 
 def _extract_response_text(payload: dict[str, Any]) -> str | None:
@@ -228,7 +271,7 @@ async def public_ai_admin_capabilities():
 
 @router.post("/chat")
 async def public_ai_admin_chat(payload: PublicAiAdminRequest, request: Request):
-    _enforce_rate_limit(request)
+    await _enforce_rate_limit(request)
     availability_raw = None
     if payload.search:
         availability_raw = await check_availability(
