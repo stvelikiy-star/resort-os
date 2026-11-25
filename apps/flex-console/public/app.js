@@ -722,6 +722,27 @@ async function subscriptionPlanPanel(){
  const l=approvalLabels(),rows=await api('/v1/platform/subscription-plans?hotel_id='+state.hotelId);
  return '<section class="panel"><h2>'+safe(l.plan)+'</h2>'+info(l.note,'info')+(rows.length?table([t('packageType'),t('skuVersion'),l.term,t('period'),t('total'),l.setup,t('status'),subscriptionFinanceLabels().title,subscriptionFinanceLabels().next],rows.map(x=>'<tr><td>'+safe(x.package_kind)+'</td><td>v'+safe(x.version)+'</td><td>'+safe(x.term_months)+'</td><td>'+safe(x.period_start)+' — '+safe(x.period_end_exclusive)+'</td><td>'+money(x.subscription_term_total,'KGS')+'</td><td>'+money(x.implementation_total,'KGS')+'</td><td>'+subscriptionLifecycleCell(x)+'</td><td>'+subscriptionFinanceCell(x)+'</td><td>'+subscriptionRenewalCell(x)+'</td></tr>')):empty(t('noData')))+'</section>';
 }
+function invoiceDocumentLabels(){
+ return ({ru:{download:'Скачать предварительный счёт',title:'ПРЕДВАРИТЕЛЬНЫЙ СЧЁТ · QA',warning:'Не является счётом к оплате или фискальным документом. Налоги не рассчитаны. Не оплачивать.',reference:'Идентификатор документа',agreement:'Версия договора',modules:'Модули по зафиксированному предложению',monthly:'Цена модуля в месяц до скидки',subscription:'Подписка за период',implementation:'Внедрение',digest:'Контрольная сумма условий',currency:'Валюта',hotel:'ID гостиницы',created:'Создан',error:'Предварительный счёт недоступен или не соответствует условиям.'},kg:{download:'Алдын ала эсепти жүктөө',title:'АЛДЫН АЛА ЭСЕП · QA',warning:'Бул төлөнүүчү эсеп же фискалдык документ эмес. Салыктар эсептелген жок. Төлөбөңүз.',reference:'Документтин ID',agreement:'Келишимдин версиясы',modules:'Бекитилген сунуштагы модулдар',monthly:'Арзандатууга чейинки айлык баа',subscription:'Мөөнөт үчүн жазылуу',implementation:'Орнотуу',digest:'Шарттардын текшерүү суммасы',currency:'Валюта',hotel:'Мейманкананын ID',created:'Түзүлгөн',error:'Алдын ала эсеп жеткиликсиз же шарттарга туура келбейт.'},en:{download:'Download invoice preview',title:'INVOICE PREVIEW · QA',warning:'Not payable and not a fiscal document. Taxes not calculated. Do not pay.',reference:'Document ID',agreement:'Agreement version',modules:'Modules from immutable offer',monthly:'Monthly module price before discount',subscription:'Subscription term',implementation:'Implementation',digest:'Terms digest',currency:'Currency',hotel:'Hotel ID',created:'Created',error:'Invoice preview unavailable or inconsistent with terms.'}})[state.lang];
+}
+async function downloadInvoicePreview(button){
+ const hotel=state.hotelId,id=button.dataset.invoicePreview,l=invoiceDocumentLabels();
+ button.disabled=true;
+ try{
+  const r=await api('/v1/platform/agreement-drafts?hotel_id='+hotel);
+  if(state.hotelId!==hotel)return;
+  const p=r.previews.find(x=>x.id===id&&x.hotel_id===hotel&&x.status==='NON_ISSUABLE');
+  const a=p&&r.agreements.find(x=>x.id===p.agreement_version_id&&x.hotel_id===hotel&&x.terms_digest===p.quote_sha256);
+  if(!a||!a.terms||a.terms.currency!=='KGS'||p.currency!=='KGS')throw Error(l.error);
+  const terms=a.terms,lang=state.lang;
+  const row=(label,value)=>'<tr><th>'+safe(label)+'</th><td>'+safe(value)+'</td></tr>';
+  const amount=value=>String(value)+' KGS';
+  const content='<!doctype html><html lang="'+safe(lang==='kg'?'ky':lang)+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+safe(l.title)+'</title><style>body{font:15px system-ui,sans-serif;color:#14213d;max-width:800px;margin:40px auto;padding:24px}h1{font-size:24px}table{width:100%;border-collapse:collapse;margin:16px 0}th,td{text-align:left;border-bottom:1px solid #ddd;padding:10px;overflow-wrap:anywhere}.warning{background:#fff2d0;border:1px solid #b58a25;padding:14px;font-weight:bold}.total{font-size:22px;font-weight:bold}@media print{body{margin:0;padding:0}}</style></head><body><header><strong>MARINA SMART FLEX</strong><h1>'+safe(l.title)+'</h1></header><p class="warning">'+safe(l.warning)+'</p><table>'+row(l.reference,p.id)+row(l.hotel,hotel)+row(l.agreement,'v'+a.version)+row(t('packageType'),terms.package_kind)+row(t('period'),p.period_start+' — '+p.period_end)+row(l.created,p.created_at)+row(l.currency,p.currency)+'</table><h2>'+safe(l.modules)+'</h2><table><thead><tr><th>'+safe(t('sku'))+'</th><th>'+safe(l.monthly)+'</th></tr></thead><tbody>'+(terms.items||[]).map(x=>row(x.sku,amount(x.monthly_price))).join('')+'</tbody></table><table>'+row(t('packageDiscount'),String(terms.discount_pct)+'%')+row(l.subscription,amount(terms.subscription_term_total))+row(l.implementation,amount(terms.implementation_total))+'</table><p class="total">'+safe(t('total'))+': '+safe(amount(p.amount_before_unresolved_taxes))+'</p><p>'+safe(l.digest)+': '+safe(p.quote_sha256)+'</p><p class="warning">'+safe(l.warning)+'</p></body></html>';
+  const url=URL.createObjectURL(new Blob([content],{type:'text/html;charset=utf-8'}));
+  const link=document.createElement('a');link.href=url;link.download='FLEX-QA-invoice-preview-'+p.id+'.html';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+ }catch(e){main.insertAdjacentHTML('afterbegin',info(e.message,'error'));}
+ finally{button.disabled=false;}
+}
 async function agreementPanel(){
  const l=customerLabels(),id=state.hotelId;
  const [r,offers]=await Promise.all([api('/v1/platform/agreement-drafts?hotel_id='+id),api('/v1/platform/tariff-packages?hotel_id='+id)]);
@@ -729,7 +750,7 @@ async function agreementPanel(){
  return '<section class="panel"><h2>'+safe(l.agreements)+'</h2>'+info(l.note,'info')+
  (usable.length?'<form id="agreement-draft-form" class="admin-form"><label>'+safe(l.offer)+'<select name="offer_id">'+usable.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.package_kind)+' · v'+safe(x.version)+' · '+money(x.subscription_term_total,'KGS')+'</option>').join('')+'</select></label><button type="submit" class="primary">'+safe(l.draft)+'</button><div role="status" aria-live="polite"></div></form>':'')+
  (r.agreements.length?table([t('skuVersion'),t('packageType'),t('status'),t('total'),t('actions')],r.agreements.map(a=>'<tr><td>'+safe(a.version)+'</td><td>'+safe(a.terms?.package_kind||'—')+'</td><td>'+safe(a.state)+agreementApprovalForm(a,r.approvals||[])+((r.acceptances||[]).some(x=>x.agreement_id===a.id)?'<p>'+safe(customerAcceptanceLabels().accepted)+'</p>':'')+'</td><td>'+money(a.terms?.subscription_term_total||0,'KGS')+'</td><td>'+(a.state==='DRAFT'&&a.source_offer_id&&!r.previews.some(p=>p.agreement_version_id===a.id)?'<form class="invoice-preview-form"><input type="hidden" name="agreement_id" value="'+safe(a.id)+'"><button type="submit" class="outline">'+safe(l.preview)+'</button><div role="status"></div></form>':'—')+'</td></tr>')):empty(t('noData')))+
- '<h3>'+safe(l.previews)+'</h3>'+(r.previews.length?table([t('period'),t('total'),t('status')],r.previews.map(x=>'<tr><td>'+safe(x.period_start)+' — '+safe(x.period_end)+'</td><td>'+money(x.amount_before_unresolved_taxes,'KGS')+'</td><td>'+safe(x.status)+'</td></tr>')):empty(t('noData')))+'</section>';
+ '<h3>'+safe(l.previews)+'</h3>'+(r.previews.length?table([t('period'),t('total'),t('status'),t('actions')],r.previews.map(x=>'<tr><td>'+safe(x.period_start)+' — '+safe(x.period_end)+'</td><td>'+money(x.amount_before_unresolved_taxes,'KGS')+'</td><td>'+safe(x.status)+'</td><td><button class="outline" type="button" data-invoice-preview="'+safe(x.id)+'">'+safe(invoiceDocumentLabels().download)+'</button></td></tr>')):empty(t('noData')))+'</section>';
 }
 async function submitCustomerOperation(form,kind){
  const d=new FormData(form),button=form.querySelector('button[type=submit]'),status=form.querySelector('[role=status]');
@@ -939,6 +960,7 @@ async function start(){
 nav.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b){state.view=b.dataset.view;state.hotelId=null;state.search='';render();}});
 main.addEventListener('click',e=>{
  const b=e.target.closest('button');if(!b)return;
+ if(b.hasAttribute('data-invoice-preview')){downloadInvoicePreview(b);return;}
  if(b.hasAttribute('data-renewal-plan')){prepareRenewalOffer(b);return;}
  if(b.hasAttribute('data-journal-append')){appendSyntheticJournal(b);return;}
  if(b.dataset.view){const target=b.dataset.view;if(!['hotel','hotel-link','subscription-draft','subscription'].includes(target))state.hotelId=null;state.view=target;render();}
