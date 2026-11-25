@@ -1,0 +1,55 @@
+{
+  "currency": "KGS",
+  "agent": {
+    "monthly_salary": 10000,
+    "hotel_connection_once": 7000,
+    "paid_addon_per_month": 500,
+    "monthly_hotel_target": 7,
+    "flexible_schedule": true,
+    "accrue_only_during_employment": true,
+    "preserve_earned_unpaid": true,
+    "unresolved": [
+      "bundle included module commission eligibility",
+      "partial month salary",
+      "refund corrections"
+    ]
+  },
+  "investor": {
+    "packages": {
+      "START": {
+        "principal": 150000,
+        "rate_bps": 2500
+      },
+      "BUSINESS": {
+        "principal": 250000,
+        "rate_bps": 3500
+      },
+      "STRATEGIC": {
+        "principal": 400000,
+        "rate_bps": 5000
+      }
+    },
+    "exclusive_hotel_assignment": true,
+    "annual_prepayment_recognition_months": 12,
+    "principal_recovery_capped": true,
+    "bonus_full_calendar_months": 3,
+    "principal_recovery_basis": "ACTUAL_PAYOUTS",
+    "eligible": "PAID_SUBSCRIPTION_NET_OF_REFUNDS",
+    "excluded": [
+      "IMPLEMENTATION",
+      "EQUIPMENT",
+      "ONE_TIME_SERVICES",
+      "UNPAID_INVOICES"
+    ],
+    "unresolved": [
+      "additional module eligibility",
+      "refunds after principal recovery"
+    ]
+  },
+  "partner": {
+    "terms": "INDIVIDUAL_CONTRACT",
+    "region": true,
+    "hotel_assignment": true,
+    "rate_configurable": true
+  }
+}

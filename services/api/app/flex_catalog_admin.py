@@ -12,6 +12,7 @@ from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from decimal import Decimal, ROUND_HALF_UP
 import json
+from calendar import monthrange
 import os
 import re
 import uuid
@@ -152,7 +153,11 @@ class NewTariffPackageProposal(BaseModel):
     package_kind: str
     title: str = Field(min_length=2, max_length=120)
     period_start: date
-    skus: list[str] = Field(min_length=1, max_length=50)
+    skus: list[str] = Field(max_length=50)
+    commercial_policy_version: int | None = Field(default=None, strict=True, ge=1)
+    term_months: int | None = Field(default=None, strict=True)
+    include_implementation: bool = Field(default=False, strict=True)
+    standard_term_discount: bool = Field(default=False, strict=True)
     discount_pct: str = "0"
     trial_days: int = Field(default=0, ge=0, le=90)
     source_template_id: uuid.UUID | None = None
@@ -190,6 +195,16 @@ class NewTariffPackageProposal(BaseModel):
 
 
 def ensure_package_proposal(payload: NewTariffPackageProposal) -> None:
+    if payload.term_months is not None and payload.term_months not in {1,3,6,12}:
+        raise HTTPException(422, detail="Unsupported subscription term")
+    if payload.commercial_policy_version is None and (payload.term_months is not None or payload.include_implementation or payload.standard_term_discount):
+        raise HTTPException(422, detail="Commercial policy required")
+    if payload.standard_term_discount and (Decimal(payload.discount_pct)!=0 or payload.custom_monthly_price is not None):
+        raise HTTPException(422, detail="Choose standard term discount or individual terms")
+    if payload.commercial_policy_version is None and not payload.skus:
+        raise HTTPException(422, detail="Select at least one legacy SKU")
+    if payload.commercial_policy_version is not None and payload.source_template_id is not None:
+        raise HTTPException(422, detail="Legacy template cannot override commercial package")
     today = datetime.now(ZoneInfo("Asia/Bishkek")).date()
     if not (today-timedelta(days=1) <= payload.period_start <= today+timedelta(days=366)):
         raise HTTPException(422, detail="Package start date out of range")
@@ -247,6 +262,93 @@ async def commercial_policy(
             return {"version": row["version"], "policy": policy,
                     "created_at": row["created_at"].isoformat()}
 
+
+
+class CommercialPriceChange(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_version: int = Field(strict=True, ge=1, le=2147483646)
+    price_kind: str
+    code: str
+    monthly_price: str
+
+    @field_validator("monthly_price")
+    @classmethod
+    def validate_amount(cls, value: str) -> str:
+        if not DECIMAL_RE.fullmatch(value) or Decimal(value) <= 0:
+            raise ValueError("Positive KGS amount required")
+        return value
+
+
+@app.post("/v1/platform/commercial-policy", status_code=201)
+async def change_commercial_price(
+    payload: CommercialPriceChange, request: Request,
+    principal: PlatformPrincipal = Depends(resolve_platform_principal),
+):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn, principal)
+            await conn.execute("SELECT pg_advisory_xact_lock(hashtext('flex_commercial_policy_revision'))")
+            row = await conn.fetchrow(
+                "SELECT version,policy FROM flex_commercial_policy_versions ORDER BY version DESC LIMIT 1"
+            )
+            if row is None or row["version"] != payload.expected_version:
+                raise HTTPException(409, detail="Commercial policy version changed; reload")
+            policy = json.loads(row["policy"]) if isinstance(row["policy"], str) else row["policy"]
+            amount = format(Decimal(payload.monthly_price), ".2f")
+            if payload.price_kind == "PACKAGE" and payload.code in {"BASE","BUSINESS","PREMIUM"}:
+                policy["monthly_packages"][payload.code]["price"] = amount
+                if payload.code == "BASE":
+                    policy["monthly_packages"]["CUSTOM"]["minimum"] = amount
+                    policy["monthly_packages"]["CUSTOM"]["base_price"] = amount
+            elif payload.price_kind == "MODULE" and payload.code in policy["module_monthly_prices"]:
+                policy["module_monthly_prices"][payload.code] = amount
+            else:
+                raise HTTPException(422, detail="Unknown commercial price code")
+            version = row["version"] + 1
+            await conn.execute(
+                "INSERT INTO flex_commercial_policy_versions(version,policy,created_by) VALUES($1,$2::jsonb,$3)",
+                version, json.dumps(policy), principal.subject_id
+            )
+            return {"version": version, "policy": policy, "entitlement_changed": False,
+                    "payment_collected": False}
+
+
+class InstallationConfirmation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    hotel_id: uuid.UUID
+
+
+@app.get("/v1/platform/installation-trial")
+async def installation_trial(request: Request, hotel_id: uuid.UUID = Query(...),
+    principal: PlatformPrincipal = Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn, principal)
+            row = await conn.fetchrow(
+                "SELECT hotel_id,completed_at,trial_start,trial_end_exclusive FROM flex_installation_completions WHERE hotel_id=$1",hotel_id)
+            return dict(row) if row else None
+
+
+@app.post("/v1/platform/installation-trial", status_code=201)
+async def confirm_installation(payload: InstallationConfirmation, request: Request,
+    principal: PlatformPrincipal = Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn, principal)
+            await conn.execute("SELECT pg_advisory_xact_lock(hashtextextended($1,0))","FLEX_INSTALL_"+str(payload.hotel_id))
+            hotel=await conn.fetchval("SELECT status FROM flex_hotels WHERE id=$1",payload.hotel_id)
+            if hotel not in {"PENDING","ACTIVE"}:
+                raise HTTPException(404,detail="Commercial hotel unavailable")
+            await conn.execute(
+                "INSERT INTO flex_installation_completions(hotel_id,completed_by,trial_start,trial_end_exclusive) "
+                "VALUES($1,$2,(now() AT TIME ZONE 'Asia/Bishkek')::date,(now() AT TIME ZONE 'Asia/Bishkek')::date+5) "
+                "ON CONFLICT(hotel_id) DO NOTHING",payload.hotel_id,principal.subject_id)
+            row=await conn.fetchrow(
+                "SELECT hotel_id,completed_at,trial_start,trial_end_exclusive FROM flex_installation_completions WHERE hotel_id=$1",payload.hotel_id)
+            return {**dict(row),"entitlement_changed":False,"payment_collected":False}
 
 @app.get("/v1/platform/catalog")
 async def catalog(
@@ -439,7 +541,7 @@ async def tariff_packages(
             rows = await conn.fetch(
                 "SELECT id,hotel_id,package_kind,version,title,sku_snapshot,source_template_id,"
                 "list_monthly_total,discount_pct,trial_days,custom_monthly_price,"
-                "proposed_monthly_total,state,enforcement,currency,created_at "
+                "proposed_monthly_total,state,enforcement,currency,created_at,commercial_policy_version,term_months,period_start,period_end_exclusive,subscription_term_total,implementation_total "
                 "FROM flex_tariff_package_versions WHERE hotel_id=$1 "
                 "ORDER BY created_at DESC,id DESC LIMIT 100",
                 hotel_id,
@@ -450,6 +552,10 @@ async def tariff_packages(
                     "package_kind":r["package_kind"], "version":r["version"],
                     "source_template_id":r["source_template_id"],
                     "title":r["title"],
+                    "commercial_policy_version":r["commercial_policy_version"],"term_months":r["term_months"],
+                    "period_start":r["period_start"],"period_end_exclusive":r["period_end_exclusive"],
+                    "subscription_term_total":str(r["subscription_term_total"]) if r["subscription_term_total"] is not None else None,
+                    "implementation_total":str(r["implementation_total"]) if r["implementation_total"] is not None else None,
                     "items":json.loads(r["sku_snapshot"]) if isinstance(r["sku_snapshot"],str) else r["sku_snapshot"],
                     "list_monthly_total":str(r["list_monthly_total"]),
                     "discount_pct":str(r["discount_pct"]),
@@ -489,35 +595,70 @@ async def create_tariff_package_proposal(
                 )
                 if hotel not in {"PENDING","ACTIVE"}:
                     raise HTTPException(404, detail="Commercial hotel unavailable")
-                rows = await conn.fetch(
-                    "SELECT s.sku,p.id AS price_id,p.version,p.monthly_price,p.currency "
-                    "FROM flex_skus s JOIN LATERAL ( "
-                    "SELECT id,version,monthly_price,currency FROM flex_price_versions "
-                    "WHERE sku=s.sku AND valid_from<=($2::date::timestamp AT TIME ZONE 'Asia/Bishkek') "
-                    "AND (valid_to IS NULL OR valid_to>($2::date::timestamp AT TIME ZONE 'Asia/Bishkek')) "
-                    "ORDER BY valid_from DESC,version DESC LIMIT 1 "
-                    ") p ON true WHERE s.sku=ANY($1::text[]) "
-                    "AND s.product_status='AVAILABLE' AND s.is_core=false AND p.currency='KGS' "
-                    "ORDER BY s.sku",
-                    payload.skus,payload.period_start,
-                )
-                if len(rows)!=len(payload.skus):
-                    raise HTTPException(
-                        422, detail="Only published non-core SKU prices effective on start date"
+                if payload.commercial_policy_version is not None:
+                    policy_row = await conn.fetchrow(
+                        "SELECT version,policy FROM flex_commercial_policy_versions ORDER BY version DESC LIMIT 1"
                     )
-                items=[
-                    {"sku":r["sku"],"price_version_id":str(r["price_id"]),
-                     "price_version":r["version"],"monthly_price":str(r["monthly_price"]),
-                     "currency":"KGS"} for r in rows
-                ]
-                list_total=sum((r["monthly_price"] for r in rows),Decimal("0.00"))
+                    if not policy_row or policy_row["version"] != payload.commercial_policy_version:
+                        raise HTTPException(409, detail="Commercial policy version changed; reload")
+                    policy = json.loads(policy_row["policy"]) if isinstance(policy_row["policy"],str) else policy_row["policy"]
+                    package = policy["monthly_packages"][payload.package_kind]
+                    prices = policy["module_monthly_prices"]
+                    included = set(package["modules"])
+                    selected = set(payload.skus)
+                    if not selected.issubset(prices):
+                        raise HTTPException(422, detail="Unknown commercial module")
+                    base = Decimal(str(package.get("price",package.get("base_price"))))
+                    extra = selected - included
+                    list_total = base + sum((Decimal(str(prices[k])) for k in extra),Decimal("0"))
+                    if payload.custom_monthly_price is not None and Decimal(payload.custom_monthly_price) < base:
+                        raise HTTPException(422, detail="CUSTOM price below mandatory base")
+                    items = [{"sku":"BASE_PMS","monthly_price":str(base),"currency":"KGS",
+                              "commercial_policy_version":policy_row["version"],"pricing_source":"COMMERCIAL_PACKAGE"}]
+                    items.extend({"sku":k,"monthly_price":str(Decimal("0") if k in included else Decimal(str(prices[k]))),
+                                  "currency":"KGS","commercial_policy_version":policy_row["version"],
+                                  "included_in_package":k in included} for k in sorted(included | selected))
+                else:
+                    rows = await conn.fetch(
+                        "SELECT s.sku,p.id AS price_id,p.version,p.monthly_price,p.currency "
+                        "FROM flex_skus s JOIN LATERAL ( "
+                        "SELECT id,version,monthly_price,currency FROM flex_price_versions "
+                        "WHERE sku=s.sku AND valid_from<=($2::date::timestamp AT TIME ZONE 'Asia/Bishkek') "
+                        "AND (valid_to IS NULL OR valid_to>($2::date::timestamp AT TIME ZONE 'Asia/Bishkek')) "
+                        "ORDER BY valid_from DESC,version DESC LIMIT 1 "
+                        ") p ON true WHERE s.sku=ANY($1::text[]) "
+                        "AND s.product_status='AVAILABLE' AND s.is_core=false AND p.currency='KGS' "
+                        "ORDER BY s.sku",
+                        payload.skus,payload.period_start,
+                    )
+                    if len(rows)!=len(payload.skus):
+                        raise HTTPException(
+                            422, detail="Only published non-core SKU prices effective on start date"
+                        )
+                    items=[
+                        {"sku":r["sku"],"price_version_id":str(r["price_id"]),
+                         "price_version":r["version"],"monthly_price":str(r["monthly_price"]),
+                         "currency":"KGS"} for r in rows
+                    ]
+                    list_total=sum((r["monthly_price"] for r in rows),Decimal("0.00"))
                 discount=Decimal(payload.discount_pct)
+                months = start = end = term_total = implementation = None
+                if payload.commercial_policy_version is not None:
+                    months = payload.term_months or 1
+                    start = payload.period_start
+                    year, month = divmod(start.year*12+start.month-1+months,12)
+                    end = date(year,month+1,min(start.day,monthrange(year,month+1)[1]))
+                    if payload.standard_term_discount:
+                        discount = Decimal(str(policy["term_discounts_pct"][str(months)]))
+                    implementation = Decimal(str(policy["implementation_fee"])) if payload.include_implementation else Decimal("0")
                 custom=(Decimal(payload.custom_monthly_price)
                         if payload.custom_monthly_price is not None else None)
                 total=(custom if custom is not None else
                        list_total*(Decimal(100)-discount)/Decimal(100)).quantize(
                            Decimal("0.01"),rounding=ROUND_HALF_UP
                        )
+                if months is not None:
+                    term_total = ((custom if custom is not None else list_total*(Decimal(100)-discount)/Decimal(100))*months).quantize(Decimal("0.01"),rounding=ROUND_HALF_UP)
                 previous=await conn.fetchval(
                     "SELECT coalesce(max(version),0) FROM flex_tariff_package_versions "
                     "WHERE hotel_id=$1 AND package_kind=$2",
@@ -528,18 +669,21 @@ async def create_tariff_package_proposal(
                     "INSERT INTO flex_tariff_package_versions("
                     "hotel_id,package_kind,version,title,sku_snapshot,"
                     "list_monthly_total,discount_pct,trial_days,custom_monthly_price,"
-                    "proposed_monthly_total,created_by,source_template_id) "
-                    "VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12) "
+                     "proposed_monthly_total,created_by,source_template_id,commercial_policy_version,term_months,period_start,period_end_exclusive,subscription_term_total,implementation_total) "
+                    "VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) "
                     "RETURNING id,created_at",
                     payload.hotel_id,payload.package_kind,version,payload.title,
                     json.dumps(items),list_total,discount,payload.trial_days,
-                    custom,total,principal.subject_id,payload.source_template_id,
+                    custom,total,principal.subject_id,payload.source_template_id,payload.commercial_policy_version,months,start,end,term_total,implementation,
                 )
                 return {
                     "id":str(row["id"]),"hotel_id":str(payload.hotel_id),
                     "package_kind":payload.package_kind,"version":version,
                     "source_template_id":payload.source_template_id,
                     "items":items,"list_monthly_total":str(list_total),
+                    "term_months":months,"period_start":start,"period_end_exclusive":end,
+                    "subscription_term_total":str(term_total) if term_total is not None else None,
+                    "implementation_total":str(implementation) if implementation is not None else None,
                     "discount_pct":str(discount),"trial_days":payload.trial_days,
                     "custom_monthly_price":str(custom) if custom is not None else None,
                     "proposed_monthly_total":str(total),"currency":"KGS",

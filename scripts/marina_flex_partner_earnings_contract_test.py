@@ -13,7 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"services"/"api"))
 from app.flex_partner_earnings import (
     CashAllocationEvidence, EarningsRule, EarningsEntry,
     InvestorRepaymentSnapshot, calculate_earnings_proposal,
-    investor_phase, summarize_earnings,
+    investor_phase, summarize_earnings, quote_agent_month,
+    investor_full_calendar_bonus_window, investor_principal_accrual, allocate_annual_subscription,
 )
 
 HOTEL_A="00000000-0000-0000-0000-00000000000a"
@@ -178,6 +179,39 @@ class PeriodicEarningsDashboard(unittest.TestCase):
                 (EarningsEntry(datetime(2026,11,22,10),positive_accrual=Decimal("1")),),
                 start=date(2026,11,22),end=date(2026,11,22),
             )
+
+
+
+class ApprovedCommercialTerms(unittest.TestCase):
+    def test_agent_fixed_compensation_and_termination(self):
+        q = quote_agent_month(employed_full_month=True,
+            new_paid_hotel_ids=(HOTEL_A, HOTEL_B),
+            paid_addon_keys=((HOTEL_A,"QR_ZONE"),(HOTEL_B,"QR_ZONE")))
+        self.assertEqual(q.total, Decimal("25000"))
+        self.assertEqual(q.sales_target, 7)
+        self.assertEqual(quote_agent_month(employed_full_month=False,
+            new_paid_hotel_ids=(), paid_addon_keys=()).total, Decimal(0))
+        with self.assertRaises(ValueError):
+            quote_agent_month(employed_full_month=False,
+                new_paid_hotel_ids=(HOTEL_A,), paid_addon_keys=())
+        with self.assertRaises(ValueError):
+            quote_agent_month(employed_full_month=True,
+                new_paid_hotel_ids=(HOTEL_A,HOTEL_A), paid_addon_keys=())
+
+    def test_investor_full_months_and_principal_cap(self):
+        self.assertEqual(investor_full_calendar_bonus_window(date(2026,11,25)),
+            (date(2026,12,1),date(2027,3,1)))
+        self.assertEqual(investor_principal_accrual(
+            eligible_subscription=Decimal("200000"), rate_bps=3500,
+            original_principal=Decimal("250000"), principal_paid=Decimal("210000"),
+            principal_unpaid_accrued=Decimal("10000")), Decimal("30000"))
+
+    def test_annual_payment_exact_reconciliation(self):
+        shares = allocate_annual_subscription(Decimal("108000.01"))
+        self.assertEqual(len(shares),12)
+        self.assertEqual(sum(shares),Decimal("108000.01"))
+        self.assertEqual(shares[0],Decimal("9000.01"))
+        self.assertEqual(shares[-1],Decimal("9000"))
 
 
 if __name__=="__main__":

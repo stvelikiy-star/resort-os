@@ -12,6 +12,7 @@ import sys
 import time
 import unittest
 import uuid
+from decimal import Decimal
 from datetime import datetime, timedelta, timezone, date, time as clock_time
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -277,6 +278,101 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         self.assertEqual(saved["source_template_id"], expected["id"])
         individual = self.post(packages, {**proposal, "package_kind": "CUSTOM"})
         self.assertEqual(self.post(templates, {"package_id": individual.json()["id"]}).status_code, 422)
+
+
+
+    def test_06_commercial_price_revision(self):
+        path="/v1/platform/commercial-policy"
+        payload={"expected_version":1,"price_kind":"PACKAGE","code":"BASE","monthly_price":"5500.00"}
+        self.assertEqual(self.post(path,payload,"owner-a").status_code,403)
+        self.assertEqual(self.post(path,{**payload,"monthly_price":"0"}).status_code,422)
+        self.assertEqual(self.post(path,{**payload,"code":"UNKNOWN"}).status_code,422)
+        first=self.post(path,payload)
+        self.assertEqual(first.status_code,201,first.text)
+        self.assertEqual(first.json()["version"],2)
+        self.assertEqual(first.json()["policy"]["monthly_packages"]["CUSTOM"]["minimum"],"5500.00")
+        self.assertFalse(first.json()["payment_collected"])
+        self.assertEqual(self.post(path,payload).status_code,409)
+        second=self.post(path,{"expected_version":2,"price_kind":"MODULE","code":"QR_ZONE","monthly_price":"2200"})
+        self.assertEqual(second.status_code,201,second.text)
+        self.assertEqual(self.get(path).json()["policy"]["module_monthly_prices"]["QR_ZONE"],"2200.00")
+        async def verify_history():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT policy#>>'{monthly_packages,BASE,price}' FROM flex_commercial_policy_versions WHERE version=1"),"5000")
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_commercial_policy_versions"),3)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+            finally:await con.close()
+        asyncio.run(verify_history())
+
+
+
+    def test_07_approved_hotel_package_prices(self):
+        path="/v1/platform/tariff-packages"
+        base={"hotel_id":HOTEL_A,"package_kind":"BUSINESS","title":"Approved business",
+              "period_start":(datetime.now(ZoneInfo("Asia/Bishkek")).date()+timedelta(days=4)).isoformat(),
+              "skus":["QR_ZONE","MULTI_HOTEL"],"commercial_policy_version":3,
+              "discount_pct":"10","trial_days":5,"custom_monthly_price":None}
+        self.assertEqual(self.post(path,base,"owner-a").status_code,403)
+        self.assertEqual(self.post(path,{**base,"commercial_policy_version":1}).status_code,409)
+        self.assertEqual(self.post(path,{**base,"skus":["UNKNOWN_MODULE"]}).status_code,422)
+        made=self.post(path,base)
+        self.assertEqual(made.status_code,201,made.text)
+        row=made.json()
+        self.assertEqual(Decimal(row["list_monthly_total"]),Decimal("20000"))
+        self.assertEqual(Decimal(row["proposed_monthly_total"]),Decimal("18000"))
+        self.assertFalse(row["subscription_activated"])
+        items={i["sku"]:i for i in row["items"]}
+        self.assertEqual(Decimal(items["QR_ZONE"]["monthly_price"]),Decimal(0))
+        self.assertEqual(items["BASE_PMS"]["commercial_policy_version"],3)
+        other=self.post(path,{**base,"hotel_id":HOTEL_B,"package_kind":"BASE","skus":[],"discount_pct":"0"})
+        self.assertEqual(other.status_code,201,other.text)
+        self.assertEqual(Decimal(other.json()["proposed_monthly_total"]),Decimal("5500"))
+        self.assertEqual(self.post(path,{**base,"package_kind":"CUSTOM","discount_pct":"0",
+            "custom_monthly_price":"4999"}).status_code,422)
+        history=self.get(path+"?hotel_id="+HOTEL_A).json()
+        self.assertEqual(history[0]["id"],row["id"])
+        self.assertEqual(Decimal(history[0]["proposed_monthly_total"]),Decimal("18000"))
+
+
+
+    def test_08_commercial_term_and_implementation_snapshot(self):
+        path="/v1/platform/tariff-packages"
+        start=(datetime.now(ZoneInfo("Asia/Bishkek")).date()+timedelta(days=4)).isoformat()
+        data={"hotel_id":HOTEL_B,"package_kind":"BUSINESS","title":"Business annual",
+              "period_start":start,"skus":[],"commercial_policy_version":3,
+              "discount_pct":"0","trial_days":5,"custom_monthly_price":None,
+              "term_months":12,"standard_term_discount":True,"include_implementation":True}
+        made=self.post(path,data)
+        self.assertEqual(made.status_code,201,made.text)
+        row=made.json()
+        self.assertEqual(row["term_months"],12)
+        self.assertEqual(Decimal(row["discount_pct"]),Decimal("30"))
+        self.assertEqual(Decimal(row["subscription_term_total"]),Decimal("126000"))
+        self.assertEqual(Decimal(row["implementation_total"]),Decimal("25000"))
+        self.assertEqual(row["period_start"],start)
+        self.assertFalse(row["subscription_activated"])
+        saved=next(x for x in self.get(path+"?hotel_id="+HOTEL_B).json() if x["id"]==row["id"])
+        self.assertEqual(saved["subscription_term_total"],row["subscription_term_total"])
+        self.assertEqual(saved["commercial_policy_version"],3)
+        self.assertEqual(self.post(path,{**data,"term_months":2}).status_code,422)
+        self.assertEqual(self.post(path,{**data,"discount_pct":"10"}).status_code,422)
+
+
+
+    def test_09_installation_trial_is_one_time_and_admin_only(self):
+        path="/v1/platform/installation-trial"
+        data={"hotel_id":HOTEL_A}
+        self.assertEqual(self.post(path,data,"owner-a").status_code,403)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A).json(),None)
+        first=self.post(path,data)
+        self.assertEqual(first.status_code,201,first.text)
+        row=first.json()
+        self.assertEqual(date.fromisoformat(row["trial_end_exclusive"])-date.fromisoformat(row["trial_start"]),timedelta(days=5))
+        self.assertEqual(self.post(path,data).json(),row)
+        self.assertFalse(row["entitlement_changed"])
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_B).json(),None)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A,who="owner-b").status_code,403)
 
 
 if __name__=="__main__":
