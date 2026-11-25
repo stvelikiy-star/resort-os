@@ -461,6 +461,7 @@ async function catalogAdminPost(req,res,url) {
 }
 
 function routeAllowed(path, search) {
+  if(path==='/v1/platform/commercial-center')return search.size===1&&/^(0|[1-9][0-9]{0,6})$/.test(search.get('offset')||'')&&Number(search.get('offset'))<=1000000?'catalog_admin':null;
   if(path==='/v1/platform/partner-proposals')return !search.size?'catalog_admin':null;
   if(path==='/v1/partner/me/proposals')return !search.size?'partner':null;
   if(['/v1/platform/investment-projection','/v1/partner/me/investment-projection'].includes(path)){
