@@ -148,6 +148,30 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
     check(profit.status_code,200,"posted ledger read")
     check(profit.json()["status"],"NOT_READY","period close not verified")
     check(profit.json()["recognized_profit_kgs"],None,"unverified profit stays null")
+    source_reverse_url="/api/v1/admin/finance/owner/revenue-source-events/"+str(source)+"/reverse"
+    source_reverse_body={"id":str(uuid.uuid4()),"reason":"Cancel source after exact ledger reversal"}
+    denied=client.post(source_reverse_url,json=source_reverse_body)
+    check(denied.status_code,409,"active ledger blocks source reversal")
+    check(denied.json()["detail"]["code"],"OWNER_REVENUE_ACTIVE_POSTING_REQUIRES_REVERSAL","specific source guard")
+    async def direct_source_reversal_denied():
+        conn=await asyncpg.connect(parsed.geturl())
+        try:
+            try:
+                await conn.execute(
+                    """INSERT INTO owner_revenue_source_events
+                       (id,"propertyId","sourceType","sourceId","serviceDate",action,
+                        "faceValueKgs","sourceSnapshot","reversesId",reason,"createdById")
+                       SELECT $1,"propertyId","sourceType","sourceId","serviceDate",'REVERSE_SOURCE',
+                         "faceValueKgs","sourceSnapshot",id,'Direct SQL cancellation attempt',"createdById"
+                       FROM owner_revenue_source_events WHERE id=$2 AND "propertyId"=$3""",
+                    uuid.uuid4(),source,p)
+            except asyncpg.CheckViolationError as exc:
+                check("OWNER_REVENUE_ACTIVE_POSTING_REQUIRES_REVERSAL" in str(exc),True,"SQL cannot bypass guard")
+            else:
+                raise AssertionError("Direct SQL reversed posted source")
+        finally:
+            await conn.close()
+    asyncio.run(direct_source_reversal_denied())
     reverse_decision=client.post(decision_url,json={
         "id":str(uuid.uuid4()),"action":"REVERSE",
         "reason":"Independent synthetic posting cancellation review"})
@@ -159,6 +183,12 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
     check(response.status_code,201,"exact reversal posted")
     check(client.post(reverse_url,json=rev_body).json()["already_processed"],
           True,"reversal idempotency")
+    check(client.post(source_reverse_url,json=source_reverse_body).status_code,201,
+          "source reversal allowed after exact ledger reversal")
+    check(client.post(source_reverse_url,json=source_reverse_body).json()["already_processed"],
+          True,"source reversal replay")
+    check(client.post(source_reverse_url,json={**source_reverse_body,"id":str(uuid.uuid4())}).status_code,
+          409,"duplicate source reversal blocked")
 
 async def verify():
     conn=await asyncpg.connect(parsed.geturl())

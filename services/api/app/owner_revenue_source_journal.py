@@ -236,6 +236,13 @@ async def reverse_source(approval_id:uuid.UUID,body:SourceReversal,
                      AND action='REVERSE_SOURCE' ''',pid,approval_id)
             if duplicate:
                 raise HTTPException(409,detail={"code":"REVENUE_ALREADY_REVERSED"})
+            # Same tenant/source serialization as the database posting triggers.
+            # Older databases can still run legacy code; staging with the new
+            # accounting tables must fail closed if the guard is not installed.
+            if await conn.fetchval("SELECT to_regclass('owner_accounting_postings') IS NOT NULL"):
+                await conn.execute("SELECT owner_lock_revenue_posting($1,$2)",pid,approval_id)
+                if await conn.fetchval("SELECT owner_revenue_has_active_posting($1,$2)",pid,approval_id):
+                    raise HTTPException(409,detail={"code":"OWNER_REVENUE_ACTIVE_POSTING_REQUIRES_REVERSAL"})
             row=await conn.fetchrow(
                 '''INSERT INTO owner_revenue_source_events
                    (id,"propertyId","sourceType","sourceId","serviceDate",action,
