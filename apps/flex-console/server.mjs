@@ -334,6 +334,7 @@ function validateCatalogAdminAction(kind,body) {
     const source='source_template_id' in body;
     const commercial='commercial_policy_version' in body;
     const termFields=['term_months','include_implementation','standard_term_discount'].filter(k=>k in body);
+    if('launch_offer' in body && (typeof body.launch_offer!=='boolean'||!commercial))return null;
     if(termFields.length&&(!commercial||termFields.length!==3||![1,3,6,12].includes(body.term_months)||typeof body.include_implementation!=='boolean'||typeof body.standard_term_discount!=='boolean'))return null;
     if(commercial&&(!Number.isInteger(body.commercial_policy_version)||body.commercial_policy_version<1||source))return null;
     if(source && (typeof body.source_template_id!=='string'||!flexUuidRe.test(body.source_template_id)))return null;
@@ -356,7 +357,7 @@ function validateCatalogAdminAction(kind,body) {
     return {hotel_id:body.hotel_id,package_kind:body.package_kind,title:body.title.trim(),
       period_start:body.period_start,skus:body.skus,discount_pct:body.discount_pct,
       trial_days:body.trial_days,custom_monthly_price:body.custom_monthly_price,
-      ...(source?{source_template_id:body.source_template_id}:{}),...(commercial?{commercial_policy_version:body.commercial_policy_version}:{}),...(termFields.length?{term_months:body.term_months,include_implementation:body.include_implementation,standard_term_discount:body.standard_term_discount}:{})};
+      ...(source?{source_template_id:body.source_template_id}:{}),...(commercial?{commercial_policy_version:body.commercial_policy_version}:{}),...('launch_offer' in body?{launch_offer:body.launch_offer}:{}),...(termFields.length?{term_months:body.term_months,include_implementation:body.include_implementation,standard_term_discount:body.standard_term_discount}:{})};
   }
   if(kind==='draft') {
     if(!exact(['hotel_id','title','period_start','period_end','skus']))return null;
