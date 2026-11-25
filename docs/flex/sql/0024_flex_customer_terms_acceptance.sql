@@ -1,7 +1,9 @@
 -- Explicit customer acceptance of immutable commercial terms, not fiscal issuance.
 BEGIN;
 CREATE ROLE flex_customer_acceptance_writer NOLOGIN;
-GRANT USAGE ON SCHEMA public TO flex_customer_acceptance_writer;
+DO $schema$ BEGIN
+ EXECUTE format('GRANT USAGE ON SCHEMA %I TO flex_customer_acceptance_writer',current_schema());
+END $schema$;
 GRANT SELECT ON flex_platform_memberships,flex_platform_hotel_grants TO flex_customer_acceptance_writer;
 CREATE POLICY flex_acceptance_own_membership ON flex_platform_memberships FOR SELECT TO flex_customer_acceptance_writer
  USING(subject_id=NULLIF(current_setting('flex.authorized_subject_id',true),'') AND active AND role='HOTEL_OWNER');
