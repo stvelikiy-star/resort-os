@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "734e32351eb50df05781c543ce0acde6ed88e3ab",
+    "scripts/marina_rc3_additive_gate.py": "3201e11840ec35a25f660b81627c2447ff244690",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -62,7 +62,9 @@ APPROVED_P0_BLOBS = {
     # and test-only workflow. No production shared-auth promotion.
     "scripts/marina_shared_owner_finance_p0_ci.py": "71cabedce521c0019a3fd900d075830d51891a13",
     # Full refund can only be recorded after external evidence; nothing is sent.
-    "services/api/app/reservation_payments.py": "f7e533861624cd8a62fd29e81c7b0d73337717f3",
+    "services/api/app/reception_reservations.py": "5ed3c98a334c523e629507ea81c2f55ac51881ea",
+    "services/api/app/manager_dashboard.py": "be33c7e0471bb668987bfb683bf3af052387dfa6",
+    "services/api/app/reservation_payments.py": "25119a6f2efb2207e73ee3ab66fe92f754a6cc49",
     "services/api/app/pms_reservation_create.py": "f068836d615409443f1742fc492f27886f9d6aee",
     "scripts/marina_shared_manual_refund_evidence_ci.py": "f52d7947e64e935497617834e17535def9a59042",
     "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
@@ -73,8 +75,8 @@ APPROVED_P0_BLOBS = {
     "scripts/test_owner_served_kitchen_cost_trace.py": "c30f2859bd5769228c7cbcd1a1c6159797369abf",
     "scripts/marina_shared_served_cost_trace_ci.py": "0d8a608004d04fd6b4ad01f548da34fc59627385",
     "apps/admin/components/AdminExperienceRuntime.tsx": "aeecbcd54bd3479ba80e541e31f884cf7ba2870d",
-    "services/api/app/hotel_finance.py": "f11fba20ea217fea3b2f075f39ddb4f2de907e6a",
-    "apps/mobile/scripts/verify-backend-contract.mjs": "913a486146cd599c92e11dbc590906e9ba8a867f",
+    "services/api/app/hotel_finance.py": "818ebdd386e7ec34e8c0fdcaecf59aaf5125d4bf",
+    "apps/mobile/scripts/verify-backend-contract.mjs": "73d08efd7c99adee25f8b1ab0ad36b67e1ed6c11",
     "apps/mobile/app/finance.tsx": "4434075da2ed4f891d7d238d606e03783dd9b1dc",
     "apps/mobile/src/api/liveModules.ts": "3b953a3a9caafb85397fe2ea5d8425bc737e9b86",
     "apps/mobile/src/api/contractValidation.ts": "bb4b0325bac08c6a362181e6e58a4306fd4d7dfc",
@@ -98,11 +100,11 @@ APPROVED_P0_BLOBS = {
     "services/api/app/owner_accounting_journal.py": "bfadba59080ec2badb554ee03ed39d964cb04c0e",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
     "services/api/app/owner_ledger_policy.py": "a731aeec650163d590eccc671f950209a9842548",
-    "services/api/app/owner_accounting_postings.py": "405f870a7c9cd3df04512398ce24926f82535448",
+    "services/api/app/owner_accounting_postings.py": "4104a493b85a0ae613ee25b9c0e532f71b720e55",
     "services/api/app/owner_revenue_corrections.py": "10f52e7f916598620c73fa2d3a61f08bed435aaa",
     "services/api/app/owner_delivered_revenue.py": "1e8881079cd4d4a64f96aaabbb51c1d21e59a035",
     "scripts/test_owner_ledger_policy.py": "d266a0fc91733e274e1f19e1b417a3adc25a7022",
-    "scripts/marina_owner_posting_api_ci.py": "eca6527ad04c2ea58909ccce2aec8bb4e194f47f",
+    "scripts/marina_owner_posting_api_ci.py": "b3749132c892a391390f0c6a42a1d59d1a761521",
     "services/api/app/owner_revenue_source_journal.py": "a748840fcce9904dbb4e52fe20c9ff6163bd9375",
     "packages/database/prisma/migrations/zz131_marina_owner_source_reversal_integrity_20261125/migration.sql": "57e9a0ffea9fc8ef4c97407d6bb70e2a8f5fd85b",
     "packages/database/prisma/migrations/zz132_marina_owner_revenue_period_integrity_20261125/migration.sql": "49ea810033a63ff721e44dc9f2bb2da2c400373e",

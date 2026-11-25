@@ -644,6 +644,10 @@ async def verify_guest_service_ledger(*, mutation_checks=False, refund_checks=Fa
             check(balance["originalAmountKgs"],700,"original receipt unchanged")
             check(balance["refundedKgs"],300,"partial cash refunds accumulated once")
             check(balance["remainingReceivedKgs"],400,"exact remaining receipt")
+            from app.reservation_payments import _totals
+            totals=await _totals(conn,rid)
+            check(totals["paid_kgs"],400,"PMS retains only unrefunded balance")
+            check(totals["remaining_kgs"],1600,"PMS debt reflects partial refunds")
             await rejected(401,"PARTIAL_REFUND_EXCEEDS_RECEIPT")
             try:
                 async with conn.transaction():

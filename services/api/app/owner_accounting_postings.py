@@ -631,6 +631,13 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
                   count(*) FILTER(WHERE NOT dated)::int AS refund_undated_count
            FROM evidence""",pid,from_date,to_date,tz)
     counts.update(dict(refunds))
+    partial=await conn.fetchrow(
+        """SELECT count(*)::int AS partial_refund_event_count,
+                  COALESCE(sum("amountKgs"),0)::bigint AS partial_refund_amount_kgs
+           FROM owner_partial_refund_events WHERE "propertyId"=$1
+             AND ("refundedAt" AT TIME ZONE $4)::date BETWEEN $2 AND $3""",
+        pid,from_date,to_date,tz)
+    counts.update(dict(partial))
     amounts=await conn.fetchrow(
         """SELECT count(*)::int AS posting_line_count,
                   COALESCE(sum(CASE WHEN l.side='CREDIT' THEN l."amountKgs" ELSE -l."amountKgs" END)
@@ -657,6 +664,8 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
         blockers.append("OTHER_SERVICE_REVENUE_NOT_RECONCILED")
     if counts["package_entitlement_count"]:
         blockers.append("PACKAGE_DELIVERY_AND_VALUE_ALLOCATION_UNVERIFIED")
+    if counts["partial_refund_event_count"]:
+        blockers.append("PARTIAL_REFUND_LEDGER_RECONCILIATION_REQUIRED")
     if counts["refund_payment_expected"]!=counts["refund_payment_verified"] or counts["refund_undated_count"]:
         blockers.append("CASH_REFUND_RECONCILIATION_INCOMPLETE")
     # Even a perfect match of these supported source categories does not prove

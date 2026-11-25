@@ -70,8 +70,8 @@ async def list_reception_reservations(
                 AND ib2."blockType"='RESERVATION'
             ) seg ON true
             LEFT JOIN LATERAL (
-              SELECT COALESCE(SUM(p."amountKgs") FILTER (WHERE p.status='RECEIVED'),0)::bigint AS paid_kgs
-              FROM payments p
+              SELECT COALESCE(SUM(p."remainingReceivedKgs"),0)::bigint AS paid_kgs
+              FROM owner_reservation_payment_balances p
               WHERE p."reservationId"=r.id
             ) pay ON true
             WHERE r."propertyId"=$1
@@ -192,14 +192,15 @@ async def reception_reservation_detail(
 
         payments = await conn.fetch(
             '''
-            SELECT id,"amountKgs",method,status::text AS status,provider,"externalRef","paidAt","createdAt"
-            FROM payments
-            WHERE "reservationId"=$1
-            ORDER BY "createdAt" ASC
+            SELECT p.id,p."amountKgs",p.method,p.status::text AS status,p.provider,p."externalRef",p."paidAt",p."createdAt",
+                   b."remainingReceivedKgs",b."refundedKgs"
+            FROM payments p JOIN owner_reservation_payment_balances b ON b."paymentId"=p.id
+            WHERE p."reservationId"=$1
+            ORDER BY p."createdAt" ASC
             ''',
             reservation_id,
         )
-        total_paid = sum(int(item["amountKgs"]) for item in payments if item["status"] == "RECEIVED")
+        total_paid = sum(int(item["remainingReceivedKgs"]) for item in payments)
         remaining = max(int(row["totalKgs"]) - total_paid, 0)
 
         audit_ids = [str(reservation_id)]
@@ -284,6 +285,8 @@ async def reception_reservation_detail(
                 {
                     "id": str(item["id"]),
                     "amount_kgs": int(item["amountKgs"]),
+                    "refunded_kgs": int(item["refundedKgs"]),
+                    "remaining_received_kgs": int(item["remainingReceivedKgs"]),
                     "method": item["method"],
                     "status": item["status"],
                     "provider": item["provider"],

@@ -117,8 +117,8 @@ async def manager_dashboard(
         active_balance = await conn.fetchrow(
             '''
             WITH paid AS (
-              SELECT "reservationId", COALESCE(sum("amountKgs") FILTER (WHERE status='RECEIVED'),0)::bigint AS paid_kgs
-              FROM payments
+              SELECT "reservationId", COALESCE(sum("remainingReceivedKgs"),0)::bigint AS paid_kgs
+              FROM owner_reservation_payment_balances
               WHERE "reservationId" IS NOT NULL
               GROUP BY "reservationId"
             )
