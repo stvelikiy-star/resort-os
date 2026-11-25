@@ -568,10 +568,30 @@ async def verify_guest_service_ledger():
           JOIN owner_accounting_postings po ON po.id=l."postingId" AND po."propertyId"=l."propertyId"
           WHERE po."proposalId"=$1 AND l."accountCode"='4300' AND l.side='CREDIT'""",qid),650,"service net revenue to 4300")
         check(await conn.fetchval("SELECT owner_revenue_has_active_posting($1,$2)",p,sid),True,"guest service posting is active")
+        # Synthetic fixture only, within the outer rolled-back CI transaction.
+        for statement, key in (
+            ('UPDATE guest_folio_charges SET "amountKgs"=701 WHERE id=$1',fid),
+            ("UPDATE guest_folio_charges SET status='VOID' WHERE id=$1",fid),
+            ("UPDATE operational_tasks SET status='CANCELLED' WHERE id=$1",tid),
+            ('UPDATE operational_tasks SET "serviceDate"="serviceDate"+1 WHERE id=$1',tid),
+        ):
+            try:
+                async with conn.transaction():
+                    await conn.execute(statement,key)
+            except asyncpg.CheckViolationError as exc:
+                check("OWNER_GUEST_SERVICE_ACTIVE_POSTING_REQUIRES_REVERSAL" in str(exc),True,
+                      "posted source mutation rejected")
+            else:
+                raise AssertionError("Posted guest service could be invalidated: "+statement)
+        await conn.execute("UPDATE guest_folio_charges SET status='PAID' WHERE id=$1",fid)
+        await conn.execute("""UPDATE operational_tasks SET "chargeStatus"='PAID' WHERE id=$1""",tid)
+        check(await conn.fetchval(proof,p,tid,day),700,"normal payment preserves recognized service")
         await conn.execute("SET CONSTRAINTS ALL DEFERRED")
         await clean_race_post(conn,(sid,qid,did,reviewer))
         await conn.execute("SET CONSTRAINTS ALL IMMEDIATE")
         check(await conn.fetchval("SELECT owner_revenue_has_active_posting($1,$2)",p,sid),False,"exact guest service reversal")
+        await conn.execute("UPDATE guest_folio_charges SET status='VOID' WHERE id=$1",fid)
+        check(await conn.fetchval(proof,p,tid,day),None,"void permitted after exact accounting reversal")
     finally:
         await tx.rollback()
         await conn.close()

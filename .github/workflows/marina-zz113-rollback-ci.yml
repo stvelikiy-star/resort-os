@@ -81,6 +81,7 @@ jobs:
           rm -rf "$baseline/migrations/zz131_marina_owner_source_reversal_integrity_20261125"
           rm -rf "$baseline/migrations/zz132_marina_owner_revenue_period_integrity_20261125"
           rm -rf "$baseline/migrations/zz133_marina_owner_guest_service_revenue_20261125"
+          rm -rf "$baseline/migrations/zz134_marina_owner_guest_service_posting_lifecycle_20261125"
           (cd packages/database && npx prisma migrate deploy --schema "$baseline/schema.prisma")
           test "$(psql -h 127.0.0.1 -U marina_ci -d marina_before -Atc "select count(*) from _prisma_migrations where finished_at is not null and rolled_back_at is null")" = 37
           test "$(psql -h 127.0.0.1 -U marina_ci -d marina_before -Atc "select count(*) from information_schema.columns where table_name='operational_tasks' and column_name='scheduledFor'")" = 0

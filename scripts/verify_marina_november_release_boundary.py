@@ -51,7 +51,7 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "fbd18d89e0a9b5aae2e5ce4d983fe4651dcb12e8",
+    "scripts/marina_rc3_additive_gate.py": "4a85b9d6ac3722cdf04c0787768fd303d0b19366",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
@@ -77,9 +77,9 @@ APPROVED_P0_BLOBS = {
     "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",
     # MARINA batch provenance: reviewed additive migration, API and executable test.
     "scripts/marina_shared_three_hotel_restore_ci.py": "0f00022721637c58d3897f5164496af7173e37dd",
-    "scripts/release_contract.py": "18faea6139e9de6bdb771778309a14360ad31156",
-    "scripts/release_contract_test.py": "acac92c6ff7490a262134206632deb6210570b4b",
-    ".github/workflows/marina-zz113-rollback-ci.yml": "89c4d9177ae62cfcc41830d0a647e3afb7b307bc",
+    "scripts/release_contract.py": "f3c6eb46f091b4c258ad3d62b495e7e13018ee61",
+    "scripts/release_contract_test.py": "2dfa70ff91b86887f12ef4e89515f6172ce8aed1",
+    ".github/workflows/marina-zz113-rollback-ci.yml": "0af020cda7bfd9247bc5e041303e24fc3f7c5b0b",
     "scripts/marina_disposable_upgrade_acceptance_ci.py": "b877c5976def9451853953b86ec48b6804ab16b0",
     ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "9bf375ac39d02cf78122dbe4544f1d69d3335cb6",
     "services/api/app/app_entry.py": "8b8e630073ddbe6a8855a5494116c5cac11064ca",
@@ -95,11 +95,12 @@ APPROVED_P0_BLOBS = {
     "services/api/app/owner_revenue_corrections.py": "10f52e7f916598620c73fa2d3a61f08bed435aaa",
     "services/api/app/owner_delivered_revenue.py": "1e8881079cd4d4a64f96aaabbb51c1d21e59a035",
     "scripts/test_owner_ledger_policy.py": "c8de02aff23a49ac33c21c314353a386d3e73879",
-    "scripts/marina_owner_posting_api_ci.py": "beff1687f7de46ab0f5e111513f6cb155addb9ca",
+    "scripts/marina_owner_posting_api_ci.py": "ff3a788a0e0ba21f585274ca29cce6dbc77e92fc",
     "services/api/app/owner_revenue_source_journal.py": "a748840fcce9904dbb4e52fe20c9ff6163bd9375",
     "packages/database/prisma/migrations/zz131_marina_owner_source_reversal_integrity_20261125/migration.sql": "57e9a0ffea9fc8ef4c97407d6bb70e2a8f5fd85b",
     "packages/database/prisma/migrations/zz132_marina_owner_revenue_period_integrity_20261125/migration.sql": "49ea810033a63ff721e44dc9f2bb2da2c400373e",
     "packages/database/prisma/migrations/zz133_marina_owner_guest_service_revenue_20261125/migration.sql": "03cc9e52e4402e6b5c59035adf143cb36b66407f",
+    "packages/database/prisma/migrations/zz134_marina_owner_guest_service_posting_lifecycle_20261125/migration.sql": "da1c1f38676b0c3082df0f50c26a671f7279aaa0",
     "scripts/marina_owner_expense_posting_ci.py": "3c5879734d3bff96269559b1aa08e25adfe937c2",
     "scripts/marina_owner_served_cogs_posting_ci.py": "75bb2cc1fb85ff6379ec0b8010115a4aad6b290b",
     "packages/database/prisma/migrations/zz129_marina_owner_accounting_postings_20261125/migration.sql": "d26106e29e9314bd3260564a6f32312b0fd159d1",
@@ -108,7 +109,7 @@ APPROVED_P0_BLOBS = {
     ".github/workflows/marina-owner-recognition-policy-ci.yml": "7965e38127aaf6a9ffe73f0c0ce755425d36d6e1",
     "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
     "scripts/marina_owner_accounting_decision_ci.py": "4b84740d89e497f976accaa6da3da082129e349e",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "61498f1969721186b165acf90a02ff974b39e744",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "38049c670f30abb64e94c667ef6f68b9804e9f1f",
     "apps/staff/components/WaiterEntry.module.css": "7218c412d73930418c4d703267bf83e5f8153c0e",
     "scripts/test_marina_staff_legacy_dining_preservation.py": "15fb8274b823c5dcb0842aa6be4ca585b85d05a5",
 }
