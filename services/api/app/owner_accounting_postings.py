@@ -236,6 +236,71 @@ async def reverse_posting(posting_id:uuid.UUID,body:PostingAction,request:Reques
             return posting_view(row)
 
 
+@router.get("/proposals/{proposal_id}/postings")
+async def list_postings(proposal_id:uuid.UUID,request:Request,user=Depends(owner_only)):
+    """Read back append-only POST + REVERSE events without declaring profit."""
+    posting_guard()
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
+            pid=await trusted_property_id(conn,user)
+            exists=await conn.fetchval(
+                'SELECT EXISTS(SELECT 1 FROM owner_accounting_journal_proposals '
+                'WHERE id=$1 AND "propertyId"=$2)',proposal_id,pid)
+            if not exists:
+                raise HTTPException(404,detail={"code":"ACCOUNTING_PROPOSAL_NOT_FOUND"})
+            headers=await conn.fetch(
+                """SELECT * FROM owner_accounting_postings
+                   WHERE "propertyId"=$1 AND "proposalId"=$2
+                   ORDER BY "createdAt",id""",pid,proposal_id)
+            out=[]
+            for row in headers:
+                lines=await conn.fetch(
+                    """SELECT "lineNo","accountCode",side,"amountKgs"
+                       FROM owner_accounting_posting_lines
+                       WHERE "propertyId"=$1 AND "postingId"=$2
+                       ORDER BY "lineNo" """,pid,row["id"])
+                out.append({**posting_view(row),
+                    "reverses_id":str(row["reversesId"]) if row["reversesId"] else None,
+                    "lines":[{"line_no":l["lineNo"],"account_code":l["accountCode"],
+                              "side":l["side"],"amount_kgs":str(l["amountKgs"])}
+                             for l in lines]})
+            return {"items":out,"recognized_profit_kgs":None,
+                    "period_completeness_verified":False}
+
+
+@router.get("/posted-subtotals")
+async def posted_subtotals(request:Request,from_date:date=Query(),to_date:date=Query(),
+                           user=Depends(owner_only)):
+    """Operational ledger subtotals, expressly not closed-period P&L."""
+    posting_guard()
+    if from_date>to_date or (to_date-from_date).days>366:
+        raise HTTPException(422,detail={"code":"ACCOUNTING_PERIOD_INVALID"})
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
+            pid=await trusted_property_id(conn,user)
+            rows=await conn.fetch(
+                """SELECT l."accountCode" AS account_code,
+                          SUM(CASE WHEN l.side='CREDIT' THEN l."amountKgs"
+                                   ELSE -l."amountKgs" END) AS net_credit
+                   FROM owner_accounting_postings p
+                   JOIN owner_accounting_posting_lines l
+                     ON p.id=l."postingId" AND p."propertyId"=l."propertyId"
+                   WHERE p."propertyId"=$1 AND p."accountingDate" BETWEEN $2 AND $3
+                   GROUP BY l."accountCode" ORDER BY l."accountCode" """,
+                pid,from_date,to_date)
+            entries={r["account_code"]:Decimal(r["net_credit"]) for r in rows}
+            revenue=sum((entries.get(c,Decimal(0)) for c in ("4100","4200","4300")),Decimal(0))
+            expenses=-sum((entries.get(c,Decimal(0)) for c in ("5100","5200")),Decimal(0))
+            return {
+                "scope":"POSTED_LEDGER_SUBTOTALS_NOT_FULL_PROFIT",
+                "posted_revenue_subtotal_kgs":str(revenue.quantize(Decimal("0.0001"))),
+                "posted_expense_cogs_subtotal_kgs":str(expenses.quantize(Decimal("0.0001"))),
+                "posted_contribution_subtotal_kgs":str((revenue-expenses).quantize(Decimal("0.0001"))),
+                "recognized_profit_kgs":None,"period_completeness_verified":False,
+                "blockers":["SERVICE_TAX_REFUND_EXPENSE_COGS_PERIOD_CLOSE_UNVERIFIED"],
+            }
+
+
 @router.get("/posted-profit")
 async def posted_profit(request:Request,from_date:date=Query(),to_date:date=Query(),
                         user=Depends(owner_only)):
