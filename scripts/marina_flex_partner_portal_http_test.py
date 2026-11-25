@@ -16,7 +16,9 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from fastapi.testclient import TestClient
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"services"/"api"))
-from app.flex_partner_portal import app
+from app.flex_partner_portal import app, investment_projection
+from datetime import date
+from decimal import Decimal
 
 
 class ScopedCommercialParticipants(unittest.TestCase):
@@ -128,6 +130,27 @@ class ScopedCommercialParticipants(unittest.TestCase):
             headers={"Authorization":"Bearer "+self.token("investor-1",mfa=True)},
             json={"amount":9999}).status_code,(404,405))
         self.assertEqual(self.client.get("/health").json()["payouts_enabled"],False)
+
+
+class InvestmentProjectionTest(unittest.TestCase):
+    def test_principal_cap_and_three_month_bonus(self):
+        args=(Decimal("150000"),2500,3,Decimal("160000"),date(2026,12,1))
+        r=investment_projection(*args,4)
+        self.assertEqual(r["projected_principal_repaid"],"150000.00")
+        self.assertEqual(r["final_principal_payment"],"30000.00")
+        self.assertEqual(r["bonus_start"],date(2027,4,1))
+        self.assertEqual(r["bonus_end_exclusive"],date(2027,7,1))
+        self.assertEqual(r["stage"],"BONUS")
+        r=investment_projection(*args,7)
+        self.assertEqual(r["projected_bonus_paid"],"120000.00")
+        self.assertEqual(r["stage"],"ENDED")
+        self.assertIsNone(r["actual_principal_repaid"])
+        self.assertFalse(r["payouts_enabled"])
+    def test_zero_revenue(self):
+        r=investment_projection(Decimal("250000"),3500,3,Decimal("0"),date(2026,12,1),120)
+        self.assertEqual(r["projected_principal_remaining"],"250000.00")
+        self.assertIsNone(r["bonus_start"])
+        self.assertEqual(r["stage"],"RETURN")
 
 
 if __name__=="__main__":
