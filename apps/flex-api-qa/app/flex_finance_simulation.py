@@ -10,7 +10,8 @@ def simulate_cash(subscription, implementation, events):
 
     Each refund references its original simulated receipt. Consume its credit
     first, then reverse its own allocations in reverse order. No implicit
-    redistribution of other receipts. This is not a real settlement writer.
+    redistribution of other receipts. CREDIT_APPLY explicitly reallocates existing
+    receipt credit, without changing simulated cash. This is not a real settlement writer.
     """
     charges={"subscription":money(subscription),"implementation":money(implementation)}
     if any(v<ZERO for v in charges.values()) or sum(charges.values())<=ZERO:
@@ -38,6 +39,17 @@ def simulate_cash(subscription, implementation, events):
                 due[a.line_id]-=a.amount
                 allocations[a.line_id]=a.amount
             receipts[key]={"remaining":amount,"credit":plan.unallocated_credit,"allocations":allocations}
+        elif kind=="CREDIT_APPLY":
+            receipt=receipts.get(event.get("payment_id"))
+            if receipt is None or amount>receipt["credit"] or amount>sum(due.values(),ZERO):
+                raise ValueError("Credit application exceeds available receipt credit or outstanding balance")
+            plan=allocate_confirmed_payment(amount,tuple(InvoiceBalance(k,v) for k,v in due.items()))
+            if plan.unallocated_credit!=ZERO:
+                raise ValueError("Credit application conservation failure")
+            receipt["credit"]-=amount
+            for a in plan.allocations:
+                due[a.line_id]-=a.amount
+                receipt["allocations"][a.line_id]+=a.amount
         elif kind=="REFUND":
             receipt=receipts.get(event.get("payment_id"))
             if receipt is None or amount>receipt["remaining"]:
