@@ -606,5 +606,48 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         asyncio.run(verify())
 
 
+    def test_15_customer_acceptance_only_exact_approved_own_terms(self):
+        path="/v1/platform/customer-agreement-acceptances"
+        history=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()
+        contract=history["agreements"][0]
+        data={"hotel_id":HOTEL_A,"agreement_id":contract["id"],
+            "terms_digest":contract["terms_digest"],"acknowledged":True}
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A,who="administrator").status_code,404)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A,who="owner-b").status_code,404)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A,who="owner-a",mfa=False).status_code,403)
+        own=self.get(path+"?hotel_id="+HOTEL_A,who="owner-a")
+        self.assertEqual(own.status_code,200,own.text)
+        self.assertEqual(len(own.json()),1)
+        self.assertEqual(own.json()[0]["state"],"AWAITING_CUSTOMER")
+        self.assertEqual(own.json()[0]["terms"],contract["terms"])
+        self.assertEqual(self.post(path,data,"administrator").status_code,404)
+        self.assertEqual(self.post(path,data,"owner-b").status_code,404)
+        self.assertEqual(self.post(path,{**data,"hotel_id":HOTEL_B},"owner-b").status_code,404)
+        self.assertEqual(self.post(path,data,"owner-a",mfa=False).status_code,403)
+        self.assertEqual(self.post(path,{**data,"terms_digest":"0"*64},"owner-a").status_code,409)
+        self.assertEqual(self.post(path,{**data,"acknowledged":False},"owner-a").status_code,422)
+        result=self.post(path,data,"owner-a")
+        self.assertEqual(result.status_code,201,result.text)
+        evidence=result.json()
+        self.assertEqual(evidence["state"],"CUSTOMER_ACCEPTED")
+        self.assertFalse(evidence["client_signed"])
+        self.assertFalse(evidence["subscription_activated"])
+        self.assertFalse(evidence["payments_enabled"])
+        self.assertEqual(self.post(path,data,"owner-a").json(),evidence)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_B,who="owner-b").json(),[])
+        history=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()
+        self.assertEqual(len(history["acceptances"]),1)
+        self.assertEqual(history["acceptances"][0]["accepted_by"],"owner-a")
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_customer_agreement_acceptances"),1)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_commercial_agreement_versions WHERE state='SIGNED'"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscriptions"),2)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+            finally: await con.close()
+        asyncio.run(verify())
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)
