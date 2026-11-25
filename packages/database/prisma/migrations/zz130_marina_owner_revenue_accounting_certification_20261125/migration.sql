@@ -26,11 +26,11 @@ DECLARE
  d record;
  reviewer record;
 BEGIN
- SELECT * INTO e FROM owner_revenue_source_events
-  WHERE "propertyId"=NEW."propertyId" AND id=NEW."sourceEventId"
-    AND action='APPROVE_SOURCE'
+ SELECT src.* INTO e FROM owner_revenue_source_events src
+  WHERE src."propertyId"=NEW."propertyId" AND src.id=NEW."sourceEventId"
+    AND src.action='APPROVE_SOURCE'
     AND NOT EXISTS (SELECT 1 FROM owner_revenue_source_events r
-      WHERE r."propertyId"=e."propertyId" AND r."reversesId"=e.id);
+      WHERE r."propertyId"=src."propertyId" AND r."reversesId"=src.id);
  SELECT * INTO d FROM owner_revenue_evidence_documents
   WHERE "propertyId"=NEW."propertyId" AND id=NEW."evidenceDocumentId";
  SELECT "propertyId",role::text AS role,"isActive" AS active INTO reviewer
