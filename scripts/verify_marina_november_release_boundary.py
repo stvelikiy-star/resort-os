@@ -20,6 +20,9 @@ ALLOWED_GOVERNANCE = frozenset({
     ".github/workflows/launch-acceptance-ci.yml",
     "release/launch-evidence.example.json",
     "scripts/verify_marina_november_release_boundary.py",
+    # Non-executable integration evidence, maintained throughout stage 1.
+    "docs/marina/PR_MAP_20261126.md",
+    "docs/marina/CODEX_REPORT_PLATFORM_20261126.md",
 })
 
 # Only these audited P0 changes are allowed beyond the frozen November
@@ -46,12 +49,14 @@ APPROVED_NATIVE_QA_BLOBS = {
 }
 
 APPROVED_P0_BLOBS = {
+    # Restored #553 regression coverage; exact test source only.
+    "apps/mobile/__tests__/owner-expenses-refresh-i18n.test.tsx": "78de45d25fa0898ca345befd1993816ee63de759",
     "services/api/app/stays.py": "16f5a87445a9eaf9315b9b43e25d54c069bd69ce",
     "scripts/test_marina_pms_schedule_property_boundary.py": "701b21a7f74d4b1c210b6e89f65a95dfdd8d8771",
     "apps/staff/components/WaiterEntry.tsx": "939bf766588432200172b4d9f14fe96f0b13611b",
     # The additive RC3 gate is also pinned: immutable historical evidence
     # remains unchanged, only reviewed current-release additions are accepted.
-    "scripts/marina_rc3_additive_gate.py": "11b882dc8ebc09c291e304f34159ee677da42aa2",
+    "scripts/marina_rc3_additive_gate.py": "9def22a3454cc5a6eab0321de3108df323e56256",
     # PR #592: reviewed staging-only shared Staff operational routes and
     # two-hotel auth regression. Exact blob pins keep this exception fail-closed.
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
