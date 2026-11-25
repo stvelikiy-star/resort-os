@@ -844,10 +844,28 @@ async function saveAgentAssignment(form){
  const d=new FormData(form),b=form.querySelector('button'),status=form.querySelector('[role=status]');b.disabled=true;
  try{await saveQaCatalogAction('agent-assignments',{hotel_id:state.hotelId,agent_id:String(d.get('agent_id')),expected_revision:Number(d.get('expected_revision')),action:String(d.get('action'))});await render();}catch(e){status.textContent=e.message;b.disabled=false;}
 }
+function employmentLabels(){
+ return ({ru:{title:'Статус работы агента',WORKING:'Работает',STOPPED:'Работа прекращена',UNRECORDED:'Не оформлено',start:'Начать работу',stop:'Прекратить работу',plan:'Новые закрепления за месяц (QA)',paid:'Подтверждённые продажи',unknown:'Нет подтверждённых данных',note:'Статус QA не отключает аккаунт и не создаёт зарплатные обязательства. Закрепления не равны продажам.'},kg:{title:'Агенттин иш абалы',WORKING:'Иштейт',STOPPED:'Иш токтотулду',UNRECORDED:'Каттала элек',start:'Ишти баштоо',stop:'Ишти токтотуу',plan:'Айдагы жаңы бекитүүлөр (QA)',paid:'Ырасталган сатуулар',unknown:'Ырасталган маалымат жок',note:'QA абалы аккаунтту өчүрбөйт жана эмгек акы милдеттенмесин түзбөйт. Бекитүү сатуу эмес.'},en:{title:'Agent employment',WORKING:'Working',STOPPED:'Stopped',UNRECORDED:'Not recorded',start:'Start employment',stop:'Stop employment',plan:'New monthly assignments (QA)',paid:'Verified sales',unknown:'Not verified',note:'QA status does not disable the account or create payroll liabilities. Assignments are not sales.'}})[state.lang];
+}
+async function agentEmploymentPanel(){
+ const l=employmentLabels(),r=await api('/v1/platform/agent-employment');
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+(r.agents.length?table([t('agent'),t('status'),t('periodStart'),t('actions')],r.agents.map(a=>{
+  const working=a.action==='START',status=working?'WORKING':a.action==='STOP'?'STOPPED':'UNRECORDED';
+  return '<tr><td>'+safe(a.platform_subject_id)+'</td><td>'+safe(l[status])+'</td><td>'+safe(a.created_at?date(a.created_at):'—')+'</td><td>'+((working||a.status==='ACTIVE')?'<form class="agent-employment-form"><input type="hidden" name="agent_id" value="'+safe(a.agent_id)+'"><input type="hidden" name="expected_revision" value="'+safe(a.revision)+'"><input type="hidden" name="action" value="'+(working?'STOP':'START')+'"><button class="outline" type="submit">'+safe(working?l.stop:l.start)+'</button><div role="status"></div></form>':'—')+'</td></tr>';
+ })):empty(t('noData')))+'</section>';
+}
+async function saveAgentEmployment(form){
+ const d=new FormData(form),b=form.querySelector('button'),status=form.querySelector('[role=status]');b.disabled=true;
+ try{await saveQaCatalogAction('agent-employment',{agent_id:String(d.get('agent_id')),expected_revision:Number(d.get('expected_revision')),action:String(d.get('action'))});await render();}catch(e){status.textContent=e.message;b.disabled=false;}
+}
+function agentEmploymentSummary(a){
+ const l=employmentLabels();
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2><div class="grid two">'+kv(t('status'),l[a.employment_state]||l.UNRECORDED)+kv(l.plan,String(a.qa_new_assignments_this_month??0)+' / '+a.monthly_target)+kv(l.paid,a.paid_connections===null?l.unknown:String(a.paid_connections))+'</div>'+info(l.note,'info')+'</section>';
+}
 function agentTermsPanel(r){
  const a=r.agent_terms,l=assignmentLabels(),h=r.qa_assignments||[];
  if(!a)return '';
- return '<section class="panel"><h2>'+safe(l.terms)+'</h2><div class="grid two">'+kv(l.salary,money(a.monthly_salary,'KGS'))+kv(l.connection,money(a.connection_fee,'KGS'))+kv(l.addon,money(a.monthly_addon_fee,'KGS'))+kv(l.target,a.monthly_target)+'</div>'+info(l.eligible,'info')+'</section><section class="panel"><h2>'+safe(l.assigned)+'</h2>'+(h.length?table([t('hotel'),t('status'),t('periodStart')],h.map(x=>'<tr><td>'+safe(x.display_name)+'</td><td>'+safe(x.status)+'</td><td>'+safe(date(x.assigned_at))+'</td></tr>')):empty(t('noData')))+'</section>';
+ return agentEmploymentSummary(a)+'<section class="panel"><h2>'+safe(l.terms)+'</h2><div class="grid two">'+kv(l.salary,money(a.monthly_salary,'KGS'))+kv(l.connection,money(a.connection_fee,'KGS'))+kv(l.addon,money(a.monthly_addon_fee,'KGS'))+kv(l.target,a.monthly_target)+'</div>'+info(l.eligible,'info')+'</section><section class="panel"><h2>'+safe(l.assigned)+'</h2>'+(h.length?table([t('hotel'),t('status'),t('periodStart')],h.map(x=>'<tr><td>'+safe(x.display_name)+'</td><td>'+safe(x.status)+'</td><td>'+safe(date(x.assigned_at))+'</td></tr>')):empty(t('noData')))+'</section>';
 }
 async function hotelDetail(){
  const id=state.hotelId;
@@ -942,7 +960,7 @@ async function catalog(){
  '<section class="panel">'+(items.length?table([t('sku'),t('features'),t('price'),t('status')],items.map(i=>'<tr><td>'+safe(i.sku)+'</td><td>'+safe(i.name)+'</td><td>'+money(i.monthly_list_price,i.currency)+'</td><td><span class="chip">v'+safe(i.price_version)+'</span></td></tr>')):empty(t('noCatalog')))+'</section>';
 }
 function earningsSummary(o){return (o.groups?.length?table([t('groups'),t('gross'),t('refunds'),t('net')],o.groups.map(g=>'<tr><td>'+safe(g.role)+'</td><td>'+money(g.accrued_gross_kg)+'</td><td>'+money(g.reversed_kg)+'</td><td>'+money(g.net_accrued_kg)+'</td></tr>')):empty(t('noPartners')))+info('QA_ONLY_NOT_BANK_RECONCILED','info')}
-async function obligations(){const r=await api('/v1/platform/partner-earnings-summary?period='+state.period);return heading(t('obligations'),t('helpQa'))+toolbar()+periodButtons()+'<section class="panel spacing-top">'+earningsSummary(r)+'</section>'+info(t('notImplemented'))}
+async function obligations(){const r=await api('/v1/platform/partner-earnings-summary?period='+state.period);return heading(t('obligations'),t('helpQa'))+toolbar()+periodButtons()+'<section class="panel spacing-top">'+earningsSummary(r)+'</section>'+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await agentEmploymentPanel().catch(e=>info(e.message,'error')):'')+info(t('notImplemented'))}
 function participantDetails(r){
  const l=({ru:{hotels:'Закреплённые гостиницы',modules:'Закреплённые модули',contracts:'Версии инвестиционных договоров',capital:'Вклад по договору',share:'Доля (%)',history:'История начислений',date:'Дата',accrual:'Начисление',reversal:'Сторно',more:'Показаны последние 100 операций за период.',unverified:'Фактические выплаты и остаток обязательств пока не подтверждаются банковскими данными.'},kg:{hotels:'Бекитилген мейманканалар',modules:'Бекитилген модулдар',contracts:'Инвестициялык келишимдердин версиялары',capital:'Келишим боюнча салым',share:'Үлүш (%)',history:'Эсептөөлөрдүн тарыхы',date:'Күн',accrual:'Эсептөө',reversal:'Жокко чыгаруу',more:'Мезгилдин акыркы 100 операциясы көрсөтүлдү.',unverified:'Чыныгы төлөмдөр жана милдеттенмелер банк маалыматы менен ырастала элек.'},en:{hotels:'Assigned hotels',modules:'Attributed modules',contracts:'Investment contract versions',capital:'Contract principal',share:'Share (%)',history:'Earnings history',date:'Date',accrual:'Accrual',reversal:'Reversal',more:'Latest 100 entries in the period.',unverified:'Actual payouts and outstanding obligations are not yet bank-verified.'}})[state.lang];
  const h=r.assigned_hotels||[],c=r.contracts||[],e=r.history||[];
@@ -1041,6 +1059,7 @@ async function submitCommercialPrice(form){
  catch(err){status.textContent=err.message;button.disabled=false;}
 }
 main.addEventListener('submit',e=>{
+ if(e.target.classList.contains('agent-employment-form')){e.preventDefault();saveAgentEmployment(e.target);return;}
  if(e.target.id==='agent-assignment-form'){e.preventDefault();saveAgentAssignment(e.target);return;}
  if(e.target.id==='customer-profile-form'){e.preventDefault();submitCustomerOperation(e.target,'customer-profile');return;}
  if(e.target.id==='agreement-draft-form'){e.preventDefault();submitCustomerOperation(e.target,'agreement-drafts');return;}
