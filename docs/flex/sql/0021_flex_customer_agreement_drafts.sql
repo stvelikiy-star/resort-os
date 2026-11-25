@@ -28,7 +28,7 @@ ALTER TABLE flex_commercial_agreement_versions
  ADD CONSTRAINT flex_agreement_offer_unique UNIQUE(source_offer_id),
  ADD CONSTRAINT flex_agreement_source_actor CHECK ((source_offer_id IS NULL AND draft_created_by IS NULL) OR (source_offer_id IS NOT NULL AND draft_created_by IS NOT NULL AND state='DRAFT'));
 GRANT SELECT,INSERT ON flex_commercial_agreement_versions TO flex_catalog_draft_writer;
-CREATE POLICY flex_agreement_draft_read ON flex_commercial_agreement_versions FOR SELECT TO flex_catalog_draft_writer USING(state='DRAFT' AND source_offer_id IS NOT NULL);
+CREATE POLICY flex_agreement_draft_read ON flex_commercial_agreement_versions FOR SELECT TO flex_catalog_draft_writer USING(true);
 CREATE POLICY flex_agreement_draft_append ON flex_commercial_agreement_versions FOR INSERT TO flex_catalog_draft_writer WITH CHECK(
  state='DRAFT' AND signed_at IS NULL AND signed_by_subject_id IS NULL
  AND draft_created_by=NULLIF(current_setting('flex.actor_subject_id',true),'')
