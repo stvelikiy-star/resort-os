@@ -771,11 +771,13 @@ async function syntheticJournalPanel(){
  const l=journalLabels(),r=await api('/v1/platform/agreement-drafts?hotel_id='+state.hotelId),ids=new Set((r.acceptances||[]).map(x=>x.agreement_id)),rows=r.agreements.filter(a=>ids.has(a.id));
  return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+(rows.length?'<form id="synthetic-journal-open"><label>'+safe(customerLabels().agreements)+'<select name="agreement_id">'+rows.map(a=>'<option value="'+safe(a.id)+'">'+safe(a.terms?.package_kind)+' · v'+safe(a.version)+'</option>').join('')+'</select></label><button type="submit" class="outline">'+safe(l.open)+'</button><div role="status"></div><div class="journal-result"></div></form>':empty(t('noData')))+'</section>';
 }
+function creditApplyLabel(){return ({ru:'Зачесть переплату',kg:'Ашыкча төлөмдү эсепке алуу',en:'Apply credit'})[state.lang];}
+function journalOperationLabel(kind){const l=simulationLabels();return kind==='CREDIT_APPLY'?creditApplyLabel():kind==='PAYMENT'?l.payment:l.reversal;}
 function renderSyntheticJournal(container,r){
  const l=journalLabels(),m=simulationLabels();
  container.innerHTML='<div class="grid two">'+kv(l.state,r.test_balance_state==='TEST_SETTLED'?l.settled:l.due)+kv(m.cash,money(r.net_simulated_cash,'KGS'))+kv(m.debt,money(r.outstanding,'KGS'))+kv(m.credit,money(r.credit,'KGS'))+kv(m.diff,money(r.discrepancy,'KGS'))+'</div>'+
- table([l.id,m.kind,m.amount,l.source],r.events.map(e=>'<tr><td>'+safe(e.event_id)+'</td><td>'+safe(e.kind==='PAYMENT'?m.payment:m.reversal)+'</td><td>'+money(e.amount,'KGS')+'</td><td>'+safe(e.payment_id||'—')+'</td></tr>'))+
- (r.sequence<100?'<div class="admin-form journal-append"><input type="hidden" name="journal_agreement_id" value="'+safe(r.agreement_id)+'"><input type="hidden" name="expected_sequence" value="'+safe(r.sequence)+'"><label>'+safe(m.kind)+'<select name="event_kind"><option value="PAYMENT">'+safe(m.payment)+'</option><option value="REFUND">'+safe(m.reversal)+'</option></select></label><label>'+safe(l.id)+'<input name="event_id" value="'+safe('event-'+(r.sequence+1))+'" maxlength="64"></label><label>'+safe(m.amount)+'<input name="event_amount" inputmode="decimal" maxlength="15"></label><label>'+safe(l.source)+'<input name="payment_id" maxlength="64"></label><button type="button" class="primary" data-journal-append>'+safe(l.append)+'</button></div>':'');
+ table([l.id,m.kind,m.amount,l.source],r.events.map(e=>'<tr><td>'+safe(e.event_id)+'</td><td>'+safe(journalOperationLabel(e.kind))+'</td><td>'+money(e.amount,'KGS')+'</td><td>'+safe(e.payment_id||'—')+'</td></tr>'))+
+ (r.sequence<100?'<div class="admin-form journal-append"><input type="hidden" name="journal_agreement_id" value="'+safe(r.agreement_id)+'"><input type="hidden" name="expected_sequence" value="'+safe(r.sequence)+'"><label>'+safe(m.kind)+'<select name="event_kind"><option value="PAYMENT">'+safe(m.payment)+'</option><option value="REFUND">'+safe(m.reversal)+'</option><option value="CREDIT_APPLY">'+safe(creditApplyLabel())+'</option></select></label><label>'+safe(l.id)+'<input name="event_id" value="'+safe('event-'+(r.sequence+1))+'" maxlength="64"></label><label>'+safe(m.amount)+'<input name="event_amount" inputmode="decimal" maxlength="15"></label><label>'+safe(l.source)+'<input name="payment_id" maxlength="64"></label><button type="button" class="primary" data-journal-append>'+safe(l.append)+'</button></div>':'');
 }
 async function openSyntheticJournal(form){
  const d=new FormData(form),status=form.querySelector('[role=status]');
@@ -788,7 +790,7 @@ async function appendSyntheticJournal(button){
  button.disabled=true;status.textContent='';
  try{
   const event={kind:d.get('event_kind'),event_id:d.get('event_id'),amount:d.get('event_amount')};
-  if(event.kind==='REFUND')event.payment_id=d.get('payment_id');
+  if(event.kind!=='PAYMENT')event.payment_id=d.get('payment_id');
   const r=await saveQaCatalogAction('synthetic-cash-journal',{hotel_id:state.hotelId,agreement_id:d.get('journal_agreement_id'),expected_sequence:Number(d.get('expected_sequence')),event});
   renderSyntheticJournal(form.querySelector('.journal-result'),r);
  }catch(e){status.textContent=e.message;button.disabled=false;}
