@@ -461,3 +461,37 @@ async def verify_full_lodging_iteration():
 before_lodging=checks
 asyncio.run(verify_full_lodging_iteration())
 print("MARINA_OWNER_FULL_LODGING_ITERATION_PASS",checks-before_lodging)
+
+# Direct SQL guard exists in the new additive migration, independent of API.
+async def verify_period_guards():
+    conn=await asyncpg.connect(parsed.geturl())
+    try:
+        triggers=await conn.fetch("""SELECT tgname FROM pg_trigger
+            WHERE NOT tgisinternal AND tgname IN
+            ('ab_owner_revenue_period_posting','aa_owner_correction_posting_guard')""")
+        check(len(triggers),2,"both PostgreSQL period guards installed")
+        async with conn.transaction():
+            fixture=await race_fixture(conn)
+            # Run direct INSERT with a mismatched header against the new trigger.
+            # The earlier proposal/header integrity guard may also reject it.
+            from datetime import timedelta
+            q=await conn.fetchrow('SELECT * FROM owner_accounting_journal_proposals WHERE id=$1',fixture[1])
+            try:
+                async with conn.transaction():
+                    await conn.execute("""INSERT INTO owner_accounting_postings
+                        (id,"propertyId","proposalId","decisionId",action,"accountingDate",
+                         "policyVersion","postedById","sourceCompletenessAttested",reason)
+                        VALUES($1,$2,$3,$4,'POST',$5,$6,$7,true,'Direct wrong date test')""",
+                        uuid.uuid4(),p,fixture[1],fixture[2],
+                        q["accountingDate"]-timedelta(days=1),q["policyVersion"],fixture[3])
+            except asyncpg.CheckViolationError as exc:
+                check("ACCOUNTING_REVENUE_SERVICE_DATE_MISMATCH" in str(exc),True,
+                      "direct SQL wrong service date rejected")
+            else:
+                raise AssertionError("wrong service date accepted")
+            # Keep fixture isolated; no artificial posting is accepted.
+    finally:
+        await conn.close()
+before_period=checks
+asyncio.run(verify_period_guards())
+print("MARINA_OWNER_PERIOD_SQL_GUARDS_PASS",checks-before_period)
