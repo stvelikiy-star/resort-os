@@ -6,7 +6,9 @@ period-close process: P&L stays NULL until complete-period reconciliation.
 import os
 import json
 import uuid
-from datetime import date
+
+import asyncpg
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -699,3 +701,114 @@ async def period_coverage_view(request:Request,from_date:date=Query(),to_date:da
                 raise HTTPException(503,detail={"code":"PROPERTY_TIMEZONE_UNAVAILABLE"})
             return await period_coverage(conn,pid,from_date,to_date,tz)
 
+
+
+class PartialRefundReview(PostingAction):
+    reservation_id: uuid.UUID
+    payment_id: uuid.UUID
+    evidence_document_id: uuid.UUID
+    amount_kgs: int=Field(gt=0,le=2147483647,strict=True)
+    refunded_at: datetime
+    external_refund_already_completed: bool
+
+    @field_validator("refunded_at")
+    @classmethod
+    def aware_refund_timestamp(cls,v):
+        if v.tzinfo is None or v.utcoffset() is None:
+            raise ValueError("Refund timestamp must contain a timezone")
+        return v.astimezone(timezone.utc)
+
+
+def partial_refund_review_guard():
+    posting_guard()
+    if os.getenv("MARINA_PARTIAL_REFUND_REVIEW_QA_ENABLED")!="true":
+        raise HTTPException(503,detail={"code":"PARTIAL_REFUND_REVIEW_QA_DISABLED"})
+
+
+@router.post("/partial-refunds",status_code=201)
+async def review_partial_refund(body:PartialRefundReview,request:Request,user=Depends(owner_only)):
+    """Record external cash evidence only in explicitly enabled accounting QA.
+
+    The authenticated OWNER is the reviewer. The original immutable document
+    uploader is the evidence maker; neither identity can be supplied by a
+    client. No payment processor or payout service is called.
+    """
+    partial_refund_review_guard()
+    if body.external_refund_already_completed is not True:
+        raise HTTPException(422,detail={"code":"EXTERNAL_REFUND_EVIDENCE_REQUIRED"})
+    async with request.app.state.db.acquire() as conn:
+        try:
+            async with conn.transaction():
+                pid=await trusted_property_id(conn,user)
+                reviewer=uuid.UUID(str(user["id"]))
+                doc=await conn.fetchrow(
+                    """SELECT id,"documentReference","uploadedById"
+                       FROM owner_revenue_evidence_documents
+                       WHERE "propertyId"=$1 AND id=$2""",pid,body.evidence_document_id)
+                if not doc or doc["uploadedById"]==reviewer:
+                    raise HTTPException(409,detail={"code":"PARTIAL_REFUND_INDEPENDENT_DOCUMENT_REQUIRED"})
+                if not await conn.fetchval(
+                    'SELECT EXISTS(SELECT 1 FROM staff_users WHERE "propertyId"=$1 AND id=$2 AND role=\'OWNER\' AND "isActive")',
+                    pid,reviewer):
+                    raise HTTPException(403,detail={"code":"PARTIAL_REFUND_OWNER_REQUIRED"})
+                reservation=await conn.fetchrow(
+                    'SELECT id FROM reservations WHERE "propertyId"=$1 AND id=$2 FOR UPDATE',pid,body.reservation_id)
+                if not reservation:
+                    raise HTTPException(404,detail={"code":"RESERVATION_NOT_FOUND"})
+                reference=doc["documentReference"]
+                await lock_keys(conn,"partial-refund-event:"+str(body.id))
+                # Use the same lock namespace as legacy full refund confirmation.
+                await conn.execute("SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+                                   "marina-manual-full-refund:"+reference)
+                pay=await conn.fetchrow(
+                    'SELECT id FROM payments WHERE id=$1 AND "reservationId"=$2 FOR UPDATE',
+                    body.payment_id,body.reservation_id)
+                if not pay:
+                    raise HTTPException(404,detail={"code":"PAYMENT_NOT_FOUND"})
+                prior=await conn.fetchrow('SELECT * FROM owner_partial_refund_events WHERE id=$1',body.id)
+                if prior:
+                    if (prior["propertyId"]!=pid or prior["paymentId"]!=body.payment_id
+                        or prior["reservationId"]!=body.reservation_id
+                        or prior["evidenceDocumentId"]!=body.evidence_document_id
+                        or prior["reviewedById"]!=reviewer or prior["amountKgs"]!=body.amount_kgs
+                        or prior["refundedAt"]!=body.refunded_at or prior["reason"]!=body.reason):
+                        raise HTTPException(409,detail={"code":"PARTIAL_REFUND_ID_CONFLICT"})
+                    repeated=True
+                else:
+                    if await conn.fetchval(
+                        """SELECT EXISTS(SELECT 1 FROM audit_logs
+                           WHERE action='CONFIRM_MANUAL_FULL_REFUND'
+                             AND "afterJson"->>'evidence_reference'=$1)""",reference):
+                        raise HTTPException(409,detail={"code":"REFUND_EVIDENCE_REFERENCE_REUSED"})
+                    await conn.execute("SELECT set_config('marina.partial_refund_evidence_qa','on',true)")
+                    await conn.execute(
+                        """INSERT INTO owner_partial_refund_events
+                          (id,"propertyId","paymentId","reservationId","amountKgs","refundedAt",
+                           "evidenceDocumentId","evidenceReference","recordedById","reviewedById",reason)
+                          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)""",
+                        body.id,pid,body.payment_id,body.reservation_id,body.amount_kgs,body.refunded_at,
+                        body.evidence_document_id,reference,doc["uploadedById"],reviewer,body.reason)
+                    # Notify CRM consumers that the retained amount changed.
+                    await conn.execute('UPDATE payments SET "updatedAt"=now() WHERE id=$1',body.payment_id)
+                    await conn.execute(
+                        """INSERT INTO audit_logs
+                           (id,"propertyId","actorType","actorId",action,resource,"resourceId",
+                            source,result,"afterJson","createdAt")
+                           VALUES($1,$2,'STAFF',$3,'REVIEW_PARTIAL_REFUND','Payment',$4,
+                            'PMS_MANUAL_REFUND','SUCCESS',
+                            jsonb_build_object('refund_id',$5::text,'amount_kgs',$6::int,
+                              'evidence_reference',$7::text,'funds_sent_by_platform',false),now())""",
+                        uuid.uuid4(),pid,str(reviewer),str(body.payment_id),str(body.id),body.amount_kgs,reference)
+                    repeated=False
+                balance=await conn.fetchrow(
+                    """SELECT "originalAmountKgs","refundedKgs","remainingReceivedKgs"
+                       FROM owner_reservation_payment_balances WHERE "propertyId"=$1 AND "paymentId"=$2""",
+                    pid,body.payment_id)
+                return {"id":str(body.id),"payment_id":str(body.payment_id),
+                        "already_processed":repeated,"currency":"KGS",
+                        "original_amount_kgs":int(balance["originalAmountKgs"]),
+                        "refunded_kgs":int(balance["refundedKgs"]),
+                        "remaining_received_kgs":int(balance["remainingReceivedKgs"]),
+                        "refund_executed_by_platform":False,"recognized_profit_kgs":None}
+        except (asyncpg.CheckViolationError,asyncpg.UniqueViolationError) as exc:
+            raise HTTPException(409,detail={"code":"PARTIAL_REFUND_EVIDENCE_CONFLICT"}) from exc

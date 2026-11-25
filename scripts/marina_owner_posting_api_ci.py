@@ -889,3 +889,70 @@ def verify_full_cancellation():
 before_full=checks
 verify_full_cancellation()
 print("MARINA_OWNER_FULL_CANCELLATION_PASS",checks-before_full)
+
+
+def verify_partial_refund_review_api():
+    from datetime import timedelta
+    async def fixture():
+        conn=await asyncpg.connect(parsed.geturl())
+        try:
+            maker=await conn.fetchval("""SELECT id FROM staff_users WHERE "propertyId"=$1 AND username='owner'""",p)
+            stamp=await conn.fetchval("SELECT now()")
+            day=await conn.fetchval("SELECT (now() AT TIME ZONE timezone)::date FROM properties WHERE id=$1",p)
+            rid,pay_id=uuid.uuid4(),uuid.uuid4()
+            await conn.execute("""INSERT INTO reservations
+              (id,"propertyId","bookingNumber",status,"checkIn","checkOut",adults,"totalKgs","createdAt","updatedAt")
+              VALUES($1,$2,$3,'CANCELLED',$4,$5,1,700,now(),now())""",
+              rid,p,"CI-PARTIAL-API-"+str(rid),day-timedelta(days=2),day-timedelta(days=1))
+            await conn.execute("""INSERT INTO payments
+                (id,"reservationId","amountKgs",method,status,provider,"paidAt","createdAt","updatedAt")
+                VALUES($1,$2,700,'CASH','RECEIVED','MANAGER_MANUAL',now()-interval '1 day',now(),now())""",pay_id,rid)
+            docs=[]
+            for index in range(3):
+                doc_id=uuid.uuid4()
+                content=b"%PDF-1.4 synthetic partial refund API evidence "+str(index).encode()
+                await conn.execute("""INSERT INTO owner_revenue_evidence_documents
+                    (id,"propertyId","documentReference","documentDate","fileName","mediaType",sha256,content,"sizeBytes","uploadedById")
+                    VALUES($1,$2,$3,$4,'partial.pdf','application/pdf',$5,$6,$7,$8)""",
+                    doc_id,p,"CI-PARTIAL-API-"+str(doc_id),day,hashlib.sha256(content).hexdigest(),content,len(content),maker)
+                docs.append(doc_id)
+            return rid,pay_id,docs,stamp
+        finally:
+            await conn.close()
+    rid,pay_id,docs,stamp=asyncio.run(fixture())
+    endpoint="/api/v1/admin/finance/owner/accounting-journal/partial-refunds"
+    payload={"id":str(uuid.uuid4()),"reservation_id":str(rid),"payment_id":str(pay_id),
+             "evidence_document_id":str(docs[0]),"amount_kgs":100,"refunded_at":stamp.isoformat(),
+             "external_refund_already_completed":True,"reason":"Synthetic external refund independently reviewed"}
+    with TestClient(app,base_url="https://ledger-qa.invalid") as client:
+        def login_partial(name):
+            client.post("/api/v1/auth/logout")
+            check(client.post("/api/v1/auth/login",json={"username":name,"password":PASSWORD}).status_code,200,"partial API login")
+        login_partial("owner")
+        check(client.post(endpoint,json=payload).status_code,503,"partial review disabled by default")
+        os.environ["MARINA_PARTIAL_REFUND_REVIEW_QA_ENABLED"]="true"
+        try:
+            check(client.post(endpoint,json=payload).status_code,409,"maker cannot review own refund evidence")
+            login_partial("accounting_reviewer")
+            check(client.post(endpoint,json={**payload,"external_refund_already_completed":False}).status_code,422,"no payout instructions")
+            check(client.post(endpoint,json={**payload,"payment_id":str(uuid.uuid4())}).status_code,404,"unknown payment denied")
+            first=client.post(endpoint,json=payload)
+            check(first.status_code,201,"record first partial refund")
+            check(first.json()["remaining_received_kgs"],600,"first remaining payment")
+            check(first.json()["refund_executed_by_platform"],False,"no payout performed")
+            check(client.post(endpoint,json=payload).json()["already_processed"],True,"idempotent review")
+            check(client.post(endpoint,json={**payload,"amount_kgs":101}).status_code,409,"replay conflict")
+            check(client.post(endpoint,json={**payload,"id":str(uuid.uuid4())}).status_code,409,"same evidence cannot be reused")
+            second={**payload,"id":str(uuid.uuid4()),"evidence_document_id":str(docs[1]),"amount_kgs":200}
+            result=client.post(endpoint,json=second)
+            check(result.status_code,201,"second partial refund")
+            check(result.json()["refunded_kgs"],300,"accumulated refund")
+            check(result.json()["remaining_received_kgs"],400,"remaining 400 KGS")
+            check(client.post(endpoint,json={**payload,"id":str(uuid.uuid4()),
+                "evidence_document_id":str(docs[2]),"amount_kgs":401}).status_code,409,"reject above remaining balance")
+        finally:
+            os.environ.pop("MARINA_PARTIAL_REFUND_REVIEW_QA_ENABLED",None)
+        check(client.post(endpoint,json=payload).status_code,503,"guard restored")
+before_partial_api=checks
+verify_partial_refund_review_api()
+print("MARINA_OWNER_PARTIAL_REFUND_REVIEW_API_PASS",checks-before_partial_api)
