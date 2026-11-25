@@ -41,6 +41,94 @@ def posting_guard():
         raise HTTPException(503,detail={"code":"OWNER_ACCOUNTING_POSTING_DISABLED"})
 
 
+class RevenueSourceCertification(BaseModel):
+    id: uuid.UUID
+    source_event_id: uuid.UUID
+    evidence_document_id: uuid.UUID
+    tax_amount_kgs: Decimal=Field(ge=0,max_digits=20,decimal_places=4,allow_inf_nan=False)
+    policy_version: str=Field(min_length=3,max_length=80)
+    reason: str=Field(min_length=8,max_length=500)
+
+    @field_validator("reason","policy_version")
+    @classmethod
+    def normalize_text(cls,value):
+        value=" ".join(value.split())
+        if len(value)<3:
+            raise ValueError("Policy / explanation is required")
+        return value
+
+
+@router.post("/revenue-certifications",status_code=201)
+async def certify_revenue_source(body:RevenueSourceCertification,request:Request,
+                                 user=Depends(owner_only)):
+    """Independent review of stored source document; not final period close."""
+    posting_guard()
+    async with request.app.state.db.acquire() as conn:
+        async with conn.transaction():
+            pid=await trusted_property_id(conn,user)
+            actor=uuid.UUID(str(user["id"]))
+            await lock_keys(conn,"owner-revenue-certification:"+str(pid)+":"+
+                            str(body.source_event_id))
+            prior=await conn.fetchrow(
+                """SELECT * FROM owner_revenue_accounting_certifications
+                   WHERE "propertyId"=$1 AND "sourceEventId"=$2""",
+                pid,body.source_event_id)
+            if prior:
+                if (prior["id"]!=body.id
+                    or prior["reviewedById"]!=actor
+                    or prior["evidenceDocumentId"]!=body.evidence_document_id
+                    or prior["taxAmountKgs"]!=body.tax_amount_kgs
+                    or prior["policyVersion"]!=body.policy_version
+                    or prior["reason"]!=body.reason):
+                    raise HTTPException(409,detail={"code":"REVENUE_SOURCE_CERTIFICATION_CONFLICT"})
+                return {"id":str(prior["id"]),"already_processed":True,
+                        "accounting_posted":False,"recognized_profit_kgs":None}
+            ev=await conn.fetchrow(
+                """SELECT e."faceValueKgs",e."createdById",e."sourceType",
+                          e."serviceDate"
+                   FROM owner_revenue_source_events e
+                   WHERE e.id=$1 AND e."propertyId"=$2 AND e.action='APPROVE_SOURCE'
+                   AND NOT EXISTS(SELECT 1 FROM owner_revenue_source_events r
+                     WHERE r."propertyId"=$2 AND r."reversesId"=e.id)""",
+                body.source_event_id,pid)
+            doc=await conn.fetchrow(
+                """SELECT "uploadedById","documentDate" FROM owner_revenue_evidence_documents
+                   WHERE id=$1 AND "propertyId"=$2""",body.evidence_document_id,pid)
+            if (not ev or not doc or ev["sourceType"] not in ("ROOM_NIGHT","DINING_ORDER")
+                or ev["createdById"]==actor or doc["uploadedById"]==actor
+                or doc["documentDate"]>date.today()):
+                raise HTTPException(409,detail={"code":"REVENUE_INDEPENDENT_DOCUMENT_REVIEW_REQUIRED"})
+            if await conn.fetchval(
+                """SELECT EXISTS(SELECT 1 FROM owner_revenue_correction_events c
+                   WHERE c."propertyId"=$1 AND c."approvalId"=$2
+                     AND c.action='RECORD'
+                     AND NOT EXISTS(SELECT 1 FROM owner_revenue_correction_events r
+                       WHERE r."propertyId"=$1 AND r."reversesId"=c.id))""",
+                pid,body.source_event_id):
+                raise HTTPException(409,detail={"code":"REVENUE_CORRECTIONS_UNRECONCILED"})
+            gross=Decimal(ev["faceValueKgs"])
+            net=gross-body.tax_amount_kgs
+            if net<=0:
+                raise HTTPException(409,detail={"code":"REVENUE_TAX_COMPONENT_INVALID"})
+            row=await conn.fetchrow(
+                """INSERT INTO owner_revenue_accounting_certifications
+                   (id,"propertyId","sourceEventId","evidenceDocumentId",
+                    "reviewedById","grossAmountKgs","taxAmountKgs",
+                    "netRevenueKgs","policyVersion",reason)
+                   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id""",
+                body.id,pid,body.source_event_id,body.evidence_document_id,
+                actor,gross,body.tax_amount_kgs,net,body.policy_version,body.reason)
+            await conn.execute(
+                """INSERT INTO audit_logs
+                   (id,"propertyId","actorType","actorId",action,resource,
+                    "resourceId",source,result,"createdAt")
+                   VALUES($1,$2,'STAFF',$3,'ACCOUNTING_REVENUE_CERTIFIED',
+                          'OwnerRevenueSource',$4,'WEB_ADMIN','SUCCESS',now())""",
+                uuid.uuid4(),pid,str(actor),str(body.source_event_id))
+            return {"id":str(row["id"]),"already_processed":False,
+                    "accounting_posted":False,"recognized_profit_kgs":None}
+
+
 async def qualified_posting_source(conn,pid,proposal):
     """Only unmodified, verified delivered-source evidence; never client amounts."""
     if proposal["sourceType"]=="STOCK_CONSUMPTION":
@@ -81,16 +169,14 @@ async def qualified_posting_source(conn,pid,proposal):
         proposal["sourceId"],pid)
     if not row:
         raise HTTPException(409,detail={"code":"ACCOUNTING_SOURCE_UNVERIFIED_OR_REVERSED"})
-    # Immutable qualification snapshot is written only by the original
-    # verified source API, never by this posting request.
-    proof=(json.loads(row["sourceSnapshot"])
-           if isinstance(row["sourceSnapshot"],str) else row["sourceSnapshot"])
-    if not isinstance(proof,dict):
-        raise HTTPException(409,detail={"code":"ACCOUNTING_SOURCE_SNAPSHOT_INVALID"})
-    key=("rate_and_tax_accounting_approved" if row["sourceType"]=="ROOM_NIGHT"
-         else "tax_discount_refund_accounting_approved")
-    if proof.get(key) is not True:
-        raise HTTPException(409,detail={"code":"ACCOUNTING_SOURCE_TAX_DISCOUNT_PROOF_MISSING"})
+    cert=await conn.fetchrow(
+        """SELECT "grossAmountKgs","taxAmountKgs","netRevenueKgs"
+           FROM owner_revenue_accounting_certifications
+           WHERE "propertyId"=$1 AND "sourceEventId"=$2
+             AND "policyVersion"=$3""",
+        pid,proposal["sourceId"],proposal["policyVersion"])
+    if not cert or cert["grossAmountKgs"]!=row["faceValueKgs"]:
+        raise HTTPException(409,detail={"code":"ACCOUNTING_CERTIFIED_SOURCE_DOCUMENT_REQUIRED"})
     corrections=await conn.fetchval(
         """SELECT COUNT(*) FROM owner_revenue_correction_events c
            WHERE c."propertyId"=$1 AND c."approvalId"=$2 AND c.action='RECORD'
@@ -99,7 +185,7 @@ async def qualified_posting_source(conn,pid,proposal):
         pid,proposal["sourceId"])
     if corrections:
         raise HTTPException(409,detail={"code":"ACCOUNTING_CORRECTIONS_NOT_RECONCILED"})
-    return row
+    return {**dict(row),**dict(cert)}
 
 
 def posting_view(row,replay=False):
@@ -153,6 +239,16 @@ async def post_approved_proposal(proposal_id:uuid.UUID,body:PostingAction,
                                  evidence_complete=True,
                                  source_amount=source["faceValueKgs"],
                                  revenue_service_type=source["sourceType"])
+                if proposal["sourceType"]=="REVENUE_SOURCE":
+                    rev_code="4100" if source["sourceType"]=="ROOM_NIGHT" else "4200"
+                    sums=lambda code,side:sum(
+                        (Decimal(r["amount_kgs"]) for r in lines
+                          if r["account_code"]==code and r["side"]==side),
+                        Decimal(0))
+                    if (sums("1100","DEBIT")!=source["grossAmountKgs"]
+                        or sums(rev_code,"CREDIT")!=source["netRevenueKgs"]
+                        or sums("2100","CREDIT")!=source["taxAmountKgs"]):
+                        raise ValueError("REVENUE_DOCUMENT_SPLIT_MISMATCH")
             except ValueError as exc:
                 raise HTTPException(409,detail={"code":"ACCOUNTING_POSTING_POLICY_REJECTED",
                                                 "reason":str(exc)}) from exc
