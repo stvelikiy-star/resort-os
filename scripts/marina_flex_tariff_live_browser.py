@@ -318,6 +318,31 @@ def run():
         assert evidence=={"acceptances":1,"signed":0,"payments":0,"subscriptions":2},evidence
         owner_context.close()
         print("PASS browser real hotel owner accepted exact terms; other hotel denied; administrator sees evidence; PostgreSQL matches")
+        page.locator('[data-hotel-tab="finance"]').click()
+        form=page.locator("#finance-simulation-form")
+        expect(form).to_be_visible()
+        form.locator('[name="agreement_id"]').select_option(contract["id"])
+        form.locator('[name="first"]').fill("20000")
+        form.locator('[name="second"]').fill("45000")
+        form.locator('[name="refund"]').fill("9000")
+        form.locator('[name="payment_id"]').select_option("p2")
+        with page.expect_response(ORIGIN+"/api/actions/finance-simulation") as submitted:
+            form.locator('button[type="submit"]').click()
+        response=submitted.value
+        assert response.status==201,("finance simulation",response.status,response.text()[:250])
+        simulation=response.json()
+        assert simulation["mode"]=="SYNTHETIC_ONLY" and not simulation["persisted"]
+        assert Decimal(simulation["net_simulated_cash"])==Decimal("56000")
+        assert Decimal(simulation["outstanding"])==Decimal("5000")
+        assert Decimal(simulation["credit"])==Decimal("0") and Decimal(simulation["discrepancy"])==Decimal("0")
+        expect(form.locator(".simulation-result")).to_contain_text("56,000 KGS")
+        expect(form.locator(".simulation-result")).to_contain_text("5,000 KGS")
+        query="""SELECT json_build_object('payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments),
+          'refunds',(SELECT count(*) FROM flex_private.flex_payment_reversals),
+          'subscriptions',(SELECT count(*) FROM flex_private.flex_subscriptions))"""
+        evidence=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
+        assert evidence=={"payments":0,"refunds":0,"subscriptions":2},evidence
+        print("PASS browser synthetic 61000 quote, 65000 receipts, 9000 refund, 5000 debt, zero discrepancy, no ledger writes")
         browser.close()
 
 
