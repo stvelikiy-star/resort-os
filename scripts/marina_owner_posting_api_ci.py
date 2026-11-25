@@ -561,7 +561,7 @@ print("MARINA_OWNER_PERIOD_SQL_GUARDS_PASS",checks-before_period)
 
 # Actual task/folio, independent certificate and exact SQL posting; rolled
 # back after checking deferred constraints. No production connections.
-async def verify_guest_service_ledger(*, mutation_checks=False, refund_checks=False):
+async def verify_guest_service_ledger(*, mutation_checks=False, refund_checks=False, partial_checks=False):
     from datetime import timedelta
     conn=await asyncpg.connect(parsed.geturl())
     tx=conn.transaction()
@@ -607,6 +607,53 @@ async def verify_guest_service_ledger(*, mutation_checks=False, refund_checks=Fa
           (id,"propertyId","sourceType","sourceId","serviceDate",action,"faceValueKgs","sourceSnapshot",reason,"createdById")
           VALUES($1,$2,'OTHER_SERVICE',$3,$4,'APPROVE_SOURCE',700,'{}'::jsonb,'Synthetic completed service evidence',$5)""",
           sid,p,tid,day,maker)
+        if partial_checks:
+            pay_id=uuid.uuid4()
+            await conn.execute("""INSERT INTO payments
+                (id,"reservationId","amountKgs",method,status,provider,"paidAt","createdAt","updatedAt")
+                VALUES($1,$2,700,'CASH','RECEIVED','MANAGER_MANUAL',now()-interval '1 day',now(),now())""",pay_id,rid)
+            async def record(amount, *, property_id=p, actor=reviewer, allow=True):
+                event,doc=uuid.uuid4(),uuid.uuid4()
+                reference="CI-PARTIAL-"+str(event)
+                content=b"%PDF-1.4 synthetic partial refund evidence"
+                await conn.execute("""INSERT INTO owner_revenue_evidence_documents
+                    (id,"propertyId","documentReference","documentDate","fileName","mediaType",sha256,content,"sizeBytes","uploadedById")
+                    VALUES($1,$2,$3,$4,'partial.pdf','application/pdf',$5,$6,$7,$8)""",
+                    doc,p,reference,day,hashlib.sha256(content).hexdigest(),content,len(content),maker)
+                await conn.execute("SELECT set_config('marina.partial_refund_evidence_qa',$1,true)","on" if allow else "off")
+                await conn.execute("""INSERT INTO owner_partial_refund_events
+                   (id,"propertyId","paymentId","reservationId","amountKgs","refundedAt",
+                    "evidenceDocumentId","evidenceReference","recordedById","reviewedById",reason)
+                   VALUES($1,$2,$3,$4,$5,now(),$6,$7,$8,$9,'Synthetic independently reviewed partial refund')""",
+                   event,property_id,pay_id,rid,amount,doc,reference,maker,actor)
+                return event
+            async def rejected(amount,code,**kw):
+                try:
+                    async with conn.transaction():
+                        await record(amount,**kw)
+                except asyncpg.CheckViolationError as exc:
+                    check(code in str(exc),True,"partial refund guard "+code)
+                else:
+                    raise AssertionError("Invalid partial refund accepted")
+            await rejected(100,"PARTIAL_REFUND_WRITE_NOT_RELEASED",allow=False)
+            await rejected(100,"PARTIAL_REFUND_PAYMENT_OR_ACTOR_INVALID",property_id=pb)
+            first=await record(100)
+            await record(200)
+            balance=await conn.fetchrow("""SELECT * FROM owner_reservation_payment_balances
+                WHERE "propertyId"=$1 AND "paymentId"=$2""",p,pay_id)
+            check(balance["originalAmountKgs"],700,"original receipt unchanged")
+            check(balance["refundedKgs"],300,"partial cash refunds accumulated once")
+            check(balance["remainingReceivedKgs"],400,"exact remaining receipt")
+            await rejected(401,"PARTIAL_REFUND_EXCEEDS_RECEIPT")
+            try:
+                async with conn.transaction():
+                    await conn.execute("UPDATE payments SET status='REFUNDED' WHERE id=$1",pay_id)
+            except asyncpg.CheckViolationError as exc:
+                check("PARTIAL_REFUND_RECEIPT_IMMUTABLE" in str(exc),True,"legacy full refund cannot double count partials")
+            else:
+                raise AssertionError("Legacy full refund bypassed partial ledger")
+            check(await conn.fetchval("SELECT count(*) FROM owner_partial_refund_events WHERE id=$1",first),1,"one immutable event")
+            return
         if refund_checks:
             # Canonical payment + audit evidence from a synthetic reservation.
             pay_id,refund_doc,refund_event=uuid.uuid4(),uuid.uuid4(),uuid.uuid4()
@@ -708,6 +755,9 @@ print("MARINA_OWNER_GUEST_SERVICE_LEDGER_PASS",checks-before_guest)
 before_refund=checks
 asyncio.run(verify_guest_service_ledger(refund_checks=True))
 print("MARINA_OWNER_CERTIFIED_REFUND_PASS",checks-before_refund)
+before_partial=checks
+asyncio.run(verify_guest_service_ledger(partial_checks=True))
+print("MARINA_OWNER_PARTIAL_REFUND_FOUNDATION_PASS",checks-before_partial)
 
 # One invoice, multiple independently reviewed corrections, one posting.
 # REFUND / PACKAGE_SPLIT are intentionally blocked from revenue recognition

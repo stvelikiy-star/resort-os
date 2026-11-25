@@ -35,6 +35,7 @@ on:
       - 'packages/database/prisma/migrations/zz136_marina_owner_certified_revenue_reductions_20261125/migration.sql'
       - 'packages/database/prisma/migrations/zz137_marina_owner_certified_refund_cash_evidence_20261125/migration.sql'
       - 'packages/database/prisma/migrations/zz138_marina_owner_full_cancellation_certificate_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz139_marina_partial_refund_evidence_foundation_20261125/migration.sql'
       - 'services/api/app/owner_revenue_source_journal.py'
       - 'packages/database/prisma/migrations/zz128_marina_owner_accounting_decision_evidence_20261124/migration.sql'
       - 'services/api/app/kitchen_batch_allocation.py'

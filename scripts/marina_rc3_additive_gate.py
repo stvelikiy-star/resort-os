@@ -2,7 +2,7 @@
 """Source gate for a NEW additive release without rewriting immutable RC3 evidence.
 
 RC2/RC3 manifests remain 39-migration history. The current release must
-preserve all 39 original SQL hashes and include pinned zz115 through zz138 SQL.
+preserve all 39 original SQL hashes and include pinned zz115 through zz139 SQL.
 """
 from __future__ import annotations
 import hashlib
@@ -36,7 +36,8 @@ NEW_MIGRATIONS = {
     "zz135_marina_owner_certified_tax_correction_20261125": "9f3239acbfa138c2c9e63a98e43875d5ad6a127cbe1cb5b43b2247edcedbb152",
     "zz136_marina_owner_certified_revenue_reductions_20261125": "e9c640033403f30b80be77a7aeede6caec3ce01d034f83bbf171603dd5c14b67",
     "zz137_marina_owner_certified_refund_cash_evidence_20261125": "0f1b18a74bf2cecea5cecf301dea4dc8835bdc3b20e6d300b95f443aafec2837",
-    "zz138_marina_owner_full_cancellation_certificate_20261125": "4e0a5290a5bd96167bf1db12cf9e436af2fdcb6427b395b6f8a6d593fc6774b4"
+    "zz138_marina_owner_full_cancellation_certificate_20261125": "4e0a5290a5bd96167bf1db12cf9e436af2fdcb6427b395b6f8a6d593fc6774b4",
+    "zz139_marina_partial_refund_evidence_foundation_20261125": "8fa7d2833def337a09a418a802a0be18df0a61114e85b27d888934f498afc3e8"
 }
 # Reviewed tightening: summary is trimmed and whitespace-only reports are rejected.
 # Keep the historical RC3 manifest immutable; pin this additive source exactly.
@@ -73,9 +74,9 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",
     # MARINA-specific 52nd migration, exact batch-to-served item ledger.
     "scripts/marina_shared_three_hotel_restore_ci.py": "0f00022721637c58d3897f5164496af7173e37dd",
-    "scripts/release_contract.py": "ca63d01dade4cc77c95fc33670d8e7178182420c",
-    "scripts/release_contract_test.py": "72f9662062db511cdb482d57fc12b7bb805a1147",
-    ".github/workflows/marina-zz113-rollback-ci.yml": "50eff3ca41afebeb69d7a2dfa0cfd6fb8f47c37f",
+    "scripts/release_contract.py": "2fc2f2600f986cab46021a19e2e724ceba43af0a",
+    "scripts/release_contract_test.py": "7cce748427fbfe7b9c256c4ffd7bad0c7ed5307f",
+    ".github/workflows/marina-zz113-rollback-ci.yml": "326d65e9fdb48a837d0712ace2c30b6baedc7c1b",
     "scripts/marina_disposable_upgrade_acceptance_ci.py": "b877c5976def9451853953b86ec48b6804ab16b0",
     ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "9bf375ac39d02cf78122dbe4544f1d69d3335cb6",
     "services/api/app/app_entry.py": "8b8e630073ddbe6a8855a5494116c5cac11064ca",
@@ -91,14 +92,14 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/owner_revenue_corrections.py": "10f52e7f916598620c73fa2d3a61f08bed435aaa",
     "services/api/app/owner_delivered_revenue.py": "1e8881079cd4d4a64f96aaabbb51c1d21e59a035",
     "scripts/test_owner_ledger_policy.py": "d266a0fc91733e274e1f19e1b417a3adc25a7022",
-    "scripts/marina_owner_posting_api_ci.py": "f0025a670f05a56961d0aa6a39875e49ae39e449",
+    "scripts/marina_owner_posting_api_ci.py": "eca6527ad04c2ea58909ccce2aec8bb4e194f47f",
     "services/api/app/owner_revenue_source_journal.py": "a748840fcce9904dbb4e52fe20c9ff6163bd9375",
     "scripts/marina_owner_expense_posting_ci.py": "3c5879734d3bff96269559b1aa08e25adfe937c2",
     "scripts/marina_owner_served_cogs_posting_ci.py": "75bb2cc1fb85ff6379ec0b8010115a4aad6b290b",
     "scripts/test_owner_recognition_policy.py": "7a856095b84319c654c9b536f763e1d763cf790a",
     ".github/workflows/marina-owner-recognition-policy-ci.yml": "7965e38127aaf6a9ffe73f0c0ce755425d36d6e1",
     "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "82dfcbd5355fdd48f1d5a1316f68655159ef9870",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "9be689e37a033ccee0a588d4110c99d6416ab83e",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
@@ -123,15 +124,15 @@ def validate_additive() -> list[str]:
     pinned = rc2.get("migration_sha256")
     if not isinstance(pinned, dict) or len(pinned) != 39:
         return ["historical RC2 expected 39 pinned migration hashes"]
-    if len(EXPECTED_MIGRATIONS) != 63 or EXPECTED_MIGRATIONS[39:] != tuple(NEW_MIGRATIONS):
-        errors.append("current release must contain exactly 39 historical + zz115 through zz138 migrations")
+    if len(EXPECTED_MIGRATIONS) != 64 or EXPECTED_MIGRATIONS[39:] != tuple(NEW_MIGRATIONS):
+        errors.append("current release must contain exactly 39 historical + zz115 through zz139 migrations")
     expected = set(pinned) | set(NEW_MIGRATIONS)
     actual = {
         p.parent.name: hashlib.sha256(p.read_bytes()).hexdigest()
         for p in (ROOT / "packages/database/prisma/migrations").glob("*/migration.sql")
     }
     if set(actual) != expected or set(EXPECTED_MIGRATIONS) != expected:
-        errors.append("new release migration set is not the approved additive 63")
+        errors.append("new release migration set is not the approved additive 64")
     for name, sha in pinned.items():
         if actual.get(name) != sha:
             errors.append("historical RC2 migration drift: " + name)
@@ -177,4 +178,4 @@ if __name__ == "__main__":
         for message in problems:
             print("MARINA_RC3_ADDITIVE_FAIL:", message)
         raise SystemExit(1)
-    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz138, total=63, original source gate preserved, NO-GO")
+    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz139, total=64, original source gate preserved, NO-GO")
