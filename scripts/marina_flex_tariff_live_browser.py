@@ -189,6 +189,51 @@ def run():
         saved=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
         assert saved=={"slot":1,"hotel":HOTEL_A,"offer":launch["id"],"total":36000,"implementation":25000,"payments":0},saved
         print("PASS browser launch offer BASE 36000 + setup 25000, capacity 1/50, independent PostgreSQL match")
+        page.locator('#nav [data-view="hotels"]').click()
+        page.locator(f'[data-hotel="{HOTEL_A}"]').click()
+        page.locator('[data-hotel-tab="overview"]').click()
+        profile=page.locator("#customer-profile-form")
+        expect(profile).to_be_visible()
+        profile.locator('[name="contact_name"]').fill("Synthetic hotel contact")
+        profile.locator('[name="contact_email"]').fill("contact@example.test")
+        profile.locator('[name="contact_phone"]').fill("+996000000000")
+        profile.locator('[name="responsible_name"]').fill("Synthetic manager")
+        with page.expect_response(ORIGIN+"/api/actions/customer-profile") as submitted:
+            profile.locator('button[type="submit"]').click()
+        assert submitted.value.status==201, ("profile",submitted.value.status,submitted.value.text()[:250])
+        expect(profile.locator('[name="expected_version"]')).to_have_value("1")
+        profile.locator('[name="contact_name"]').fill("Updated synthetic contact")
+        with page.expect_response(ORIGIN+"/api/actions/customer-profile") as submitted:
+            profile.locator('button[type="submit"]').click()
+        assert submitted.value.status==201
+        expect(profile.locator('[name="expected_version"]')).to_have_value("2")
+        page.locator('[data-hotel-tab="history"]').click()
+        expect(page.get_by_role("heading",name="Contact history",exact=True)).to_be_visible()
+        expect(page.get_by_text("Updated synthetic contact",exact=True)).to_be_visible()
+        expect(page.get_by_text("Synthetic hotel contact",exact=True)).to_be_visible()
+        agreement=page.locator("#agreement-draft-form")
+        agreement.locator('[name="offer_id"]').select_option(launch["id"])
+        with page.expect_response(ORIGIN+"/api/actions/agreement-drafts") as submitted:
+            agreement.locator('button[type="submit"]').click()
+        response=submitted.value
+        assert response.status==201, ("agreement",response.status,response.text()[:250])
+        contract=response.json()
+        assert contract["state"]=="DRAFT" and contract["source_offer_id"]==launch["id"]
+        preview=page.locator(".invoice-preview-form")
+        with page.expect_response(ORIGIN+"/api/actions/invoice-previews") as submitted:
+            preview.locator('button[type="submit"]').click()
+        response=submitted.value
+        assert response.status==201, ("preview",response.status,response.text()[:250])
+        doc=response.json()
+        assert doc["status"]=="NON_ISSUABLE" and Decimal(str(doc["amount_before_unresolved_taxes"]))==Decimal("61000")
+        expect(page.locator("tr").filter(has_text="NON_ISSUABLE")).to_contain_text("61,000 KGS")
+        query="""SELECT json_build_object('profiles',(SELECT count(*) FROM flex_private.flex_hotel_profile_versions),
+          'agreement',a.id,'source',a.source_offer_id,'state',a.state,'preview',p.id,
+          'amount',p.amount_before_unresolved_taxes,'payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments))
+          FROM flex_private.flex_commercial_agreement_versions a JOIN flex_private.flex_non_issuable_invoice_previews p ON p.agreement_version_id=a.id"""
+        saved=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
+        assert saved=={"profiles":2,"agreement":contract["id"],"source":launch["id"],"state":"DRAFT","preview":doc["id"],"amount":61000,"payments":0},saved
+        print("PASS browser customer profile revisions, unsigned agreement and non-issuable 61000 KGS preview match PostgreSQL")
         browser.close()
 
 
