@@ -127,10 +127,18 @@ async def own_earnings(
                     FROM (SELECT DISTINCT ON(hotel_id) hotel_id,action,created_at
                         FROM flex_qa_agent_assignments WHERE agent_id=$1 ORDER BY hotel_id,revision DESC) q
                     JOIN flex_hotels h ON h.id=q.hotel_id WHERE q.action='ASSIGN' ORDER BY h.display_name,h.id""",party_uuid)
+                employment=await conn.fetchrow("SELECT action,created_at FROM flex_qa_agent_employment_events WHERE agent_id=$1 ORDER BY revision DESC LIMIT 1",party_uuid)
+                month_start,_=_window("month")
+                planned_connections=await conn.fetchval("""SELECT count(*) FROM
+                    (SELECT hotel_id,min(created_at) AS first_assignment FROM flex_qa_agent_assignments
+                     WHERE agent_id=$1 AND action='ASSIGN' GROUP BY hotel_id) a
+                    WHERE first_assignment>=$2 AND first_assignment<=$3""",party_uuid,month_start,end)
                 contracts=[]
             else:
                 details=[]
                 qa_assignments=[]
+                employment=None
+                planned_connections=None
                 contracts=await conn.fetch("""SELECT id,contract_key,version,principal,share_bps,effective_from
                     FROM flex_investor_contract_versions WHERE investor_id=$1
                     ORDER BY contract_key,version DESC""",party_uuid)
@@ -150,6 +158,9 @@ async def own_earnings(
                 "qa_assignments":[dict(h) for h in qa_assignments],
                 "agent_terms":({"currency":"KGS","connection_fee":"7000.00","monthly_addon_fee":"500.00",
                     "monthly_salary":"10000.00","monthly_target":7,"employment_required":True,
+                    "employment_state":("WORKING" if employment["action"]=="START" else "STOPPED") if employment else "UNRECORDED",
+                    "employment_since":employment["created_at"] if employment else None,
+                    "qa_new_assignments_this_month":planned_connections,
                     "paid_connections":None,"payable_amount":None} if principal.role=="SALES_AGENT" else None),
                 "contracts":[{**dict(c),"principal":f"{c['principal']:.2f}"} for c in contracts],
                 "outstanding_payable_kg":None,
