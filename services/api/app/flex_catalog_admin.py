@@ -1145,7 +1145,7 @@ async def accept_customer_agreement(payload: AgreementInternalApproval,request: 
 
 class SimulationEvent(BaseModel):
     model_config=ConfigDict(extra="forbid")
-    kind: str = Field(pattern=r"^(PAYMENT|REFUND)$")
+    kind: str = Field(pattern=r"^(PAYMENT|REFUND|CREDIT_APPLY)$")
     event_id: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
     amount: str = Field(pattern=r"^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$")
     payment_id: str | None = Field(default=None,pattern=r"^[a-zA-Z0-9_-]{1,64}$")
