@@ -406,15 +406,16 @@ async function commercialHotelOfferForm(){
  '<form id="hotel-commercial-offer" class="admin-form"><input type="hidden" name="policy_version" value="'+safe(r.version)+'"><label>'+safe(t('packageType'))+'<select name="package_kind">'+Object.entries(p.monthly_packages).map(([k,v])=>'<option value="'+safe(k)+'">'+safe(k)+' · '+money(v.price??v.base_price,p.currency)+'</option>').join('')+'</select></label>'+
  '<label>'+safe(t('periodStart'))+'<input type="date" name="period_start" required value="'+safe(dateValue(2))+'"></label>'+
  '<fieldset><legend>'+safe(l.extras)+'</legend>'+Object.entries(p.module_monthly_prices).map(([k,v])=>'<label class="check-row"><input type="checkbox" name="extras" value="'+safe(k)+'"><span>'+safe(k)+' · '+money(v,p.currency)+'</span></label>').join('')+'</fieldset>'+
- '<label>'+safe(t('packageDiscount'))+'<input name="discount_pct" type="number" min="0" max="100" step="0.01" value="0" required></label>'+
+ '<label>'+safe(t('packageDiscount'))+'<input name="discount_pct" type="number" min="0" max="100" step="0.01" value="0" required></label>'+'<label>'+safe(t('packageCustomPrice'))+'<input name="custom_monthly_price" inputmode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" maxlength="15"></label><p>'+safe(t('packagePriceOverride'))+'</p><p class="renewal-context" role="status"></p>'+
  '<label>'+safe({ru:'Месяцев',kg:'Ай',en:'Months'}[state.lang]||'Месяцев')+'<select name="term_months">'+[1,3,6,12].map(n=>'<option value="'+n+'">'+n+'</option>').join('')+'</select></label><label class="check-row"><input type="checkbox" name="standard_term_discount">'+safe({ru:'Стандартная скидка за срок',kg:'Мөөнөт үчүн стандарттык арзандатуу',en:'Standard term discount'}[state.lang]||'Стандартная скидка')+'</label><label class="check-row"><input type="checkbox" name="launch_offer">'+safe({ru:'Стартовая акция: 40% на первый год (резервация)',kg:'Баштапкы акция: биринчи жылга 40% (орун ээлөө)',en:'Launch offer: 40% off first year (reservation)'}[state.lang]||'Launch offer')+'</label><label class="check-row"><input type="checkbox" name="include_implementation">'+safe({ru:'Включить внедрение',kg:'Орнотууну кошуу',en:'Include implementation'}[state.lang]||'Включить внедрение')+'</label><button class="primary" type="submit">'+safe(t('packageSave'))+'</button><div role="status" aria-live="polite"></div></form></section>';
 }
 async function saveCommercialHotelOffer(form){
  const d=new FormData(form),button=form.querySelector('button[type=submit]'),status=form.querySelector('[role=status]');
  button.disabled=true;
  try{
- const kind=String(d.get('package_kind'));
- await saveQaCatalogAction('tariff-packages',{hotel_id:state.hotelId,package_kind:kind,title:kind,period_start:String(d.get('period_start')),skus:d.getAll('extras'),discount_pct:String(d.get('discount_pct')),trial_days:5,custom_monthly_price:null,commercial_policy_version:Number(d.get('policy_version')),term_months:Number(d.get('term_months')),launch_offer:d.has('launch_offer'),standard_term_discount:d.has('standard_term_discount'),include_implementation:d.has('include_implementation')});
+ const kind=String(d.get('package_kind')),custom=String(d.get('custom_monthly_price')||'').trim();
+ if(custom&&(kind!=='CUSTOM'||Number(d.get('discount_pct'))!==0||d.has('standard_term_discount')||d.has('launch_offer')))throw Error(t('packagePriceOverride'));
+ await saveQaCatalogAction('tariff-packages',{hotel_id:state.hotelId,package_kind:kind,title:kind,period_start:String(d.get('period_start')),skus:d.getAll('extras'),discount_pct:String(d.get('discount_pct')),trial_days:form.dataset.renewalPrepared==='true'?0:5,custom_monthly_price:custom||null,commercial_policy_version:Number(d.get('policy_version')),term_months:Number(d.get('term_months')),launch_offer:d.has('launch_offer'),standard_term_discount:d.has('standard_term_discount'),include_implementation:d.has('include_implementation')});
  await render();
  }catch(e){status.textContent=e.message;button.disabled=false;}
 }
@@ -692,7 +693,30 @@ function subscriptionFinanceCell(x){
 }
 function subscriptionRenewalCell(x){
  const l=subscriptionFinanceLabels(),r=x.renewal_preview;
- return r?safe(r.period_start)+' — '+safe(r.period_end_exclusive)+'<br>'+safe(l.newOffer):'—';
+ const prepare=({ru:'Подготовить продление / изменить тариф',kg:'Узартууну даярдоо / тарифти өзгөртүү',en:'Prepare renewal / change tariff'})[state.lang];
+ if(!r)return '—';
+ const context={hotel_id:x.hotel_id,package_kind:x.package_kind,period_start:r.period_start,term_months:r.term_months,skus:(x.sku_snapshot||[]).filter(v=>v.sku!=='BASE_PMS'&&v.included_in_package!==true).map(v=>v.sku)};
+ return safe(r.period_start)+' — '+safe(r.period_end_exclusive)+'<br>'+safe(l.newOffer)+'<br><button class="outline" type="button" data-renewal-plan="'+safe(JSON.stringify(context))+'">'+safe(prepare)+'</button>';
+}
+function prepareRenewalOffer(button){
+ const form=document.getElementById('hotel-commercial-offer');
+ if(!form)return;
+ const plan=JSON.parse(button.dataset.renewalPlan);
+ if(plan.hotel_id!==state.hotelId)return;
+ const e=form.elements,context=form.querySelector('.renewal-context');
+ const labels=({ru:{ready:'Проект продления: проверьте новый тариф, модули и цену. Прежняя скидка и внедрение не переносятся.',missing:'Модули отсутствуют в текущем каталоге: '},kg:{ready:'Узартуу долбоору: жаңы тарифти, модулдарды жана бааны текшериңиз. Мурунку арзандатуу жана орнотуу көчүрүлбөйт.',missing:'Учурдагы каталогдо жок модулдар: '},en:{ready:'Renewal proposal: review current tariff, modules and price. Previous discount and implementation fee are not carried forward.',missing:'Modules unavailable in current catalog: '}})[state.lang];
+ form.dataset.renewalPrepared='true';
+ e.package_kind.value=plan.package_kind;
+ e.period_start.value=plan.period_start;
+ e.term_months.value=String(plan.term_months);
+ e.discount_pct.value='0';e.custom_monthly_price.value='';
+ for(const name of ['standard_term_discount','launch_offer','include_implementation'])e[name].checked=false;
+ const extras=[...form.querySelectorAll('input[name="extras"]')];
+ for(const input of extras)input.checked=plan.skus.includes(input.value);
+ const missing=plan.skus.filter(sku=>!extras.some(input=>input.value===sku));
+ context.textContent=labels.ready+(missing.length?' '+labels.missing+missing.join(', '):'');
+ form.scrollIntoView({block:'center',behavior:'smooth'});
+ e.package_kind.focus({preventScroll:true});
 }
 async function subscriptionPlanPanel(){
  const l=approvalLabels(),rows=await api('/v1/platform/subscription-plans?hotel_id='+state.hotelId);
@@ -913,6 +937,7 @@ async function start(){
 nav.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b){state.view=b.dataset.view;state.hotelId=null;state.search='';render();}});
 main.addEventListener('click',e=>{
  const b=e.target.closest('button');if(!b)return;
+ if(b.hasAttribute('data-renewal-plan')){prepareRenewalOffer(b);return;}
  if(b.hasAttribute('data-journal-append')){appendSyntheticJournal(b);return;}
  if(b.dataset.view){const target=b.dataset.view;if(!['hotel','hotel-link','subscription-draft','subscription'].includes(target))state.hotelId=null;state.view=target;render();}
  if(b.dataset.hotel){state.hotelId=b.dataset.hotel;state.hotelTab='overview';state.view=state.me.role==='SUPER_ADMIN'?'hotel':'subscription';state.linkChallenge=null;state.linkSuccess=false;render();}
