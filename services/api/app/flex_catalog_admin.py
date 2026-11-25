@@ -834,3 +834,142 @@ async def create_configuration_draft(
                 }
         except (asyncpg.UniqueViolationError, asyncpg.CheckViolationError):
             raise HTTPException(409, detail="Concurrent draft or invalid constraints") from None
+
+
+class CustomerProfileRevision(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    hotel_id: uuid.UUID
+    expected_version: int = Field(strict=True, ge=0)
+    contact_name: str = Field(max_length=180)
+    contact_email: str = Field(max_length=254)
+    contact_phone: str = Field(max_length=40)
+    responsible_name: str = Field(max_length=180)
+
+    @field_validator("contact_email")
+    @classmethod
+    def validate_email(cls, value):
+        if value and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value):
+            raise ValueError("Invalid contact email")
+        return value
+
+
+class AgreementDraftRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    hotel_id: uuid.UUID
+    offer_id: uuid.UUID
+
+
+class InvoicePreviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    hotel_id: uuid.UUID
+    agreement_id: uuid.UUID
+
+
+async def commercial_hotel_lock(conn, hotel_id):
+    await conn.execute("SELECT pg_advisory_xact_lock(hashtext($1))", "FLEX_CUSTOMER:"+str(hotel_id))
+    if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_hotels WHERE id=$1 AND status IN ('PENDING','ACTIVE'))",hotel_id):
+        raise HTTPException(404,detail="Commercial hotel unavailable")
+
+
+@app.get("/v1/platform/customer-profile")
+async def customer_profile(request: Request, hotel_id: uuid.UUID=Query(...),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn,principal)
+            rows=await conn.fetch("SELECT * FROM flex_hotel_profile_versions WHERE hotel_id=$1 ORDER BY version DESC",hotel_id)
+            return {"current":dict(rows[0]) if rows else None,"history":[dict(r) for r in rows]}
+
+
+@app.post("/v1/platform/customer-profile",status_code=201)
+async def save_customer_profile(payload: CustomerProfileRevision,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await commercial_hotel_lock(conn,payload.hotel_id)
+            version=await conn.fetchval("SELECT coalesce(max(version),0) FROM flex_hotel_profile_versions WHERE hotel_id=$1",payload.hotel_id)
+            if version!=payload.expected_version:
+                raise HTTPException(409,detail="Customer profile revision changed")
+            row=await conn.fetchrow("INSERT INTO flex_hotel_profile_versions(hotel_id,version,contact_name,contact_email,contact_phone,responsible_name,created_by) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+                payload.hotel_id,version+1,payload.contact_name,payload.contact_email,payload.contact_phone,payload.responsible_name,principal.subject_id)
+            return dict(row)
+
+
+def draft_agreement_response(row):
+    data=dict(row)
+    if isinstance(data["terms"],str):
+        data["terms"]=json.loads(data["terms"])
+    return data
+
+
+@app.get("/v1/platform/agreement-drafts")
+async def agreement_drafts(request: Request,hotel_id: uuid.UUID=Query(...),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn,principal)
+            rows=await conn.fetch("SELECT * FROM flex_commercial_agreement_versions WHERE hotel_id=$1 ORDER BY version DESC",hotel_id)
+            previews=await conn.fetch("SELECT * FROM flex_non_issuable_invoice_previews WHERE hotel_id=$1 ORDER BY created_at DESC",hotel_id)
+            return {"agreements":[draft_agreement_response(r) for r in rows],"previews":[dict(r) for r in previews]}
+
+
+@app.post("/v1/platform/agreement-drafts",status_code=201)
+async def create_agreement_draft(payload: AgreementDraftRequest,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    import hashlib
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await commercial_hotel_lock(conn,payload.hotel_id)
+            offer=await conn.fetchrow("SELECT * FROM flex_tariff_package_versions WHERE id=$1 AND hotel_id=$2 AND commercial_policy_version IS NOT NULL AND term_months IS NOT NULL",payload.offer_id,payload.hotel_id)
+            if offer is None:
+                raise HTTPException(404,detail="Versioned commercial offer unavailable for hotel")
+            existing=await conn.fetchrow("SELECT * FROM flex_commercial_agreement_versions WHERE source_offer_id=$1",payload.offer_id)
+            if existing:
+                return draft_agreement_response(existing)
+            version=await conn.fetchval("SELECT coalesce(max(version),0)+1 FROM flex_commercial_agreement_versions WHERE hotel_id=$1",payload.hotel_id)
+            items=offer["sku_snapshot"]
+            if isinstance(items,str):
+                items=json.loads(items)
+            terms={"source_offer_id":str(offer["id"]),"hotel_id":str(payload.hotel_id),
+                "package_kind":offer["package_kind"],"policy_version":offer["commercial_policy_version"],
+                "items":items,"currency":"KGS","term_months":offer["term_months"],
+                "period_start":offer["period_start"].isoformat(),
+                "period_end_exclusive":offer["period_end_exclusive"].isoformat(),
+                "subscription_term_total":str(offer["subscription_term_total"]),
+                "implementation_total":str(offer["implementation_total"]),
+                "discount_pct":str(offer["discount_pct"]),"tax_status":"NOT_CALCULATED"}
+            encoded=json.dumps(terms,sort_keys=True,separators=(",",":"),ensure_ascii=False)
+            digest=hashlib.sha256(encoded.encode()).hexdigest()
+            row=await conn.fetchrow("INSERT INTO flex_commercial_agreement_versions(hotel_id,version,state,terms,terms_digest,effective_from,source_offer_id,draft_created_by) VALUES($1,$2,'DRAFT',$3::jsonb,$4,$5,$6,$7) RETURNING *",
+                payload.hotel_id,version,encoded,digest,offer["period_start"],payload.offer_id,principal.subject_id)
+            return draft_agreement_response(row)
+
+
+@app.post("/v1/platform/invoice-previews",status_code=201)
+async def create_invoice_preview(payload: InvoicePreviewRequest,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    import hashlib
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await commercial_hotel_lock(conn,payload.hotel_id)
+            row=await conn.fetchrow("SELECT a.terms_digest,p.period_start,p.period_end_exclusive,p.subscription_term_total,p.implementation_total FROM flex_commercial_agreement_versions a JOIN flex_tariff_package_versions p ON p.id=a.source_offer_id WHERE a.id=$1 AND a.hotel_id=$2 AND a.state='DRAFT'",payload.agreement_id,payload.hotel_id)
+            if row is None:
+                raise HTTPException(404,detail="Draft agreement unavailable for hotel")
+            amount=row["subscription_term_total"]+row["implementation_total"]
+            if amount>=Decimal("10000000000000000"):
+                raise HTTPException(422,detail="Preview amount exceeds storage limit")
+            digest=hashlib.sha256(("FLEX_NON_ISSUABLE:"+str(payload.agreement_id)+":"+row["terms_digest"]).encode()).hexdigest()
+            existing=await conn.fetchrow("SELECT * FROM flex_non_issuable_invoice_previews WHERE hotel_id=$1 AND agreement_version_id=$2 AND preview_sha256=$3",payload.hotel_id,payload.agreement_id,digest)
+            if existing:
+                return dict(existing)
+            saved=await conn.fetchrow("INSERT INTO flex_non_issuable_invoice_previews(hotel_id,agreement_version_id,preview_sha256,quote_sha256,period_start,period_end,amount_before_unresolved_taxes) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+                payload.hotel_id,payload.agreement_id,digest,row["terms_digest"],row["period_start"],row["period_end_exclusive"]-timedelta(days=1),amount)
+            return dict(saved)
