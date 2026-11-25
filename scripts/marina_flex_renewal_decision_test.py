@@ -120,6 +120,28 @@ class RenewalEvidenceRules(unittest.TestCase):
                      term_months=3)
         self.assertEqual(self.run_decision(leap).new_period_end,date(2028,2,29))
 
+    def test_arbitrary_start_and_short_month_anniversary(self):
+        cases=(
+            (date(2027,1,31),1,date(2027,2,27)),
+            (date(2028,1,31),1,date(2028,2,28)),
+            (date(2027,1,15),3,date(2027,4,14)),
+            (date(2027,8,31),6,date(2028,2,28)),
+            (date(2028,2,29),12,date(2029,2,27)),
+        )
+        for start,months,end in cases:
+            with self.subTest(start=start,months=months):
+                evidence=replace(self.paid(),current_period_end=start-timedelta(days=1),
+                    invoice_period_start=start,invoice_period_end=end,term_months=months)
+                result=self.run_decision(evidence)
+                self.assertTrue(result.can_prepare)
+                self.assertEqual(result.new_period_start,start)
+                self.assertEqual(result.new_period_end,end)
+                self.assertFalse(result.bank_authorized)
+                with self.assertRaises(ValueError):
+                    self.run_decision(replace(evidence,invoice_period_end=end+timedelta(days=1)))
+                with self.assertRaises(ValueError):
+                    self.run_decision(replace(evidence,current_period_end=start))
+
     def test_invalid_signed_terms_are_rejected(self):
         for term in (0,2,4,13,True,"12",None):
             with self.subTest(term=term),self.assertRaises(ValueError):
