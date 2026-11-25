@@ -2,7 +2,7 @@
 """Source gate for a NEW additive release without rewriting immutable RC3 evidence.
 
 RC2/RC3 manifests remain 39-migration history. The current release must
-preserve all 39 original SQL hashes and include pinned zz115 through zz134 SQL.
+preserve all 39 original SQL hashes and include pinned zz115 through zz135 SQL.
 """
 from __future__ import annotations
 import hashlib
@@ -32,7 +32,8 @@ NEW_MIGRATIONS = {
     "zz131_marina_owner_source_reversal_integrity_20261125": "6f74b46833e78fbbf02fced5cb0a8564f7a2bdad6eedf74445f4fd9d0d52af11",
     "zz132_marina_owner_revenue_period_integrity_20261125": "0a6084420b707d8741eaec61141c1a1fa3a03ddac0460b327452c3cc009ad179",
     "zz133_marina_owner_guest_service_revenue_20261125": "487ff0ccc1b1a46804c5de2b153dd3e95c921002ce27eea49d1840b16fb465d6",
-    "zz134_marina_owner_guest_service_posting_lifecycle_20261125": "bb1e57baa2cac2c4e94c294a229b67fc98e7597486c022c265f8f3cd8c9b4621"
+    "zz134_marina_owner_guest_service_posting_lifecycle_20261125": "bb1e57baa2cac2c4e94c294a229b67fc98e7597486c022c265f8f3cd8c9b4621",
+    "zz135_marina_owner_certified_tax_correction_20261125": "9f3239acbfa138c2c9e63a98e43875d5ad6a127cbe1cb5b43b2247edcedbb152"
 }
 # Reviewed tightening: summary is trimmed and whitespace-only reports are rejected.
 # Keep the historical RC3 manifest immutable; pin this additive source exactly.
@@ -62,9 +63,9 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",
     # MARINA-specific 52nd migration, exact batch-to-served item ledger.
     "scripts/marina_shared_three_hotel_restore_ci.py": "0f00022721637c58d3897f5164496af7173e37dd",
-    "scripts/release_contract.py": "f3c6eb46f091b4c258ad3d62b495e7e13018ee61",
-    "scripts/release_contract_test.py": "2dfa70ff91b86887f12ef4e89515f6172ce8aed1",
-    ".github/workflows/marina-zz113-rollback-ci.yml": "0af020cda7bfd9247bc5e041303e24fc3f7c5b0b",
+    "scripts/release_contract.py": "c6250b925382f85386c3d8839e76fe27b02662ea",
+    "scripts/release_contract_test.py": "55916f81549fcbdcb6fdfbc5a9925bd4057ffeac",
+    ".github/workflows/marina-zz113-rollback-ci.yml": "f0407f5ec9a9dbe231a52be9d79d1b382117f7a8",
     "scripts/marina_disposable_upgrade_acceptance_ci.py": "b877c5976def9451853953b86ec48b6804ab16b0",
     ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "9bf375ac39d02cf78122dbe4544f1d69d3335cb6",
     "services/api/app/app_entry.py": "8b8e630073ddbe6a8855a5494116c5cac11064ca",
@@ -76,18 +77,18 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "services/api/app/owner_accounting_journal.py": "bfadba59080ec2badb554ee03ed39d964cb04c0e",
     "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
     "services/api/app/owner_ledger_policy.py": "5489152a7cf19737932a4413c9e446afa62b69e4",
-    "services/api/app/owner_accounting_postings.py": "6a4b4a14b0313072f19848a43517d8ecb5ea1eef",
+    "services/api/app/owner_accounting_postings.py": "ea9bd8af52fc6ad0433cdde1caa195b6b121440b",
     "services/api/app/owner_revenue_corrections.py": "10f52e7f916598620c73fa2d3a61f08bed435aaa",
     "services/api/app/owner_delivered_revenue.py": "1e8881079cd4d4a64f96aaabbb51c1d21e59a035",
     "scripts/test_owner_ledger_policy.py": "c8de02aff23a49ac33c21c314353a386d3e73879",
-    "scripts/marina_owner_posting_api_ci.py": "58c71f69b34552d0bb3253a59ec8f1aab13b4260",
+    "scripts/marina_owner_posting_api_ci.py": "1d03f6e957ffba1faf3a264865f896f1b073ff52",
     "services/api/app/owner_revenue_source_journal.py": "a748840fcce9904dbb4e52fe20c9ff6163bd9375",
     "scripts/marina_owner_expense_posting_ci.py": "3c5879734d3bff96269559b1aa08e25adfe937c2",
     "scripts/marina_owner_served_cogs_posting_ci.py": "75bb2cc1fb85ff6379ec0b8010115a4aad6b290b",
     "scripts/test_owner_recognition_policy.py": "7a856095b84319c654c9b536f763e1d763cf790a",
     ".github/workflows/marina-owner-recognition-policy-ci.yml": "7965e38127aaf6a9ffe73f0c0ce755425d36d6e1",
     "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "38049c670f30abb64e94c667ef6f68b9804e9f1f",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "29c7320b1df48063cb449b7aa5bc2b81162e909f",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
@@ -112,15 +113,15 @@ def validate_additive() -> list[str]:
     pinned = rc2.get("migration_sha256")
     if not isinstance(pinned, dict) or len(pinned) != 39:
         return ["historical RC2 expected 39 pinned migration hashes"]
-    if len(EXPECTED_MIGRATIONS) != 59 or EXPECTED_MIGRATIONS[39:] != tuple(NEW_MIGRATIONS):
-        errors.append("current release must contain exactly 39 historical + zz115 through zz134 migrations")
+    if len(EXPECTED_MIGRATIONS) != 60 or EXPECTED_MIGRATIONS[39:] != tuple(NEW_MIGRATIONS):
+        errors.append("current release must contain exactly 39 historical + zz115 through zz135 migrations")
     expected = set(pinned) | set(NEW_MIGRATIONS)
     actual = {
         p.parent.name: hashlib.sha256(p.read_bytes()).hexdigest()
         for p in (ROOT / "packages/database/prisma/migrations").glob("*/migration.sql")
     }
     if set(actual) != expected or set(EXPECTED_MIGRATIONS) != expected:
-        errors.append("new release migration set is not the approved additive 59")
+        errors.append("new release migration set is not the approved additive 60")
     for name, sha in pinned.items():
         if actual.get(name) != sha:
             errors.append("historical RC2 migration drift: " + name)
@@ -166,4 +167,4 @@ if __name__ == "__main__":
         for message in problems:
             print("MARINA_RC3_ADDITIVE_FAIL:", message)
         raise SystemExit(1)
-    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz134, total=59, original source gate preserved, NO-GO")
+    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz135, total=60, original source gate preserved, NO-GO")

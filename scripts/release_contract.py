@@ -69,6 +69,7 @@ EXPECTED_MIGRATIONS = (
     "zz132_marina_owner_revenue_period_integrity_20261125",
     "zz133_marina_owner_guest_service_revenue_20261125",
     "zz134_marina_owner_guest_service_posting_lifecycle_20261125",
+    "zz135_marina_owner_certified_tax_correction_20261125",
 )
 
 # Explicit business/data-integrity CHECK/EXCLUDE constraints whose loss must make

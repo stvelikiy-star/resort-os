@@ -93,6 +93,19 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
     response=client.post(base+"/proposals",json=propose)
     check(response.status_code,201,"balanced proposal")
     check(response.json()["accounting_posted"],False,"proposal is unposted")
+    tax_id=uuid.uuid4()
+    # Same stored invoice bytes; the reviewer must approve the exact amount.
+    doc_bytes=b"%PDF-1.4\\n% Synthetic accounting source certification\\n%%EOF\\n"
+    tax_event={
+        "id":str(tax_id),"approval_id":str(source),"kind":"TAX_COMPONENT",
+        "component":"DINING","amount_kgs":"50.0000",
+        "document_reference":"CI-TAX-REVIEW-700","document_date":date.today().isoformat(),
+        "document_sha256":hashlib.sha256(doc_bytes).hexdigest(),
+        "evidence_document_id":str(document_id),"evidence_reference":"Synthetic original invoice",
+        "reason":"Record documented tax allocation for source"
+    }
+    check(client.post("/api/v1/admin/finance/owner/revenue-corrections",json=tax_event).status_code,
+          201,"document-backed tax correction")
     owner_self=client.post(base+"/revenue-certifications",json={
         "id":str(uuid.uuid4()),"source_event_id":str(source),
         "evidence_document_id":str(document_id),"tax_amount_kgs":"50.0000",
@@ -124,6 +137,9 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
     over_tax={**certificate,"id":str(uuid.uuid4()),"tax_amount_kgs":"900.0000"}
     check(client.post(base+"/revenue-certifications",json=over_tax).status_code,
           409,"certified tax cannot exceed source amount")
+    wrong_tax={**certificate,"id":str(uuid.uuid4()),"tax_amount_kgs":"49.0000"}
+    check(client.post(base+"/revenue-certifications",json=wrong_tax).status_code,
+          409,"tax certificate cannot differ from documented correction")
     certified=client.post(base+"/revenue-certifications",json=certificate)
     check(certified.status_code,201,"independent source certification")
     check(certified.json()["accounting_posted"],False,"certificate not posting")
@@ -154,6 +170,32 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
     response=client.post(url,json=body)
     check(response.status_code,201,"approved posting")
     check(response.json()["accounting_posted"],True,"actual posted evidence")
+    async def verify_tax_binding():
+        conn=await asyncpg.connect(parsed.geturl())
+        try:
+            bound=await conn.fetchval("""SELECT "taxCorrectionEventId"
+              FROM owner_revenue_accounting_certifications
+              WHERE "propertyId"=$1 AND "sourceEventId"=$2""",p,source)
+            check(bound,tax_id,"immutable document tax-event binding")
+            lines=await conn.fetch("""SELECT "accountCode",side,"amountKgs"
+              FROM owner_accounting_posting_lines WHERE "postingId"=$1""",posting)
+            check(sorted((r["accountCode"],r["side"],int(r["amountKgs"])) for r in lines),
+                  [("1100","DEBIT",700),("2100","CREDIT",50),("4200","CREDIT",650)],
+                  "tax allocation recognized exactly once")
+            match="SELECT owner_revenue_corrections_match_certificate($1,$2,$3,$4,$5,$6)"
+            reviewer=await conn.fetchval("""SELECT id FROM staff_users
+                WHERE "propertyId"=$1 AND username='accounting_reviewer'""",p)
+            check(await conn.fetchval(match,p,source,document_id,reviewer,50,tax_id),True,"exact binding valid")
+            check(await conn.fetchval(match,p,source,document_id,reviewer,49,tax_id),False,"wrong tax rejected")
+            check(await conn.fetchval(match,pb,source,document_id,reviewer,50,tax_id),False,"foreign tax rejected")
+            check(await conn.fetchval(match,p,source,document_id,reviewer,50,None),False,"unbound active tax rejected")
+        finally:
+            await conn.close()
+    asyncio.run(verify_tax_binding())
+    correction_reverse="/api/v1/admin/finance/owner/revenue-corrections/"+str(tax_id)+"/reverse"
+    check(client.post(correction_reverse,json={"id":str(uuid.uuid4()),
+        "reason":"Cannot reverse tax while revenue is posted"}).status_code,409,
+        "posted tax cannot be reversed alone")
     check(response.json()["recognized_profit_kgs"],None,"no false profit")
     replay=client.post(url,json=body)
     check(replay.status_code,201,"post replay")
@@ -207,6 +249,9 @@ with TestClient(app,base_url="https://ledger-qa.invalid") as client:
     check(response.status_code,201,"exact reversal posted")
     check(client.post(reverse_url,json=rev_body).json()["already_processed"],
           True,"reversal idempotency")
+    check(client.post(correction_reverse,json={"id":str(uuid.uuid4()),
+        "reason":"Reverse documented tax after exact ledger reversal"}).status_code,201,
+        "tax reversal permitted after ledger reversal")
     check(client.post(source_reverse_url,json=source_reverse_body).status_code,201,
           "source reversal allowed after exact ledger reversal")
     check(client.post(source_reverse_url,json=source_reverse_body).json()["already_processed"],

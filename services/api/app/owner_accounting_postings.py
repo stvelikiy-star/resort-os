@@ -98,13 +98,11 @@ async def certify_revenue_source(body:RevenueSourceCertification,request:Request
                 or ev["createdById"]==actor or doc["uploadedById"]==actor
                 or doc["documentDate"]>date.today()):
                 raise HTTPException(409,detail={"code":"REVENUE_INDEPENDENT_DOCUMENT_REVIEW_REQUIRED"})
-            if await conn.fetchval(
-                """SELECT EXISTS(SELECT 1 FROM owner_revenue_correction_events c
-                   WHERE c."propertyId"=$1 AND c."approvalId"=$2
-                     AND c.action='RECORD'
-                     AND NOT EXISTS(SELECT 1 FROM owner_revenue_correction_events r
-                       WHERE r."propertyId"=$1 AND r."reversesId"=c.id))""",
-                pid,body.source_event_id):
+            await conn.execute("SELECT owner_lock_revenue_posting($1,$2)",pid,body.source_event_id)
+            if not await conn.fetchval(
+                """SELECT owner_revenue_corrections_match_certificate(
+                     $1,$2,$3,$4,$5,owner_active_revenue_correction_id($1,$2))""",
+                pid,body.source_event_id,body.evidence_document_id,actor,body.tax_amount_kgs):
                 raise HTTPException(409,detail={"code":"REVENUE_CORRECTIONS_UNRECONCILED"})
             if ev["sourceType"]=="OTHER_SERVICE" and await conn.fetchval(
                 "SELECT owner_guest_service_revenue_proof($1,$2,$3)",pid,ev["sourceId"],ev["serviceDate"])!=ev["faceValueKgs"]:
@@ -179,20 +177,18 @@ async def qualified_posting_source(conn,pid,proposal):
         "SELECT owner_guest_service_revenue_proof($1,$2,$3)",pid,row["sourceId"],row["serviceDate"])!=row["faceValueKgs"]:
         raise HTTPException(409,detail={"code":"REVENUE_GUEST_SERVICE_NOT_QUALIFIED"})
     cert=await conn.fetchrow(
-        """SELECT "grossAmountKgs","taxAmountKgs","netRevenueKgs"
+        """SELECT "grossAmountKgs","taxAmountKgs","netRevenueKgs",
+                  "evidenceDocumentId","reviewedById","taxCorrectionEventId"
            FROM owner_revenue_accounting_certifications
            WHERE "propertyId"=$1 AND "sourceEventId"=$2
              AND "policyVersion"=$3""",
         pid,proposal["sourceId"],proposal["policyVersion"])
     if not cert or cert["grossAmountKgs"]!=row["faceValueKgs"]:
         raise HTTPException(409,detail={"code":"ACCOUNTING_CERTIFIED_SOURCE_DOCUMENT_REQUIRED"})
-    corrections=await conn.fetchval(
-        """SELECT COUNT(*) FROM owner_revenue_correction_events c
-           WHERE c."propertyId"=$1 AND c."approvalId"=$2 AND c.action='RECORD'
-             AND NOT EXISTS(SELECT 1 FROM owner_revenue_correction_events rev
-               WHERE rev."propertyId"=$1 AND rev."reversesId"=c.id)""",
-        pid,proposal["sourceId"])
-    if corrections:
+    if not await conn.fetchval(
+        "SELECT owner_revenue_corrections_match_certificate($1,$2,$3,$4,$5,$6)",
+        pid,proposal["sourceId"],cert["evidenceDocumentId"],cert["reviewedById"],
+        cert["taxAmountKgs"],cert["taxCorrectionEventId"]):
         raise HTTPException(409,detail={"code":"ACCOUNTING_CORRECTIONS_NOT_RECONCILED"})
     return {**dict(row),**dict(cert)}
 
@@ -554,6 +550,15 @@ async def period_coverage(conn,pid,from_date,to_date,tz):
                  AND (c."documentDate" BETWEEN $2 AND $3 OR e."serviceDate" BETWEEN $2 AND $3)
                  AND NOT EXISTS(SELECT 1 FROM owner_revenue_correction_events r
                    WHERE r."propertyId"=$1 AND r."reversesId"=c.id AND r.action='REVERSE')
+                 AND NOT EXISTS(SELECT 1 FROM owner_revenue_accounting_certifications cert
+                   JOIN active_post p ON p."sourceType"='REVENUE_SOURCE'
+                     AND p."sourceId"=cert."sourceEventId"
+                     AND p."accountingDate"=e."serviceDate"
+                   WHERE cert."propertyId"=$1 AND cert."sourceEventId"=e.id
+                     AND cert."taxCorrectionEventId"=c.id
+                     AND owner_revenue_corrections_match_certificate(
+                       cert."propertyId",cert."sourceEventId",cert."evidenceDocumentId",
+                       cert."reviewedById",cert."taxAmountKgs",cert."taxCorrectionEventId"))
              ) AS active_corrections""",pid,from_date,to_date,tz)
     counts.update(dict(coverage))
     counts["cogs_expected"]=len(orders)
