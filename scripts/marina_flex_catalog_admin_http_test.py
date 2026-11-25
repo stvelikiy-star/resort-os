@@ -649,5 +649,39 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         asyncio.run(verify())
 
 
+    def test_16_synthetic_finance_replay_does_not_write_ledger(self):
+        path="/v1/platform/finance-simulation"
+        contract=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()["agreements"][0]
+        data={"hotel_id":HOTEL_A,"agreement_id":contract["id"],"events":[
+            {"kind":"PAYMENT","event_id":"p1","amount":"100000"},
+            {"kind":"PAYMENT","event_id":"p2","amount":"40000"},
+            {"kind":"REFUND","event_id":"r1","payment_id":"p2","amount":"10000"}]}
+        self.assertEqual(self.post(path,data,"owner-a").status_code,403)
+        self.assertEqual(self.post(path,{**data,"hotel_id":HOTEL_B}).status_code,404)
+        response=self.post(path,data)
+        self.assertEqual(response.status_code,201,response.text)
+        r=response.json()
+        self.assertEqual(r["mode"],"SYNTHETIC_ONLY")
+        self.assertEqual(Decimal(r["amount_before_unresolved_taxes"]),Decimal("133000"))
+        self.assertEqual(Decimal(r["net_simulated_cash"]),Decimal("130000"))
+        self.assertEqual(Decimal(r["outstanding"]),Decimal("3000"))
+        self.assertEqual(Decimal(r["credit"]),Decimal("0"))
+        self.assertEqual(Decimal(r["discrepancy"]),Decimal("0"))
+        self.assertFalse(r["persisted"])
+        self.assertFalse(r["payments_enabled"])
+        self.assertFalse(r["launch_offer_finalized"])
+        self.assertEqual(self.post(path,data).json(),r)
+        invalid={**data,"events":[{"kind":"REFUND","event_id":"r","payment_id":"missing","amount":"1"}]}
+        self.assertEqual(self.post(path,invalid).status_code,422)
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_payment_reversals"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscriptions"),2)
+            finally: await con.close()
+        asyncio.run(verify())
+
+
 if __name__=="__main__":
     unittest.main(verbosity=2)
