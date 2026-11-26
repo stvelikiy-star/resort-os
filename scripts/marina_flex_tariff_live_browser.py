@@ -399,6 +399,33 @@ def run():
         evidence=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
         assert evidence=={"test_events":3,"payments":0,"refunds":0},evidence
         print("PASS browser persisted synthetic journal, reload, 5000 debt, no real ledger writes")
+        if PASSWORD_MODE:
+            # Run after the existing two-hotel assertions to keep their fixture exact.
+            page.locator('#nav [data-view="hotels"]').click()
+            page.locator('[data-view="hotel-new"]').click()
+            registration=page.locator('#hotel-registration')
+            registration.locator('[name="display_name"]').fill('QA registration retry')
+            captured=[]
+            def abort_first(route):
+                captured.append(route.request.headers.get('idempotency-key'))
+                route.abort()
+            page.route(ORIGIN+'/api/actions/hotels',abort_first,times=1)
+            registration.locator('button[type="submit"]').click()
+            expect(registration.locator('#registration-result')).to_contain_text('Connection interrupted')
+            expect(registration.locator('button[type="submit"]')).to_be_enabled()
+            expect(registration.locator('[name="display_name"]')).to_have_value('QA registration retry')
+            with page.expect_request(ORIGIN+'/api/actions/hotels') as retried:
+                with page.expect_response(ORIGIN+'/api/actions/hotels') as created:
+                    registration.locator('button[type="submit"]').click()
+            assert captured[0] and retried.value.headers.get('idempotency-key')==captured[0]
+            assert created.value.status==201, ('registration',created.value.status)
+            hotel=created.value.json()
+            assert hotel['status']=='PENDING' and hotel['billable'] is False
+            page.locator('#nav [data-view="hotels"]').click()
+            expect(page.locator('[data-hotel="'+hotel['hotel_id']+'"]')).to_be_visible()
+            query="SELECT count(*) FROM flex_private.flex_hotels WHERE display_name='QA registration retry'"
+            assert subprocess.check_output(['psql','-XAt','-v','ON_ERROR_STOP=1','-c',query],text=True).strip()=='1'
+            print('PASS browser registration network failure, enabled retry, same idempotency key, one persisted PENDING hotel')
         browser.close()
 
 

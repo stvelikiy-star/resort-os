@@ -188,28 +188,41 @@ function registrationForm(){
  '<div class="formbar"><button class="primary" type="submit">'+safe(t('registerHotel'))+'</button><button class="outline" type="button" data-view="hotels">'+safe(t('cancel'))+'</button></div>'+
  '<div id="registration-result" role="status" aria-live="polite"></div></form></section>';
 }
+const registrationErrors={
+ ru:{network:'Связь с сервером прервана. Повторите сохранение с тем же названием; повторный запрос не создаст дубль.',session:'Сессия истекла. Войдите снова.',conflict:'Запрос конфликтует с сохранённой регистрацией. Проверьте реестр гостиниц.',denied:'Сервер отклонил права доступа.',server:'Сервис регистрации временно недоступен. Повторите сохранение с тем же названием.',invalid:'Проверьте название гостиницы.'},
+ kg:{network:'Сервер менен байланыш үзүлдү. Ошол эле аталыш менен кайра сактаңыз; дубликат түзүлбөйт.',session:'Сессиянын мөөнөтү бүттү. Кайра кириңиз.',conflict:'Каттоо сурамы сакталган жазууга каршы келет. Тизмени текшериңиз.',denied:'Сервер уруксат берген жок.',server:'Каттоо кызматы убактылуу жеткиликсиз. Ошол эле аталыш менен кайталаңыз.',invalid:'Мейманкананын аталышын текшериңиз.'},
+ en:{network:'Connection interrupted. Retry with the same hotel name; the same request will not create a duplicate.',session:'Session expired. Sign in again.',conflict:'Registration conflicts with an existing request. Check the hotel registry.',denied:'Server denied access.',server:'Registration service temporarily unavailable. Retry with the same name.',invalid:'Check the hotel name.'}
+};
+function registrationError(status){
+ return status===401?'session':status===403?'denied':status===409?'conflict':status===422?'invalid':'server';
+}
 async function submitRegistration(form){
  if(state.me?.role!=='SUPER_ADMIN'||!state.status?.qa_onboarding_enabled)return;
  const name=form.querySelector('[name="display_name"]').value.trim();
  if(name.length<2||name.length>180)return;
- const button=form.querySelector('[type="submit"]');button.disabled=true;button.textContent=t('saving');
- const output=document.getElementById('registration-result');
+ const button=form.querySelector('[type="submit"]');
+ if(button.disabled)return;
+ button.disabled=true;button.textContent=t('saving');
+ const output=form.querySelector('#registration-result');
+ output.replaceChildren();
+ const message=key=>info((registrationErrors[state.lang]||registrationErrors.ru)[key],'error');
  try{
-   const tokenReply=await fetch('/api/session',{cache:'no-store'});
-   if(!tokenReply.ok)throw Error('Session expired. Please sign in again.');
+   const tokenReply=await fetch('/api/session',{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(20000)});
+   if(!tokenReply.ok){output.innerHTML=message(registrationError(tokenReply.status));return;}
    const session=await tokenReply.json();
-   if(!session.csrf)throw Error('CSRF session missing; sign in again.');
+   if(!session.csrf){output.innerHTML=message('session');return;}
    if(name!==state.registerName){state.registerName=name;state.registerKey=crypto.randomUUID();}
-   const r=await fetch('/api/actions/hotels',{method:'POST',credentials:'same-origin',cache:'no-store',
+   const r=await fetch('/api/actions/hotels',{method:'POST',credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(25000),
      headers:{'Content-Type':'application/json','X-Flex-CSRF':session.csrf,'Idempotency-Key':state.registerKey},
      body:JSON.stringify({display_name:name,currency:'KGS'})});
+   if(!r.ok){output.innerHTML=message(registrationError(r.status));return;}
    const data=await r.json();
-   if(!r.ok)throw Error(data.detail||data.error||('HTTP '+r.status));
+   if(!data.hotel_id||data.status!=='PENDING'||data.billable!==false){output.innerHTML=message('server');return;}
    state.lastCreated=data.hotel_id;
    state.registerName=null;state.registerKey=null;
    output.innerHTML=info(t('created')+': '+data.hotel_id+' — PENDING','info');
    form.reset();
- }catch(e){output.innerHTML=info(t('hotelError')+': '+e.message,'error')}
+ }catch{output.innerHTML=message('network');}
  finally{button.disabled=false;button.textContent=t('registerHotel')}
 }
 
