@@ -34,3 +34,7 @@ No defect closed merely because code exists. No unrelated repo or active cloud c
 ## 2026-11-26 — residual legacy review
 - FLEX-020/021: canonical password recovery and prior-session revocation TEST PASS at a875e5f (Console 45751953090). Password-only invite return present in current source. Read-only catalogue compatibility restored in 1bcfa4a, dedicated regression tests pending. Legacy CSS not copied over approved design; full UX matrix remains Stage 8. Preserve both old PR heads.
 - Unrelated shared repository CI: AK BERMET run 45751953084 failed provider-mapping persistence on a875e5f. Native retry requested; no changes outside FLEX. Do not bypass required checks.
+
+## 2026-11-26 — Stage 1 acceptance and Stage 2 preparation
+- FLEX-010 independent recovery ACCEPTED; see PR #614 comments 7183379783, 7183470973 and Ubuntu evidence. FLEX-018–021 integrated candidate TEST PASS, merged (42/42); full cloud UX deferred to Stage 8 as planned.
+- FLEX-004 password-mode customer acceptance CODE READY in Stage 2 candidate. Existing QA password gate reused; no Production or permission expansion, no new MFA. CI and cloud acceptance pending. FLEX-005 cloud owner fixture still open. FLEX-001/002 current cloud update not authorized; 0026–0031 pending active database, isolated rehearsal PASS.
