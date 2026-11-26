@@ -12,6 +12,7 @@ import sys
 import time
 import unittest
 import uuid
+from decimal import Decimal
 from datetime import datetime, timedelta, timezone, date, time as clock_time
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -88,6 +89,49 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
                 self.assertIn(r.status_code,{403},r.text)
         self.assertEqual(self.get("/v1/platform/catalog",who="owner-a").status_code,403)
         self.assertEqual(self.get("/v1/platform/subscription-drafts",mfa=False).status_code,403)
+
+    def test_01a_commercial_policy_is_admin_scoped_and_persisted(self):
+        path = "/v1/platform/commercial-policy"
+        self.assertEqual(self.get(path, who="owner-a").status_code, 403)
+        response = self.get(path)
+        self.assertEqual(response.status_code, 200, response.text)
+        approved = json.loads((Path(__file__).resolve().parents[1] / "docs/flex/commercial-policy-20261124.json").read_text())
+        self.assertEqual(response.json()["version"], 1)
+        self.assertEqual(response.json()["policy"], approved)
+
+    def test_01b_initial_base_launch_offer(self):
+        async def seed():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT current_database()"),"flex_ci")
+                hotel=uuid.uuid4()
+                await con.execute("INSERT INTO flex_hotels(id,display_name) VALUES($1,$2)",hotel,"Synthetic initial BASE")
+                return str(hotel)
+            finally: await con.close()
+        hotel=asyncio.run(seed())
+        path="/v1/platform/launch-offer"
+        self.assertEqual(self.get(path,who="owner-a").status_code,403)
+        before=self.get(path)
+        self.assertEqual(before.status_code,200,before.text)
+        self.assertEqual(before.json()["available"],50)
+        made=self.post("/v1/platform/tariff-packages",{
+            "hotel_id":hotel,"package_kind":"BASE","title":"Initial BASE launch",
+            "period_start":datetime.now(ZoneInfo("Asia/Bishkek")).date().isoformat(),
+            "skus":[],"commercial_policy_version":1,"discount_pct":"0",
+            "trial_days":5,"custom_monthly_price":None,"term_months":12,
+            "standard_term_discount":False,"include_implementation":True,"launch_offer":True})
+        self.assertEqual(made.status_code,201,made.text)
+        row=made.json()
+        self.assertEqual(Decimal(row["subscription_term_total"]),Decimal("36000"))
+        self.assertEqual(Decimal(row["implementation_total"]),Decimal("25000"))
+        after=self.get(path)
+        self.assertEqual(after.status_code,200,after.text)
+        data=after.json()
+        self.assertEqual((data["capacity"],data["reserved"],data["available"]),(50,1,49))
+        self.assertEqual(str(data["reservations"][0]["hotel_id"]),hotel)
+        self.assertEqual(str(data["reservations"][0]["offer_id"]),row["id"])
+        self.assertEqual(Decimal(str(data["reservations"][0]["subscription_term_total"])),Decimal("36000"))
+        self.assertFalse(data["payments_enabled"])
 
     def test_02_planned_sku_append_and_price_version(self):
         sku={"sku":"EXTRA_QA_CI","title":"QA add-on 1","capability_key":"qa.extra.feature"}
@@ -222,7 +266,7 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         async def verify_unchanged():
             con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
             try:
-                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_tariff_package_versions"),3)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_tariff_package_versions WHERE hotel_id=$1",uuid.UUID(HOTEL_A)),3)
                 self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
                 self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_payment_intents"),0)
                 self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscription_configuration_drafts"),1)
@@ -268,6 +312,458 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         self.assertEqual(saved["source_template_id"], expected["id"])
         individual = self.post(packages, {**proposal, "package_kind": "CUSTOM"})
         self.assertEqual(self.post(templates, {"package_id": individual.json()["id"]}).status_code, 422)
+
+
+
+    def test_06_commercial_price_revision(self):
+        path="/v1/platform/commercial-policy"
+        payload={"expected_version":1,"price_kind":"PACKAGE","code":"BASE","monthly_price":"5500.00"}
+        self.assertEqual(self.post(path,payload,"owner-a").status_code,403)
+        self.assertEqual(self.post(path,{**payload,"monthly_price":"0"}).status_code,422)
+        self.assertEqual(self.post(path,{**payload,"code":"UNKNOWN"}).status_code,422)
+        first=self.post(path,payload)
+        self.assertEqual(first.status_code,201,first.text)
+        self.assertEqual(first.json()["version"],2)
+        self.assertEqual(first.json()["policy"]["monthly_packages"]["CUSTOM"]["minimum"],"5500.00")
+        self.assertFalse(first.json()["payment_collected"])
+        self.assertEqual(self.post(path,payload).status_code,409)
+        second=self.post(path,{"expected_version":2,"price_kind":"MODULE","code":"QR_ZONE","monthly_price":"2200"})
+        self.assertEqual(second.status_code,201,second.text)
+        self.assertEqual(self.get(path).json()["policy"]["module_monthly_prices"]["QR_ZONE"],"2200.00")
+        async def verify_history():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT policy#>>'{monthly_packages,BASE,price}' FROM flex_commercial_policy_versions WHERE version=1"),"5000")
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_commercial_policy_versions"),3)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+            finally:await con.close()
+        asyncio.run(verify_history())
+
+
+
+    def test_07_approved_hotel_package_prices(self):
+        path="/v1/platform/tariff-packages"
+        base={"hotel_id":HOTEL_A,"package_kind":"BUSINESS","title":"Approved business",
+              "period_start":(datetime.now(ZoneInfo("Asia/Bishkek")).date()+timedelta(days=4)).isoformat(),
+              "skus":["QR_ZONE","MULTI_HOTEL"],"commercial_policy_version":3,
+              "discount_pct":"10","trial_days":5,"custom_monthly_price":None}
+        self.assertEqual(self.post(path,base,"owner-a").status_code,403)
+        self.assertEqual(self.post(path,{**base,"commercial_policy_version":1}).status_code,409)
+        self.assertEqual(self.post(path,{**base,"skus":["UNKNOWN_MODULE"]}).status_code,422)
+        made=self.post(path,base)
+        self.assertEqual(made.status_code,201,made.text)
+        row=made.json()
+        self.assertEqual(Decimal(row["list_monthly_total"]),Decimal("20000"))
+        self.assertEqual(Decimal(row["proposed_monthly_total"]),Decimal("18000"))
+        self.assertFalse(row["subscription_activated"])
+        items={i["sku"]:i for i in row["items"]}
+        self.assertEqual(Decimal(items["QR_ZONE"]["monthly_price"]),Decimal(0))
+        self.assertEqual(items["BASE_PMS"]["commercial_policy_version"],3)
+        other=self.post(path,{**base,"hotel_id":HOTEL_B,"package_kind":"BASE","skus":[],"discount_pct":"0"})
+        self.assertEqual(other.status_code,201,other.text)
+        self.assertEqual(Decimal(other.json()["proposed_monthly_total"]),Decimal("5500"))
+        self.assertEqual(self.post(path,{**base,"package_kind":"CUSTOM","discount_pct":"0",
+            "custom_monthly_price":"4999"}).status_code,422)
+        history=self.get(path+"?hotel_id="+HOTEL_A).json()
+        self.assertEqual(history[0]["id"],row["id"])
+        self.assertEqual(Decimal(history[0]["proposed_monthly_total"]),Decimal("18000"))
+
+
+
+    def test_08_commercial_term_and_implementation_snapshot(self):
+        path="/v1/platform/tariff-packages"
+        start=(datetime.now(ZoneInfo("Asia/Bishkek")).date()+timedelta(days=4)).isoformat()
+        data={"hotel_id":HOTEL_B,"package_kind":"BUSINESS","title":"Business annual",
+              "period_start":start,"skus":[],"commercial_policy_version":3,
+              "discount_pct":"0","trial_days":5,"custom_monthly_price":None,
+              "term_months":12,"standard_term_discount":True,"include_implementation":True}
+        made=self.post(path,data)
+        self.assertEqual(made.status_code,201,made.text)
+        row=made.json()
+        self.assertEqual(row["term_months"],12)
+        self.assertEqual(Decimal(row["discount_pct"]),Decimal("30"))
+        self.assertEqual(Decimal(row["subscription_term_total"]),Decimal("126000"))
+        self.assertEqual(Decimal(row["implementation_total"]),Decimal("25000"))
+        self.assertEqual(row["period_start"],start)
+        self.assertFalse(row["subscription_activated"])
+        saved=next(x for x in self.get(path+"?hotel_id="+HOTEL_B).json() if x["id"]==row["id"])
+        self.assertEqual(saved["subscription_term_total"],row["subscription_term_total"])
+        self.assertEqual(saved["commercial_policy_version"],3)
+        self.assertEqual(self.post(path,{**data,"term_months":2}).status_code,422)
+        self.assertEqual(self.post(path,{**data,"discount_pct":"10"}).status_code,422)
+
+
+
+    def test_10_launch_offer_atomic_and_admin_only(self):
+        from concurrent.futures import ThreadPoolExecutor
+        path="/v1/platform/tariff-packages"
+        data={"hotel_id":HOTEL_A,"package_kind":"BUSINESS","title":"Launch offer",
+              "period_start":datetime.now(ZoneInfo("Asia/Bishkek")).date().isoformat(),
+              "skus":[],"commercial_policy_version":3,"discount_pct":"0",
+              "trial_days":5,"custom_monthly_price":None,"term_months":12,
+              "standard_term_discount":False,"include_implementation":True,"launch_offer":True}
+        self.assertEqual(self.post(path,data,"owner-a").status_code,403)
+        for bad in ({"term_months":6},{"standard_term_discount":True},{"discount_pct":"10"},
+                    {"package_kind":"CUSTOM"},{"skus":["MULTI_HOTEL"]}):
+            self.assertEqual(self.post(path,{**data,**bad}).status_code,422)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results=list(pool.map(lambda _:self.post(path,data),range(2)))
+        self.assertEqual(sorted(x.status_code for x in results),[201,409])
+        row=next(x.json() for x in results if x.status_code==201)
+        self.assertEqual(Decimal(row["subscription_term_total"]),Decimal("108000"))
+        self.assertEqual(Decimal(row["implementation_total"]),Decimal("25000"))
+        self.assertTrue(row["launch_offer_reserved"])
+        self.assertFalse(row["payments_enabled"])
+        self.assertFalse(row["subscription_activated"])
+        self.assertEqual(self.post(path,data).status_code,409)
+        premium=self.post(path,{**data,"hotel_id":HOTEL_B,"package_kind":"PREMIUM"})
+        self.assertEqual(premium.status_code,201,premium.text)
+        self.assertEqual(Decimal(premium.json()["subscription_term_total"]),Decimal("180000"))
+        self.assertNotEqual(row["launch_offer_slot"],premium.json()["launch_offer_slot"])
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_launch_offer_reservations"),3)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+            finally:await con.close()
+        asyncio.run(verify())
+
+    def test_11_launch_capacity_and_base_price(self):
+        from concurrent.futures import ThreadPoolExecutor
+        async def seed():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT current_database()"),"flex_ci")
+                ids=[uuid.uuid4() for _ in range(48)]
+                await con.executemany("INSERT INTO flex_hotels(id,display_name) VALUES($1,$2)",
+                                      [(i,"Synthetic launch capacity") for i in ids])
+                return [str(i) for i in ids]
+            finally: await con.close()
+        ids=asyncio.run(seed())
+        path="/v1/platform/tariff-packages"
+        data={"package_kind":"BASE","title":"Launch capacity",
+              "period_start":datetime.now(ZoneInfo("Asia/Bishkek")).date().isoformat(),
+              "skus":[],"commercial_policy_version":3,"discount_pct":"0",
+              "trial_days":5,"custom_monthly_price":None,"term_months":12,
+              "standard_term_discount":False,"include_implementation":True,"launch_offer":True}
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            results=list(pool.map(lambda i:self.post(path,{**data,"hotel_id":i}),ids))
+        self.assertEqual(sorted(x.status_code for x in results),[201]*47+[409])
+        accepted=[x.json() for x in results if x.status_code==201]
+        self.assertEqual(len({x["launch_offer_slot"] for x in accepted}),47)
+        for row in accepted:
+            self.assertEqual(Decimal(row["subscription_term_total"]),Decimal("39600"))
+            self.assertEqual(Decimal(row["implementation_total"]),Decimal("25000"))
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_launch_offer_reservations"),50)
+                self.assertEqual(await con.fetchval("SELECT count(DISTINCT slot) FROM flex_launch_offer_reservations"),50)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+            finally: await con.close()
+        asyncio.run(verify())
+        status=self.get("/v1/platform/launch-offer")
+        self.assertEqual(status.status_code,200,status.text)
+        summary=status.json()
+        self.assertEqual((summary["capacity"],summary["reserved"],summary["available"]),(50,50,0))
+        self.assertEqual({x["slot"] for x in summary["reservations"]},set(range(1,51)))
+        self.assertEqual(len({x["hotel_id"] for x in summary["reservations"]}),50)
+        self.assertFalse(summary["payments_enabled"])
+
+    def test_09_installation_trial_is_one_time_and_admin_only(self):
+        path="/v1/platform/installation-trial"
+        data={"hotel_id":HOTEL_A}
+        self.assertEqual(self.post(path,data,"owner-a").status_code,403)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A).json(),None)
+        first=self.post(path,data)
+        self.assertEqual(first.status_code,201,first.text)
+        row=first.json()
+        self.assertEqual(date.fromisoformat(row["trial_end_exclusive"])-date.fromisoformat(row["trial_start"]),timedelta(days=5))
+        self.assertEqual(self.post(path,data).json(),row)
+        self.assertFalse(row["entitlement_changed"])
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_B).json(),None)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A,who="owner-b").status_code,403)
+
+
+    def test_12_customer_profile_contract_and_preview(self):
+        profile="/v1/platform/customer-profile"
+        agreement="/v1/platform/agreement-drafts"
+        preview="/v1/platform/invoice-previews"
+        data={"hotel_id":HOTEL_A,"expected_version":0,"contact_name":"Synthetic contact",
+              "contact_email":"qa@example.test","contact_phone":"+996000000000","responsible_name":"Synthetic responsible"}
+        self.assertEqual(self.get(profile+"?hotel_id="+HOTEL_A,who="owner-a").status_code,403)
+        self.assertEqual(self.post(profile,data,"owner-a").status_code,403)
+        self.assertEqual(self.post(profile,{**data,"contact_email":"bad"}).status_code,422)
+        made=self.post(profile,data)
+        self.assertEqual(made.status_code,201,made.text)
+        self.assertEqual(made.json()["version"],1)
+        self.assertEqual(self.post(profile,data).status_code,409)
+        updated=self.post(profile,{**data,"expected_version":1,"contact_name":"Updated synthetic"})
+        self.assertEqual(updated.status_code,201,updated.text)
+        history=self.get(profile+"?hotel_id="+HOTEL_A).json()
+        self.assertEqual([x["version"] for x in history["history"]],[2,1])
+        self.assertEqual(history["current"]["contact_name"],"Updated synthetic")
+        self.assertIsNone(self.get(profile+"?hotel_id="+HOTEL_B).json()["current"])
+        offers=self.get("/v1/platform/tariff-packages?hotel_id="+HOTEL_A).json()
+        offer=next(x for x in offers if x["commercial_policy_version"]==3 and Decimal(str(x["discount_pct"]))==40)
+        a={"hotel_id":HOTEL_A,"offer_id":offer["id"]}
+        self.assertEqual(self.post(agreement,a,"owner-a").status_code,403)
+        self.assertEqual(self.post(agreement,{**a,"hotel_id":HOTEL_B}).status_code,404)
+        self.assertEqual(self.post(agreement,{**a,"state":"SIGNED"}).status_code,422)
+        made=self.post(agreement,a)
+        self.assertEqual(made.status_code,201,made.text)
+        contract=made.json()
+        self.assertEqual(contract["state"],"DRAFT")
+        self.assertIsNone(contract["signed_at"])
+        self.assertEqual(contract["terms"]["source_offer_id"],offer["id"])
+        self.assertEqual(Decimal(contract["terms"]["subscription_term_total"]),Decimal("108000"))
+        self.assertEqual(self.post(agreement,a).json()["id"],contract["id"])
+        p={"hotel_id":HOTEL_A,"agreement_id":contract["id"]}
+        self.assertEqual(self.post(preview,{**p,"hotel_id":HOTEL_B}).status_code,404)
+        self.assertEqual(self.post(preview,{**p,"amount":1}).status_code,422)
+        made=self.post(preview,p)
+        self.assertEqual(made.status_code,201,made.text)
+        document=made.json()
+        self.assertEqual(document["status"],"NON_ISSUABLE")
+        self.assertEqual(document["tax_status"],"NOT_CALCULATED")
+        self.assertEqual(Decimal(str(document["amount_before_unresolved_taxes"])),Decimal("133000"))
+        self.assertEqual(self.post(preview,p).json()["id"],document["id"])
+        history=self.get(agreement+"?hotel_id="+HOTEL_A).json()
+        self.assertTrue(any(x["id"]==contract["id"] for x in history["agreements"]))
+        self.assertTrue(any(x["id"]==document["id"] for x in history["previews"]))
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscriptions"),2)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_commercial_agreement_versions WHERE source_offer_id=$1",uuid.UUID(offer["id"])),1)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_non_issuable_invoice_previews WHERE agreement_version_id=$1",uuid.UUID(contract["id"])),1)
+            finally: await con.close()
+        asyncio.run(verify())
+
+
+    def test_13_financial_reconciliation_excludes_drafts_and_denies_other_roles(self):
+        path="/v1/platform/financial-reconciliation?hotel_id="
+        self.assertEqual(self.get(path+HOTEL_A,who="owner-a").status_code,403)
+        self.assertEqual(self.get(path+HOTEL_A,mfa=False).status_code,403)
+        for hotel in (HOTEL_A,HOTEL_B):
+            reply=self.get(path+hotel)
+            self.assertEqual(reply.status_code,200,reply.text)
+            data=reply.json()
+            self.assertEqual(data["hotel_id"],hotel)
+            self.assertEqual(data["invoice_count"],0)
+            self.assertEqual(data["invoices"],[])
+            self.assertTrue(data["reconciled"])
+            self.assertFalse(data["payments_enabled"])
+            self.assertFalse(data["payouts_enabled"])
+            self.assertTrue(all(Decimal(v)==0 for v in data["totals"].values()))
+
+
+    def test_14_internal_approval_and_subscription_plan(self):
+        read="/v1/platform/subscription-plans?hotel_id="
+        path="/v1/platform/agreement-internal-approvals"
+        contract=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()["agreements"][0]
+        body={"hotel_id":HOTEL_A,"agreement_id":contract["id"],
+              "terms_digest":contract["terms_digest"],"acknowledged":True}
+        self.assertEqual(self.get(read+HOTEL_A).json(),[])
+        self.assertEqual(self.get(read+HOTEL_A,who="owner-a").status_code,403)
+        self.assertEqual(self.post(path,body,"owner-a").status_code,403)
+        self.assertEqual(self.post(path,body,mfa=False).status_code,403)
+        self.assertEqual(self.post(path,{**body,"hotel_id":HOTEL_B}).status_code,404)
+        self.assertEqual(self.post(path,{**body,"terms_digest":"0"*64}).status_code,409)
+        self.assertEqual(self.post(path,{**body,"acknowledged":False}).status_code,422)
+        self.assertEqual(self.post(path,{**body,"client_signed":True}).status_code,422)
+        result=self.post(path,body)
+        self.assertEqual(result.status_code,201,result.text)
+        saved=result.json()
+        self.assertEqual(saved["state"],"INTERNALLY_APPROVED")
+        self.assertFalse(saved["client_signed"])
+        self.assertFalse(saved["subscription_activated"])
+        self.assertFalse(saved["payments_enabled"])
+        self.assertEqual(self.post(path,body).json(),saved)
+        plans=self.get(read+HOTEL_A).json()
+        self.assertEqual(len(plans),1)
+        plan=plans[0]
+        self.assertEqual(plan["agreement_id"],contract["id"])
+        self.assertEqual(plan["terms_digest"],contract["terms_digest"])
+        self.assertEqual(plan["term_months"],12)
+        self.assertEqual(Decimal(plan["subscription_term_total"]),Decimal("108000"))
+        self.assertEqual(Decimal(plan["implementation_total"]),Decimal("25000"))
+        self.assertEqual((plan["state"],plan["enforcement"]),("PLAN_ONLY","OFF"))
+        self.assertFalse(plan["subscription_activated"])
+        self.assertEqual(self.get(read+HOTEL_B).json(),[])
+        history=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()
+        self.assertEqual(len(history["approvals"]),1)
+        self.assertEqual(history["agreements"][0]["state"],"DRAFT")
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_agreement_internal_approvals"),1)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_commercial_agreement_versions WHERE state='SIGNED'"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscriptions"),2)
+            finally: await con.close()
+        asyncio.run(verify())
+
+
+    def test_15_customer_acceptance_only_exact_approved_own_terms(self):
+        path="/v1/platform/customer-agreement-acceptances"
+        history=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()
+        contract=history["agreements"][0]
+        data={"hotel_id":HOTEL_A,"agreement_id":contract["id"],
+            "terms_digest":contract["terms_digest"],"acknowledged":True}
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A,who="administrator").status_code,404)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A,who="owner-b").status_code,404)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_A,who="owner-a",mfa=False).status_code,403)
+        own=self.get(path+"?hotel_id="+HOTEL_A,who="owner-a")
+        self.assertEqual(own.status_code,200,own.text)
+        self.assertEqual(len(own.json()),1)
+        self.assertEqual(own.json()[0]["state"],"AWAITING_CUSTOMER")
+        self.assertEqual(own.json()[0]["terms"],contract["terms"])
+        self.assertEqual(self.post(path,data,"administrator").status_code,404)
+        self.assertEqual(self.post(path,data,"owner-b").status_code,404)
+        self.assertEqual(self.post(path,{**data,"hotel_id":HOTEL_B},"owner-b").status_code,404)
+        self.assertEqual(self.post(path,data,"owner-a",mfa=False).status_code,403)
+        self.assertEqual(self.post(path,{**data,"terms_digest":"0"*64},"owner-a").status_code,409)
+        self.assertEqual(self.post(path,{**data,"acknowledged":False},"owner-a").status_code,422)
+        result=self.post(path,data,"owner-a")
+        self.assertEqual(result.status_code,201,result.text)
+        evidence=result.json()
+        self.assertEqual(evidence["state"],"CUSTOMER_ACCEPTED")
+        self.assertFalse(evidence["client_signed"])
+        self.assertFalse(evidence["subscription_activated"])
+        self.assertFalse(evidence["payments_enabled"])
+        self.assertEqual(self.post(path,data,"owner-a").json(),evidence)
+        self.assertEqual(self.get(path+"?hotel_id="+HOTEL_B,who="owner-b").json(),[])
+        history=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()
+        self.assertEqual(len(history["acceptances"]),1)
+        self.assertEqual(history["acceptances"][0]["accepted_by"],"owner-a")
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_customer_agreement_acceptances"),1)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_commercial_agreement_versions WHERE state='SIGNED'"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscriptions"),2)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+            finally: await con.close()
+        asyncio.run(verify())
+
+
+    def test_16_synthetic_finance_replay_does_not_write_ledger(self):
+        path="/v1/platform/finance-simulation"
+        contract=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()["agreements"][0]
+        data={"hotel_id":HOTEL_A,"agreement_id":contract["id"],"events":[
+            {"kind":"PAYMENT","event_id":"p1","amount":"100000"},
+            {"kind":"PAYMENT","event_id":"p2","amount":"40000"},
+            {"kind":"REFUND","event_id":"r1","payment_id":"p2","amount":"10000"}]}
+        self.assertEqual(self.post(path,data,"owner-a").status_code,403)
+        self.assertEqual(self.post(path,{**data,"hotel_id":HOTEL_B}).status_code,404)
+        response=self.post(path,data)
+        self.assertEqual(response.status_code,201,response.text)
+        r=response.json()
+        self.assertEqual(r["mode"],"SYNTHETIC_ONLY")
+        self.assertEqual(Decimal(r["amount_before_unresolved_taxes"]),Decimal("133000"))
+        self.assertEqual(Decimal(r["net_simulated_cash"]),Decimal("130000"))
+        self.assertEqual(Decimal(r["outstanding"]),Decimal("3000"))
+        self.assertEqual(Decimal(r["credit"]),Decimal("0"))
+        self.assertEqual(Decimal(r["discrepancy"]),Decimal("0"))
+        self.assertFalse(r["persisted"])
+        self.assertFalse(r["payments_enabled"])
+        self.assertFalse(r["launch_offer_finalized"])
+        self.assertEqual(self.post(path,data).json(),r)
+        invalid={**data,"events":[{"kind":"REFUND","event_id":"r","payment_id":"missing","amount":"1"}]}
+        self.assertEqual(self.post(path,invalid).status_code,422)
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_payment_reversals"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscriptions"),2)
+            finally: await con.close()
+        asyncio.run(verify())
+
+
+    def test_17_persistent_synthetic_cash_journal(self):
+        path="/v1/platform/synthetic-cash-journal"
+        contract=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()["agreements"][0]
+        base={"hotel_id":HOTEL_A,"agreement_id":contract["id"]}
+        read=path+"?hotel_id="+HOTEL_A+"&agreement_id="+contract["id"]
+        self.assertEqual(self.get(read,who="owner-a").status_code,403)
+        self.assertEqual(self.get(read).json()["sequence"],0)
+        def append(n,key,amount,kind="PAYMENT",payment_id=None):
+            return self.post(path,{**base,"expected_sequence":n,"event":{
+                "kind":kind,"event_id":key,"amount":amount,"payment_id":payment_id}})
+        first=append(0,"p1","100000")
+        self.assertEqual(first.status_code,201,first.text)
+        self.assertEqual(first.json()["sequence"],1)
+        self.assertEqual(append(0,"p1","100000").json(),first.json())
+        self.assertEqual(append(0,"p1","100001").status_code,409)
+        self.assertEqual(append(0,"p2","40000").status_code,409)
+        second=append(1,"p2","40000")
+        self.assertEqual(second.status_code,201,second.text)
+        self.assertEqual(second.json()["test_balance_state"],"TEST_SETTLED")
+        self.assertEqual(Decimal(second.json()["credit"]),Decimal("7000"))
+        self.assertEqual(append(2,"bad","40001","REFUND","p2").status_code,422)
+        final=append(2,"r1","10000","REFUND","p2")
+        self.assertEqual(final.status_code,201,final.text)
+        data=final.json()
+        self.assertEqual(data["sequence"],3)
+        self.assertEqual(data["test_balance_state"],"TEST_OUTSTANDING")
+        self.assertEqual(Decimal(data["outstanding"]),Decimal("3000"))
+        self.assertEqual(Decimal(data["discrepancy"]),Decimal("0"))
+        self.assertFalse(data["payments_enabled"])
+        self.assertFalse(data["subscription_activated"])
+        self.assertFalse(data["launch_offer_finalized"])
+        self.assertEqual(self.get(read).json(),data)
+        self.assertEqual(self.get(read.replace(HOTEL_A,HOTEL_B)).status_code,404)
+        plans=self.get("/v1/platform/subscription-plans?hotel_id="+HOTEL_A).json()
+        plan=next(p for p in plans if p["agreement_id"]==contract["id"])
+        self.assertEqual(plan["customer_acceptance_state"],"ACCEPTED")
+        self.assertEqual(Decimal(plan["test_finance"]["outstanding"]),Decimal("3000"))
+        self.assertEqual(Decimal(plan["test_finance"]["credit"]),Decimal("0"))
+        self.assertEqual(plan["test_finance"]["mode"],"SYNTHETIC_ONLY")
+        self.assertEqual(plan["renewal_preview"]["period_start"],plan["period_end_exclusive"])
+        self.assertTrue(plan["renewal_preview"]["requires_new_offer"])
+        self.assertFalse(plan["renewal_preview"]["bank_authorized"])
+        self.assertFalse(plan["subscription_activated"])
+        async def verify():
+            con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
+            try:
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_qa_cash_events"),3)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_confirmed_payments"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_payment_reversals"),0)
+                self.assertEqual(await con.fetchval("SELECT count(*) FROM flex_subscriptions"),2)
+                with self.assertRaises(asyncpg.PostgresError):
+                    await con.execute("UPDATE flex_qa_cash_events SET amount=1 WHERE event_id='p1'")
+            finally: await con.close()
+        asyncio.run(verify())
+
+
+    def test_18_explicit_credit_application(self):
+        path="/v1/platform/synthetic-cash-journal"
+        contract=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()["agreements"][0]
+        base={"hotel_id":HOTEL_A,"agreement_id":contract["id"]}
+        def append(n,key,amount,kind="PAYMENT",payment_id=None):
+            return self.post(path,{**base,"expected_sequence":n,"event":{
+                "kind":kind,"event_id":key,"amount":amount,"payment_id":payment_id}})
+        self.assertEqual(append(3,"p3","8000").status_code,201)
+        before=append(4,"r2","4000","REFUND","p1").json()
+        self.assertEqual(Decimal(before["outstanding"]),Decimal("4000"))
+        self.assertEqual(Decimal(before["credit"]),Decimal("5000"))
+        self.assertEqual(append(5,"bad-credit","4001","CREDIT_APPLY","p3").status_code,422)
+        result=append(5,"c1","4000","CREDIT_APPLY","p3")
+        self.assertEqual(result.status_code,201,result.text)
+        after=result.json()
+        self.assertEqual(Decimal(after["outstanding"]),Decimal("0"))
+        self.assertEqual(Decimal(after["credit"]),Decimal("1000"))
+        self.assertEqual(after["net_simulated_cash"],before["net_simulated_cash"])
+        self.assertEqual(append(5,"c1","4000","CREDIT_APPLY","p3").json(),after)
+        self.assertFalse(after["payments_enabled"])
+        self.assertFalse(after["subscription_activated"])
+        refund=append(6,"r3","2000","REFUND","p3").json()
+        self.assertEqual(Decimal(refund["outstanding"]),Decimal("1000"))
+        self.assertEqual(Decimal(refund["credit"]),Decimal("0"))
+        self.assertEqual(Decimal(refund["discrepancy"]),Decimal("0"))
 
 
 if __name__=="__main__":

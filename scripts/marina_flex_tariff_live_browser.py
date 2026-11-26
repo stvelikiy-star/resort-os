@@ -14,6 +14,7 @@ from playwright.sync_api import expect, sync_playwright
 ORIGIN = "https://127.0.0.1:3443"
 HOTEL_A = "00000000-0000-0000-0000-00000000000a"
 HOTEL_B = "00000000-0000-0000-0000-00000000000b"
+PASSWORD_MODE = os.environ.get("FLEX_CI_LOGIN_MODE") == "password"
 
 
 def totp(secret):
@@ -25,7 +26,7 @@ def totp(secret):
     return f"{value % 1000000:06d}"
 
 
-def enroll(browser):
+def enroll(browser, email=None, password=None):
     context = browser.new_context()
     page = context.new_page()
     page.goto(ORIGIN)
@@ -41,8 +42,8 @@ def enroll(browser):
         assert reply["status"] == 200, (path, reply["status"], reply["data"].get("code"))
         return reply["data"]
 
-    password = os.environ["QA_PASSWORD"]
-    post("sign-in/email", {"email": os.environ["QA_EMAIL"], "password": password})
+    password = password or os.environ["QA_PASSWORD"]
+    post("sign-in/email", {"email": email or os.environ["QA_EMAIL"], "password": password})
     setup = post("two-factor/enable", {"password": password})
     secret = parse_qs(urlsplit(setup["totpURI"]).query)["secret"][0]
     post("two-factor/verify-totp", {"code": totp(secret), "trustDevice": False})
@@ -100,21 +101,30 @@ def run():
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path=which("google-chrome") or which("chromium"),
             args=["--ignore-certificate-errors-spki-list=" + os.environ["QA_TLS_PIN"]])
-        secret = enroll(browser)
+        secret = None if PASSWORD_MODE else enroll(browser)
         context = browser.new_context()
         page = context.new_page()
         page.goto(ORIGIN)
         signin = page.locator("#flex-identity-signin")
         signin.locator('[name="email"]').fill(os.environ["QA_EMAIL"])
         signin.locator('[name="password"]').fill(os.environ["QA_PASSWORD"])
-        signin.locator('button[type="submit"]').click()
-        challenge = page.locator("#flex-identity-totp")
-        challenge.locator('[name="code"]').fill(totp(secret))
-        with page.expect_response(ORIGIN + "/api/identity/two-factor/verify-totp") as verified:
-            challenge.locator('button[type="submit"]').click()
+        if PASSWORD_MODE:
+            status = page.request.get(ORIGIN + "/api/status", ignore_https_errors=True)
+            assert status.status == 200 and status.json()["password_login"] is True
+            with page.expect_response(ORIGIN + "/api/identity/sign-in/email") as verified:
+                signin.locator('button[type="submit"]').click()
+        else:
+            signin.locator('button[type="submit"]').click()
+            challenge = page.locator("#flex-identity-totp")
+            challenge.locator('[name="code"]').fill(totp(secret))
+            with page.expect_response(ORIGIN + "/api/identity/two-factor/verify-totp") as verified:
+                challenge.locator('button[type="submit"]').click()
         # Successful login immediately navigates away. Check the cookie and server-side
         # role in the new document instead of reading the discarded response body.
         assert verified.value.status == 200, ("login challenge", verified.value.status)
+        expect(page.locator(f'[data-hotel="{HOTEL_A}"]')).to_be_visible(timeout=15000)
+        if PASSWORD_MODE:
+            expect(page.locator("#flex-identity-totp")).to_have_count(0)
         assert any(c["name"] == "flex_session" for c in context.cookies()), "Missing platform session cookie"
         for path in ["/api/data/v1/me", "/api/data/v1/hotels"]:
             status = page.request.get(ORIGIN + path, ignore_https_errors=True)
@@ -149,8 +159,273 @@ def run():
             assert (row["id"],row["hotel_id"],row["version"],row["discount_pct"],row["total"],
                     row["source_template_id"],row["template_revision"],row["sku"],row["state"],row["enforcement"]) == (
                     ident,hotel,1,pct,total,source,1 if source else None,"TARIFF_E2E","DRAFT","OFF")
-        print("PASS real SUPER_ADMIN password/TOTP login, catalog and shared template revision 1")
+        print("PASS real SUPER_ADMIN " + ("QA password-only" if PASSWORD_MODE else "password/TOTP") + " login, catalog and shared template revision 1")
         print("PASS reopened hotel A v1 10% = 3600.00 KGS; hotel B v1 25% = 3000.00 KGS; both match PostgreSQL")
+        open_card(page, HOTEL_A)
+        form=page.locator("#hotel-commercial-offer")
+        expect(form).to_be_visible()
+        form.locator('[name="package_kind"]').select_option("BASE")
+        form.locator('[name="term_months"]').select_option("12")
+        form.locator('[name="launch_offer"]').check()
+        form.locator('[name="include_implementation"]').check()
+        with page.expect_response(ORIGIN+"/api/actions/tariff-packages") as submitted:
+            form.locator('button[type="submit"]').click()
+        response=submitted.value
+        assert response.status==201, ("launch offer",response.status,response.text()[:250])
+        launch=response.json()
+        from decimal import Decimal
+        assert Decimal(str(launch["subscription_term_total"]))==Decimal("36000")
+        assert Decimal(str(launch["implementation_total"]))==Decimal("25000")
+        assert launch["launch_offer_slot"]==1
+        assert launch["launch_offer_reserved"] and not launch["payments_enabled"] and not launch["subscription_activated"]
+        # Navigation waits for the saved card to finish rendering.
+        expect(page.locator("#hotel-commercial-offer")).to_be_visible()
+        stats=page.request.get(ORIGIN+"/api/data/v1/platform/launch-offer",ignore_https_errors=True)
+        assert stats.status==200, ("launch stats",stats.status)
+        data=stats.json()
+        assert (data["capacity"],data["reserved"],data["available"])==(50,1,49)
+        assert data["reservations"][0]["offer_id"]==launch["id"]
+        page.locator('#nav [data-view="catalog"]').click()
+        panel=page.locator("section.panel").filter(has=page.get_by_role("heading",name="Launch offer",exact=True))
+        expect(panel).to_contain_text("1 / 50")
+        expect(panel).to_contain_text("49")
+        expect(panel.locator("tr").filter(has_text="BASE")).to_contain_text("36,000 KGS")
+        expect(panel.locator("tr").filter(has_text="BASE")).to_contain_text("25,000 KGS")
+        query="""SELECT json_build_object('slot',r.slot,'hotel',r.hotel_id,'offer',r.offer_id,
+            'total',p.subscription_term_total,'implementation',p.implementation_total,
+            'payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments))
+            FROM flex_private.flex_launch_offer_reservations r
+            JOIN flex_private.flex_tariff_package_versions p ON p.id=r.offer_id"""
+        saved=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
+        assert saved=={"slot":1,"hotel":HOTEL_A,"offer":launch["id"],"total":36000,"implementation":25000,"payments":0},saved
+        print("PASS browser launch offer BASE 36000 + setup 25000, capacity 1/50, independent PostgreSQL match")
+        page.locator('#nav [data-view="hotels"]').click()
+        page.locator(f'[data-hotel="{HOTEL_A}"]').click()
+        page.locator('[data-hotel-tab="overview"]').click()
+        profile=page.locator("#customer-profile-form")
+        expect(profile).to_be_visible()
+        profile.locator('[name="contact_name"]').fill("Synthetic hotel contact")
+        profile.locator('[name="contact_email"]').fill("contact@example.test")
+        profile.locator('[name="contact_phone"]').fill("+996000000000")
+        profile.locator('[name="responsible_name"]').fill("Synthetic manager")
+        with page.expect_response(ORIGIN+"/api/actions/customer-profile") as submitted:
+            profile.locator('button[type="submit"]').click()
+        assert submitted.value.status==201, ("profile",submitted.value.status,submitted.value.text()[:250])
+        expect(profile.locator('[name="expected_version"]')).to_have_value("1")
+        profile.locator('[name="contact_name"]').fill("Updated synthetic contact")
+        with page.expect_response(ORIGIN+"/api/actions/customer-profile") as submitted:
+            profile.locator('button[type="submit"]').click()
+        assert submitted.value.status==201
+        expect(profile.locator('[name="expected_version"]')).to_have_value("2")
+        page.locator('[data-hotel-tab="history"]').click()
+        expect(page.get_by_role("heading",name="Contact history",exact=True)).to_be_visible()
+        expect(page.get_by_text("Updated synthetic contact",exact=True)).to_be_visible()
+        expect(page.get_by_text("Synthetic hotel contact",exact=True)).to_be_visible()
+        agreement=page.locator("#agreement-draft-form")
+        agreement.locator('[name="offer_id"]').select_option(launch["id"])
+        with page.expect_response(ORIGIN+"/api/actions/agreement-drafts") as submitted:
+            agreement.locator('button[type="submit"]').click()
+        response=submitted.value
+        assert response.status==201, ("agreement",response.status,response.text()[:250])
+        contract=response.json()
+        assert contract["state"]=="DRAFT" and contract["source_offer_id"]==launch["id"]
+        preview=page.locator(".invoice-preview-form")
+        with page.expect_response(ORIGIN+"/api/actions/invoice-previews") as submitted:
+            preview.locator('button[type="submit"]').click()
+        response=submitted.value
+        assert response.status==201, ("preview",response.status,response.text()[:250])
+        doc=response.json()
+        assert doc["status"]=="NON_ISSUABLE" and Decimal(str(doc["amount_before_unresolved_taxes"]))==Decimal("61000")
+        expect(page.locator("tr").filter(has_text="NON_ISSUABLE")).to_contain_text("61,000 KGS")
+        query="""SELECT json_build_object('profiles',(SELECT count(*) FROM flex_private.flex_hotel_profile_versions),
+          'agreement',a.id,'source',a.source_offer_id,'state',a.state,'preview',p.id,
+          'amount',p.amount_before_unresolved_taxes,'payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments))
+          FROM flex_private.flex_commercial_agreement_versions a JOIN flex_private.flex_non_issuable_invoice_previews p ON p.agreement_version_id=a.id"""
+        saved=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
+        assert saved=={"profiles":2,"agreement":contract["id"],"source":launch["id"],"state":"DRAFT","preview":doc["id"],"amount":61000,"payments":0},saved
+        print("PASS browser customer profile revisions, unsigned agreement and non-issuable 61000 KGS preview match PostgreSQL")
+        page.locator('[data-hotel-tab="finance"]').click()
+        panel=page.locator("section.panel").filter(has=page.get_by_role("heading",name="Financial reconciliation",exact=True))
+        expect(panel).to_be_visible()
+        expect(panel).to_contain_text("Outstanding")
+        expect(panel).to_contain_text("Unapplied credit")
+        stats=page.request.get(ORIGIN+"/api/data/v1/platform/financial-reconciliation?hotel_id="+HOTEL_A,ignore_https_errors=True)
+        assert stats.status==200, ("financial reconciliation",stats.status,stats.text()[:250])
+        data=stats.json()
+        assert data["invoice_count"]==0 and data["reconciled"]
+        assert all(Decimal(v)==0 for v in data["totals"].values())
+        assert not data["payments_enabled"] and not data["payouts_enabled"]
+        expect(panel).not_to_contain_text("61,000 KGS")
+        print("PASS browser financial reconciliation excludes non-issuable 61000 KGS preview")
+        page.locator('[data-hotel-tab="history"]').click()
+        form=page.locator(".agreement-approval-form")
+        expect(form).to_be_visible()
+        form.locator('[name="acknowledged"]').check()
+        with page.expect_response(ORIGIN+"/api/actions/agreement-internal-approvals") as submitted:
+            form.locator('button[type="submit"]').click()
+        response=submitted.value
+        assert response.status==201, ("internal approval",response.status,response.text()[:250])
+        approval=response.json()
+        assert approval["terms_digest"]==contract["terms_digest"]
+        assert approval["agreement_id"]==contract["id"] and approval["state"]=="INTERNALLY_APPROVED"
+        assert not approval["client_signed"] and not approval["subscription_activated"]
+        expect(page.get_by_text("Internally approved",exact=False)).to_be_visible()
+        page.locator('[data-hotel-tab="subscription"]').click()
+        panel=page.locator("section.panel").filter(has=page.get_by_role("heading",name="Subscription plan",exact=True))
+        expect(panel).to_be_visible()
+        expect(panel).to_contain_text("36,000 KGS")
+        expect(panel).to_contain_text("25,000 KGS")
+        expect(panel.locator('tr[data-plan-state="PLAN_ONLY"][data-subscription-activated="false"]')).to_have_count(1)
+        expect(panel).to_contain_text("Awaiting acceptance")
+        expect(panel).to_contain_text("Subscription not activated")
+        query="""SELECT json_build_object('approvals',count(*),'signed',(SELECT count(*) FROM flex_private.flex_commercial_agreement_versions WHERE state='SIGNED'),
+            'payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments),'subscriptions',(SELECT count(*) FROM flex_private.flex_subscriptions))
+            FROM flex_private.flex_agreement_internal_approvals"""
+        evidence=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
+        assert evidence=={"approvals":1,"signed":0,"payments":0,"subscriptions":2},evidence
+        print("PASS browser internal agreement approval and subscription plan; client signature, payment and activation remain disabled")
+        # Real invitation-backed owner session; no forged identity or admin impersonation.
+        owner_email=os.environ["QA_OWNER_EMAIL"]
+        owner_password=os.environ["QA_OWNER_PASSWORD"]
+        owner_secret=None if PASSWORD_MODE else enroll(browser,owner_email,owner_password)
+        # Better Auth shares a database-backed 60-second rate window on the
+        # local runner IP. Enrollment and the second fresh login must not
+        # consume each other's allowance. Keep the production limiter intact.
+        if not PASSWORD_MODE:
+            time.sleep(65)
+        owner_context=browser.new_context()
+        owner=owner_context.new_page()
+        owner.goto(ORIGIN)
+        signin=owner.locator("#flex-identity-signin")
+        signin.locator('[name="email"]').fill(owner_email)
+        signin.locator('[name="password"]').fill(owner_password)
+        with owner.expect_response(ORIGIN+"/api/identity/sign-in/email") as signed_in:
+            signin.locator('button[type="submit"]').click()
+        reply=signed_in.value
+        assert reply.status==200,("owner sign-in HTTP",reply.status)
+        if PASSWORD_MODE:
+            expect(owner.locator('[data-hotel-tab="subscription"]')).to_be_visible(timeout=15000)
+            expect(owner.locator("#flex-identity-totp")).to_have_count(0)
+        else:
+            assert reply.json().get("twoFactorRedirect") is True, "Owner fresh password login did not request TOTP"
+            challenge=owner.locator("#flex-identity-totp")
+            expect(challenge).to_be_visible(timeout=15000)
+            challenge.locator('[name="code"]').fill(totp(owner_secret))
+            with owner.expect_response(ORIGIN+"/api/identity/two-factor/verify-totp") as verified:
+                challenge.locator('button[type="submit"]').click()
+            assert verified.value.status==200
+        me=owner.request.get(ORIGIN+"/api/data/v1/me",ignore_https_errors=True)
+        assert me.status==200 and me.json()["role"]=="HOTEL_OWNER"
+        assert me.json()["hotels"]==[HOTEL_A]
+        owner.locator("#lang").select_option("en")
+        owner.locator('[data-hotel-tab="subscription"]').click()
+        panel=owner.locator("section.panel").filter(has=owner.get_by_role("heading",name="Confirm commercial terms",exact=True))
+        expect(panel).to_be_visible()
+        expect(panel).to_contain_text("36,000 KGS")
+        expect(panel).to_contain_text("25,000 KGS")
+        form=panel.locator(".customer-acceptance-form")
+        form.locator('[name="acknowledged"]').check()
+        with owner.expect_response(ORIGIN+"/api/actions/customer-agreement-acceptances") as submitted:
+            form.locator('button[type="submit"]').click()
+        response=submitted.value
+        assert response.status==201,("owner acceptance",response.status,response.text()[:250])
+        accepted=response.json()
+        assert accepted["agreement_id"]==contract["id"] and accepted["terms_digest"]==contract["terms_digest"]
+        assert not accepted["client_signed"] and not accepted["subscription_activated"] and not accepted["payments_enabled"]
+        expect(panel.get_by_text("Customer accepted terms",exact=False)).to_be_visible()
+        denied=owner.request.get(ORIGIN+"/api/data/v1/platform/customer-agreement-acceptances?hotel_id="+HOTEL_B,ignore_https_errors=True)
+        assert denied.status==404
+        page.locator('[data-hotel-tab="history"]').click()
+        expect(page.get_by_text("Customer accepted terms",exact=True)).to_be_visible()
+        query="""SELECT json_build_object('acceptances',count(*),'signed',(SELECT count(*) FROM flex_private.flex_commercial_agreement_versions WHERE state='SIGNED'),
+            'payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments),'subscriptions',(SELECT count(*) FROM flex_private.flex_subscriptions))
+            FROM flex_private.flex_customer_agreement_acceptances"""
+        evidence=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
+        assert evidence=={"acceptances":1,"signed":0,"payments":0,"subscriptions":2},evidence
+        owner_context.close()
+        print("PASS browser real hotel owner (" + ("QA password-only" if PASSWORD_MODE else "TOTP") + ") accepted exact terms; other hotel denied; administrator sees evidence; PostgreSQL matches")
+        page.locator('[data-hotel-tab="finance"]').click()
+        form=page.locator("#finance-simulation-form")
+        expect(form).to_be_visible()
+        form.locator('[name="agreement_id"]').select_option(contract["id"])
+        form.locator('[name="first"]').fill("20000")
+        form.locator('[name="second"]').fill("45000")
+        form.locator('[name="refund"]').fill("9000")
+        form.locator('[name="payment_id"]').select_option("p2")
+        with page.expect_response(ORIGIN+"/api/actions/finance-simulation") as submitted:
+            form.locator('button[type="submit"]').click()
+        response=submitted.value
+        assert response.status==201,("finance simulation",response.status,response.text()[:250])
+        simulation=response.json()
+        assert simulation["mode"]=="SYNTHETIC_ONLY" and not simulation["persisted"]
+        assert Decimal(simulation["net_simulated_cash"])==Decimal("56000")
+        assert Decimal(simulation["outstanding"])==Decimal("5000")
+        assert Decimal(simulation["credit"])==Decimal("0") and Decimal(simulation["discrepancy"])==Decimal("0")
+        expect(form.locator(".simulation-result")).to_contain_text("56,000 KGS")
+        expect(form.locator(".simulation-result")).to_contain_text("5,000 KGS")
+        query="""SELECT json_build_object('payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments),
+          'refunds',(SELECT count(*) FROM flex_private.flex_payment_reversals),
+          'subscriptions',(SELECT count(*) FROM flex_private.flex_subscriptions))"""
+        evidence=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
+        assert evidence=={"payments":0,"refunds":0,"subscriptions":2},evidence
+        print("PASS browser synthetic 61000 quote, 65000 receipts, 9000 refund, 5000 debt, zero discrepancy, no ledger writes")
+        journal=page.locator("#synthetic-journal-open")
+        expect(journal).to_be_visible()
+        journal.locator('[name="agreement_id"]').select_option(contract["id"])
+        journal.locator('button[type="submit"]').click()
+        for n,kind,amount,source in [(1,"PAYMENT","20000",None),(2,"PAYMENT","45000",None),(3,"REFUND","9000","event-2")]:
+            expect(journal.locator('[name="expected_sequence"]')).to_have_value(str(n-1))
+            journal.locator('[name="event_kind"]').select_option(kind)
+            journal.locator('[name="event_amount"]').fill(amount)
+            if source:
+                journal.locator('[name="payment_id"]').fill(source)
+            with page.expect_response(ORIGIN+"/api/actions/synthetic-cash-journal") as submitted:
+                journal.locator('[data-journal-append]').click()
+            response=submitted.value
+            assert response.status==201,("synthetic journal",response.status,response.text()[:250])
+            assert response.json()["sequence"]==n
+        expect(journal.locator(".journal-result")).to_contain_text("5,000 KGS")
+        page.reload()
+        open_card(page,HOTEL_A)
+        page.locator('[data-hotel-tab="finance"]').click()
+        journal=page.locator("#synthetic-journal-open")
+        journal.locator('[name="agreement_id"]').select_option(contract["id"])
+        journal.locator('button[type="submit"]').click()
+        expect(journal.locator('[name="expected_sequence"]')).to_have_value("3")
+        expect(journal.locator(".journal-result")).to_contain_text("5,000 KGS")
+        query="""SELECT json_build_object('test_events',(SELECT count(*) FROM flex_private.flex_qa_cash_events),
+          'payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments),
+          'refunds',(SELECT count(*) FROM flex_private.flex_payment_reversals))"""
+        evidence=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
+        assert evidence=={"test_events":3,"payments":0,"refunds":0},evidence
+        print("PASS browser persisted synthetic journal, reload, 5000 debt, no real ledger writes")
+        if PASSWORD_MODE:
+            # Run after the existing two-hotel assertions to keep their fixture exact.
+            page.locator('#nav [data-view="hotels"]').click()
+            page.locator('[data-view="hotel-new"]').click()
+            registration=page.locator('#hotel-registration')
+            registration.locator('[name="display_name"]').fill('QA registration retry')
+            captured=[]
+            def abort_first(route):
+                captured.append(route.request.headers.get('idempotency-key'))
+                route.abort()
+            page.route(ORIGIN+'/api/actions/hotels',abort_first,times=1)
+            registration.locator('button[type="submit"]').click()
+            expect(registration.locator('#registration-result')).to_contain_text('Connection interrupted')
+            expect(registration.locator('button[type="submit"]')).to_be_enabled()
+            expect(registration.locator('[name="display_name"]')).to_have_value('QA registration retry')
+            with page.expect_request(ORIGIN+'/api/actions/hotels') as retried:
+                with page.expect_response(ORIGIN+'/api/actions/hotels') as created:
+                    registration.locator('button[type="submit"]').click()
+            assert captured[0] and retried.value.headers.get('idempotency-key')==captured[0]
+            assert created.value.status==201, ('registration',created.value.status)
+            hotel=created.value.json()
+            assert hotel['status']=='PENDING' and hotel['billable'] is False
+            page.locator('#nav [data-view="hotels"]').click()
+            expect(page.locator('[data-hotel="'+hotel['hotel_id']+'"]')).to_be_visible()
+            query="SELECT count(*) FROM flex_private.flex_hotels WHERE display_name='QA registration retry'"
+            assert subprocess.check_output(['psql','-XAt','-v','ON_ERROR_STOP=1','-c',query],text=True).strip()=='1'
+            print('PASS browser registration network failure, enabled retry, same idempotency key, one persisted PENDING hotel')
         browser.close()
 
 

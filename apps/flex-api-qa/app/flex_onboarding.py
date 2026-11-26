@@ -2,8 +2,7 @@
 
 Run as a separate process ONLY on a dedicated, isolated commercial database.
 Provisioning accepts SUPER_ADMIN with verified MFA; new hotels remain PENDING.
-It cannot link a hotel to a PMS instance, activate paid features, change an
-existing hotel, issue invoices or touch any hotel operational database.
+It cannot link a hotel to a PMS instance, activate paid features, change a hotel's lifecycle, issue invoices or touch any hotel operational database.
 
 Application authentication is delegated to the read-only control plane.
 """
@@ -14,6 +13,7 @@ import base64
 import binascii
 import hashlib
 import json
+import os
 import secrets
 import uuid
 from contextlib import asynccontextmanager
@@ -30,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .flex_control_plane import (
     lifespan as read_lifespan,
     resolve_platform_principal,
+    qa_password_reads,
 )
 from .flex_foundation import PlatformPrincipal
 
@@ -93,7 +94,8 @@ async def register_hotel(
     ),
     principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    if principal.role != "SUPER_ADMIN" or not principal.mfa_verified:
+    allow_qa_password = qa_password_reads() and os.environ.get("FLEX_ENABLE_QA_ONBOARDING") == "true"
+    if principal.role != "SUPER_ADMIN" or not (principal.mfa_verified or allow_qa_password):
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="MFA Super Admin required")
 
     canonical = json.dumps(
@@ -160,6 +162,42 @@ async def register_hotel(
                 "hotel_id": str(hotel_id), "status": "PENDING",
                 "billable": False, "idempotent_replay": False,
             }
+
+
+
+class HotelNameUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    display_name: str = Field(min_length=2, max_length=180, pattern=r"^[^\x00-\x1f\x7f]+$")
+    expected_name: str = Field(min_length=1, max_length=180)
+
+
+@app.post("/v1/onboarding/hotels/{hotel_id}/name")
+async def update_hotel_name(
+    hotel_id: uuid.UUID, payload: HotelNameUpdate, request: Request,
+    principal: PlatformPrincipal = Depends(resolve_platform_principal),
+):
+    allow_qa_password = qa_password_reads() and os.environ.get("FLEX_ENABLE_QA_ONBOARDING") == "true"
+    if principal.role != "SUPER_ADMIN" or not (principal.mfa_verified or allow_qa_password):
+        raise HTTPException(403, detail="Super Admin required")
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await _set_writer_context(conn, principal.subject_id)
+            row = await conn.fetchrow(
+                "SELECT display_name,status FROM flex_hotels WHERE id=$1 "
+                "AND status IN ('PENDING','ACTIVE') FOR UPDATE", hotel_id)
+            if row is None:
+                raise HTTPException(404, detail="Editable hotel not found")
+            if row["display_name"] != payload.expected_name:
+                raise HTTPException(409, detail="Hotel name changed; reload")
+            if row["display_name"] != payload.display_name:
+                await conn.execute("UPDATE flex_hotels SET display_name=$2 WHERE id=$1",
+                                   hotel_id, payload.display_name)
+                await conn.execute(
+                    "INSERT INTO flex_audit_events(platform_subject_id,action,resource_type,resource_id,metadata) "
+                    "VALUES($1,'HOTEL_NAME_UPDATED','FLEX_HOTEL',$2,$3::jsonb)",
+                    principal.subject_id, str(hotel_id),
+                    json.dumps({"before": row["display_name"], "after": payload.display_name}))
+            return {"hotel_id": str(hotel_id), "name": payload.display_name, "status": row["status"]}
 
 
 class LinkChallengeRequest(BaseModel):

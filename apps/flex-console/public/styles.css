@@ -86,3 +86,15 @@ input,select,textarea{max-width:100%}
 @media(max-width:820px){.side{border-right:0;border-bottom:1px solid var(--border)}.topbar{gap:10px}.top-actions{justify-content:flex-end}}
 @media(max-width:390px){.brand{gap:9px;font-size:17px}.content{padding:14px 10px}.panel{padding:15px}.topbar{padding:12px 10px;flex-wrap:wrap}.top-actions{width:100%;justify-content:space-between}#nav button{padding:11px 12px}footer{padding:14px 10px}.formbar{align-items:stretch}.toolbar>*{max-width:100%}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* Responsive identity layout: independent of commercial dashboard grids. */
+.content:has(.identity-card){display:grid;align-content:center;justify-items:center;min-height:420px}
+.identity-card,.content>.panel:has(#flex-identity-signin),.content>.panel:has(#flex-identity-totp){width:100%;max-width:440px;margin:clamp(16px,5vh,48px) auto;padding:clamp(20px,4vw,36px)}
+.identity-card h2,.panel:has(#flex-identity-signin) h2,.panel:has(#flex-identity-totp) h2{text-align:center;font-size:clamp(19px,3vw,24px);line-height:1.35;margin-bottom:24px}
+.identity-card form,#flex-identity-signin,#flex-identity-totp{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;margin:0}
+.identity-card label,#flex-identity-signin label,#flex-identity-totp label{display:grid;gap:8px;min-width:0;font-weight:600;color:var(--muted)}
+.identity-card input,#flex-identity-signin input,#flex-identity-totp input{display:block;width:100%;max-width:none;min-width:0;min-height:48px}
+.identity-card .primary,#flex-identity-signin .primary,#flex-identity-totp .primary{width:100%;min-height:48px;color:#fff;overflow-wrap:anywhere}
+.identity-card [role=alert]{margin:16px 0 0;color:var(--red)}
+.identity-card .subtle{display:block;margin:12px auto 0;text-align:center;white-space:normal}
+@media(max-width:540px){.content:has(.identity-card){min-height:0;align-content:start}.identity-card{margin:12px auto;padding:20px 16px}.topbar{flex-wrap:wrap}.top-actions{max-width:100%}}

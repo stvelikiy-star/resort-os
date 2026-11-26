@@ -17,7 +17,7 @@ import asyncpg
 from fastapi import FastAPI, HTTPException
 from fastapi.routing import APIRoute
 
-# The deployment carries only a byte-for-byte copy of five FLEX-only modules.
+# The deployment carries only a byte-for-byte copy of explicitly listed FLEX-only modules.
 # CI compares them against services/api/app; no PMS application is imported.
 _BUNDLE_ROOT = Path(__file__).resolve().parent
 _BUNDLED_MODULES = (
@@ -26,6 +26,7 @@ _BUNDLED_MODULES = (
     "flex_partner_portal.py",
     "flex_onboarding.py",
     "flex_catalog_admin.py",
+    "flex_finance_simulation.py",
 )
 if any(not (_BUNDLE_ROOT / "app" / module).is_file() for module in _BUNDLED_MODULES):
     raise RuntimeError("FLEX_BUNDLED_MODULES_MISSING")
@@ -88,13 +89,21 @@ _ROUTES = [
 ]
 if _ENABLE_ONBOARDING:
     _ROUTES.append(flex_onboarding.app)
-if _ENABLE_CATALOG:
+_CATALOG_READ_ONLY = {
+    "/v1/platform/catalog",
+    "/v1/platform/catalog/skus/{sku}/versions",
+    "/v1/platform/subscription-drafts",
+}
+if os.environ.get("FLEX_ENVIRONMENT") == "qa":
     _ROUTES.append(flex_catalog_admin.app)
 _seen = set()
 for source in _ROUTES:
     for route in source.routes:
         if not isinstance(route, APIRoute) or not route.path.startswith("/v1/"):
             continue
+        if source is flex_catalog_admin.app and not _ENABLE_CATALOG:
+            if route.path not in _CATALOG_READ_ONLY or route.methods != {"GET"}:
+                continue
         route_keys = {(method, route.path) for method in route.methods}
         if _seen.intersection(route_keys):
             raise RuntimeError("FLEX_ROUTE_COLLISION: " + route.path)
@@ -169,11 +178,13 @@ async def health() -> dict:
             "status": "ok",
             "mode": "QA_MANAGEMENT_READ_ONLY" if not (_ENABLE_ONBOARDING or _ENABLE_CATALOG) else "QA_MANAGEMENT_DRAFTS",
             "database": "disposable_postgresql" if urlsplit(dsn).hostname == "127.0.0.1" else "isolated_neon",
+            "build_sha": (os.environ.get("VERCEL_GIT_COMMIT_SHA") if len(os.environ.get("VERCEL_GIT_COMMIT_SHA", "")) == 40 and all(c in "0123456789abcdef" for c in os.environ.get("VERCEL_GIT_COMMIT_SHA", "")) else None),
             "least_privilege": True,
             "payments_enabled": False,
             "payouts_enabled": False,
             "onboarding_enabled": _ENABLE_ONBOARDING,
             "catalog_drafts_enabled": _ENABLE_CATALOG,
+            "catalog_read_only_enabled": True,
             "real_user_auth_enabled": bool(os.environ.get("FLEX_AUTH_PUBLIC_KEYS_JSON")),
             "read_routes_registered": True,
         }

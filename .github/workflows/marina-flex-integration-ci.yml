@@ -46,6 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           for test_file in \
+            marina_flex_migration_runner_test.py \
             marina_flex_foundation_contract_test.py \
             marina_flex_control_plane_auth_test.py \
             marina_flex_pricing_contract_test.py \
@@ -53,6 +54,7 @@ jobs:
             marina_flex_subscription_contract_test.py \
             marina_flex_qr_provider_contract_test.py \
             marina_flex_renewal_decision_test.py \
+            marina_flex_finance_simulation_test.py \
             marina_flex_partner_earnings_contract_test.py
           do
             python "scripts/$test_file"
@@ -64,7 +66,7 @@ jobs:
           echo "Historical November Release RC Truth stays a separate NO-GO for main."
 
   clean-install-and-recovery:
-    name: FLEX ten-migration PostgreSQL bootstrap, backup and restore acceptance
+    name: FLEX PostgreSQL bootstrap, backup and restore acceptance
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -100,16 +102,19 @@ jobs:
           psql --version
       - name: Refuse installation outside empty disposable PostgreSQL 16 database
         run: psql -X -v ON_ERROR_STOP=1 -d flex_ci -f scripts/marina_flex_qa_db_preflight.sql
-      - name: Install all twelve independent FLEX preview migrations in exact order
+      - name: Install all thirty-one independent FLEX preview migrations in exact order
         run: |
           set -euo pipefail
           test -f "docs/flex/sql/0010_flex_partner_earnings_preview.sql"
           test -f "docs/flex/sql/0011_flex_catalog_subscription_drafts_preview.sql"
           test -f "docs/flex/sql/0012_flex_tariff_package_versions_preview.sql"
-          for file in 0001_flex_control_plane_preview.sql 0002_flex_platform_identity_rls_preview.sql 0003_flex_price_version_guard_preview.sql 0004_flex_hotel_onboarding_preview.sql 0005_flex_deployment_attestation_preview.sql 0006_flex_agreements_subscription_preview.sql 0007_flex_invoice_ledger_preview.sql 0008_flex_refund_reconciliation_preview.sql 0009_flex_signed_qa_settlement_preview.sql 0010_flex_partner_earnings_preview.sql 0011_flex_catalog_subscription_drafts_preview.sql 0012_flex_tariff_package_versions_preview.sql 0013_flex_shared_tariff_templates_preview.sql; do
+          for file in 0001_flex_control_plane_preview.sql 0002_flex_platform_identity_rls_preview.sql 0003_flex_price_version_guard_preview.sql 0004_flex_hotel_onboarding_preview.sql 0005_flex_deployment_attestation_preview.sql 0006_flex_agreements_subscription_preview.sql 0007_flex_invoice_ledger_preview.sql 0008_flex_refund_reconciliation_preview.sql 0009_flex_signed_qa_settlement_preview.sql 0010_flex_partner_earnings_preview.sql 0011_flex_catalog_subscription_drafts_preview.sql 0012_flex_tariff_package_versions_preview.sql 0013_flex_shared_tariff_templates_preview.sql 0014_flex_hotel_name_edit_preview.sql 0015_flex_commercial_policy_preview.sql 0016_flex_commercial_policy_edit.sql 0017_flex_package_term_snapshot.sql 0018_flex_installation_trial.sql 0019_flex_force_financial_rls.sql 0020_flex_launch_offer_reservations.sql 0021_flex_customer_agreement_drafts.sql 0022_flex_admin_reconciliation_read.sql 0023_flex_agreement_internal_approval.sql 0024_flex_customer_terms_acceptance.sql 0025_flex_synthetic_cash_journal.sql 0026_flex_synthetic_credit_application.sql 0027_flex_participant_details.sql 0028_flex_qa_agent_assignments.sql 0029_flex_qa_agent_employment.sql 0030_flex_qa_investor_plans.sql 0031_flex_qa_partner_proposals.sql; do
             psql -X -v ON_ERROR_STOP=1 -d flex_ci -f "docs/flex/sql/$file"
           done
           sha256sum docs/flex/sql/*.sql
+      - name: Verify forced financial RLS
+        run: |
+          psql -X -v ON_ERROR_STOP=1 -d flex_ci -c "DO \$\$ BEGIN IF (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('flex_agent_attributions','flex_agent_commission_accruals','flex_allocation_reversals','flex_confirmed_payments','flex_investor_accruals','flex_investor_contract_versions','flex_payment_allocations','flex_payment_intents','flex_payment_reversals','flex_provider_event_attempts','flex_provider_events') AND c.relrowsecurity AND c.relforcerowsecurity) <> 11 THEN RAISE EXCEPTION 'FLEX_FORCE_RLS_REQUIRED'; END IF; END \$\$;"
       - name: Seed two synthetic hotels, no operational PMS records
         run: psql -X -v ON_ERROR_STOP=1 -d flex_ci -f scripts/marina_flex_rls_isolation_contract.sql
       - name: Verify source schema and data security before backup
@@ -172,3 +177,71 @@ jobs:
           set -euo pipefail
           test "$(psql -X -Atqc "SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename IN ('properties','guests','reservations','folio','staff_users')" -d flex_restored_ci)" = "0"
           test "$(psql -X -Atqc "SELECT count(*) FROM flex_confirmed_payments WHERE provider <> 'FLEX_QA_SIMULATOR'" -d flex_restored_ci)" = "0"
+
+  migration-runner:
+    name: FLEX incremental migration runner against disposable PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: flex_ci
+          POSTGRES_USER: flex_ci
+          POSTGRES_PASSWORD: flex_ci_ci_only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flex_ci -d flex_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: flex_ci
+      PGPASSWORD: flex_ci_ci_only
+      PGDATABASE: flex_ci
+      FLEX_MIGRATION_DATABASE_URL: postgresql://flex_ci:flex_ci_ci_only@localhost:5432/flex_ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r services/api/requirements-flex-control.txt
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Bootstrap synthetic baseline with frozen settlement
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -f scripts/marina_flex_qa_db_preflight.sql
+          psql -X -v ON_ERROR_STOP=1 -c 'CREATE TABLE flex_schema_migrations(migration_id integer PRIMARY KEY,filename text NOT NULL,git_blob_sha char(40) NOT NULL,release_sha char(40) NOT NULL,disposition text NOT NULL,completed_at timestamptz DEFAULT now())'
+          for file in docs/flex/sql/00{01,02,03,04,05,06,07,08,09,10,11,12,13,14,15}_*.sql; do
+            name=$(basename "$file")
+            n=$((10#${name:0:4}))
+            disposition=APPLIED
+            if [ "$n" = 9 ]; then disposition=SKIPPED_PAYMENT_FREEZE; else psql -X -v ON_ERROR_STOP=1 -f "$file"; fi
+            psql -X -v ON_ERROR_STOP=1 -c "INSERT INTO flex_schema_migrations VALUES ($n,'$name','$(git hash-object "$file")','$(git rev-parse HEAD)','$disposition')"
+          done
+      - name: Apply pending migrations twice and prove freeze
+        run: |
+          set -euo pipefail
+          python scripts/marina_flex_migration_runner.py --ci --schema public
+          test "$(psql -X -Atqc 'SELECT count(*) FROM flex_schema_migrations')" = 15
+          python scripts/marina_flex_migration_runner.py --ci --schema public --apply
+          python scripts/marina_flex_migration_runner.py --ci --schema public --apply | tee /tmp/flex_runner_repeat.log
+          grep -q '0 pending' /tmp/flex_runner_repeat.log
+          test "$(psql -X -Atqc 'SELECT count(*) FROM flex_schema_migrations')" = 31
+          test "$(psql -X -Atqc "SELECT count(*) FROM flex_schema_migrations WHERE disposition='APPLIED'")" = 30
+          test "$(psql -X -Atqc 'SELECT string_agg(migration_id::text,CHR(44) ORDER BY migration_id) FROM flex_schema_migrations')" = "$(seq -s, 1 31)"
+          test "$(psql -X -Atqc 'SELECT disposition FROM flex_schema_migrations WHERE migration_id=9')" = SKIPPED_PAYMENT_FREEZE
+          test "$(psql -X -Atqc 'SELECT count(*) FROM flex_confirmed_payments')" = 0
+      - name: Reject checksum mismatch without changing schema
+        run: |
+          set -euo pipefail
+          psql -X -v ON_ERROR_STOP=1 -c "UPDATE flex_schema_migrations SET git_blob_sha=repeat('0',40) WHERE migration_id=14"
+          if python scripts/marina_flex_migration_runner.py --ci --schema public --apply > /tmp/flex_runner_bad.log 2>&1; then exit 1; fi
+          grep -q 'SHA or filename mismatch' /tmp/flex_runner_bad.log
+          test "$(psql -X -Atqc 'SELECT count(*) FROM flex_schema_migrations')" = 31
+          test "$(psql -X -Atqc "SELECT count(*) FROM flex_schema_migrations WHERE disposition='APPLIED'")" = 30
+          test "$(psql -X -Atqc 'SELECT string_agg(migration_id::text,CHR(44) ORDER BY migration_id) FROM flex_schema_migrations')" = "$(seq -s, 1 31)"

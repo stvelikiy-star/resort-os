@@ -229,3 +229,82 @@ def summarize_earnings(
         "actual_paid_in_period": f"{_money(paid):.2f}",
         "currency": "KGS",
     }
+
+
+@dataclass(frozen=True)
+class AgentMonthQuote:
+    salary: Decimal
+    connections: Decimal
+    modules: Decimal
+    total: Decimal
+    sales_target: int
+    new_hotels: int
+
+
+def quote_agent_month(*, employed_full_month: bool,
+                      new_paid_hotel_ids: tuple[str, ...],
+                      paid_addon_keys: tuple[tuple[str, str], ...],
+                      salary: Decimal = Decimal("10000"),
+                      connection_fee: Decimal = Decimal("7000"),
+                      addon_fee: Decimal = Decimal("500"),
+                      sales_target: int = 7) -> AgentMonthQuote:
+    """Full-month calculation only. Caller verifies distinct first connections,
+    paid add-on months, contract scope, refunds and previous accruals.
+    Partial employment months require a separate approved calculation.
+    """
+    if type(employed_full_month) is not bool or type(sales_target) is not int or sales_target < 0:
+        raise ValueError("Invalid employment or target")
+    for hotel in new_paid_hotel_ids:
+        _uuid(hotel)
+    for hotel, sku in paid_addon_keys:
+        _uuid(hotel)
+        if not isinstance(sku, str) or not sku or sku in {"BASE", "BASE_PMS", "PMS"}:
+            raise ValueError("Invalid paid additional module")
+    if len(set(new_paid_hotel_ids)) != len(new_paid_hotel_ids) or len(set(paid_addon_keys)) != len(paid_addon_keys):
+        raise ValueError("Duplicate commission evidence")
+    salary, connection_fee, addon_fee = map(_money, (salary, connection_fee, addon_fee))
+    if not employed_full_month:
+        if new_paid_hotel_ids or paid_addon_keys:
+            raise ValueError("Employment eligibility must be resolved before calculation")
+        salary = Decimal("0.00")
+    connections = _money(connection_fee * len(new_paid_hotel_ids))
+    modules = _money(addon_fee * len(paid_addon_keys))
+    return AgentMonthQuote(salary, connections, modules, _money(salary + connections + modules),
+                           sales_target, len(new_paid_hotel_ids))
+
+
+def investor_full_calendar_bonus_window(repaid_at: date, months: int = 3) -> tuple[date, date]:
+    """Start on the first day of the month AFTER confirmed principal repayment;
+    end exclusive after the contracted number of full calendar months.
+    """
+    if type(repaid_at) is not date or type(months) is not int or not 1 <= months <= 36:
+        raise ValueError("Invalid repayment date or duration")
+    first = repaid_at.year * 12 + repaid_at.month
+    year, month = divmod(first, 12)
+    end_year, end_month = divmod(first + months, 12)
+    return date(year, month + 1, 1), date(end_year, end_month + 1, 1)
+
+
+def investor_principal_accrual(*, eligible_subscription: Decimal, rate_bps: int,
+                              original_principal: Decimal,
+                              principal_paid: Decimal,
+                              principal_unpaid_accrued: Decimal) -> Decimal:
+    """Cap new principal accrual by remaining uncommitted principal.
+    Actual payouts, not accruals, determine transition to bonus.
+    """
+    principal = _money(original_principal)
+    paid = _money(principal_paid)
+    accrued = _money(principal_unpaid_accrued)
+    if principal <= 0 or paid + accrued > principal:
+        raise ValueError("Invalid principal ledger")
+    eligible = _money(eligible_subscription)
+    return min(principal - paid - accrued,
+               _money(eligible * Decimal(_rate(rate_bps)) / Decimal(10000)))
+
+
+def allocate_annual_subscription(amount: Decimal) -> tuple[Decimal, ...]:
+    """Twelve monthly shares, preserving every tiyin exactly."""
+    amount = _money(amount)
+    cents = int(amount * 100)
+    share, remainder = divmod(cents, 12)
+    return tuple(Decimal(share + (1 if i < remainder else 0)) / 100 for i in range(12))

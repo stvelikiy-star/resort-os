@@ -4,7 +4,7 @@ import pg from 'pg';
 import {getMigrations} from 'better-auth/db/migration';
 import {hashPassword} from 'better-auth/crypto';
 import {createFlexAuthConfig} from '../auth/identity-enabled.mjs';
-import {redeemFirstInvite} from '../auth/first-invite.mjs';
+import {redeemFirstInvite,resendOwnerInvite} from '../auth/first-invite.mjs';
 import {verifiedLogin,createMfaSigner} from '../auth/mfa-bridge.mjs';
 const db=new pg.Pool({connectionString:'postgresql://ci_no_login:ci_no_secret@127.0.0.1:55449/flex_ci',options:'-c search_path=flex_auth'});
 await db.query('create schema if not exists flex_auth');
@@ -67,4 +67,104 @@ const result=await accepted.json();
 assert.equal(accepted.status,200,result.code || result.message);
 assert.equal(result.platform_session,true);
 assert.deepEqual(JSON.parse(Buffer.from(minted.token.split('.')[1],'base64url')).amr,['pwd']);
+// Regression for the legacy #588/#590 behavior using the CURRENT Better Auth
+// implementation, never the obsolete custom recovery endpoint. This is a
+// disposable CI database; the only mail transport is an in-memory stub.
+const cookieHeader=reply=>reply.headers.getSetCookie().map(line=>line.split(';')[0]).join('; ');
+const loginCookie=cookieHeader(accepted);
+const readSession=cookie=>simpleAuth.api.getSession({headers:new Headers({cookie}),query:{disableCookieCache:true}});
+const subject=claims.sub;
+const live=await readSession(loginCookie);
+assert.equal(live?.user?.id,subject);
+assert.equal(live?.user?.emailVerified,true);
+assert.ok(live?.session?.token);
+assert.equal(await readSession(''),null);
+const replacement=await tryPassword(password);
+assert.equal(replacement.status,200);
+const replacementCookie=cookieHeader(replacement);
+const replacementSession=await readSession(replacementCookie);
+assert.equal(replacementSession?.user?.id,subject);
+assert.notEqual(replacementSession?.session?.token,live.session.token,'separate login must have separate session binding');
+
+const originalFetch=globalThis.fetch;
+const mailEnv={FLEX_RESEND_API_KEY:process.env.FLEX_RESEND_API_KEY,FLEX_RECOVERY_FROM:process.env.FLEX_RECOVERY_FROM};
+const messages=[];
+process.env.FLEX_RESEND_API_KEY='ci-only-not-a-real-key';
+process.env.FLEX_RECOVERY_FROM='qa@example.test';
+globalThis.fetch=async (url,options)=>{
+  assert.equal(String(url),'https://api.resend.com/emails','unexpected outbound request');
+  assert.equal(options.method,'POST');
+  messages.push(JSON.parse(options.body));
+  return Response.json({id:'ci-mail'});
+};
+const request=async (path,body)=>simpleAuth.handler(new Request(origin+'/api/identity/'+path,{
+  method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify(body)
+}));
+const newPassword=randomBytes(24).toString('hex');
+try {
+  await db.query('TRUNCATE flex_auth."rateLimit"');
+  const requested=await request('request-password-reset',{email,redirectTo:origin+'/'});
+  assert.equal(requested.status,200);
+  assert.equal(messages.length,1);
+  assert.deepEqual(messages[0].to,[email]);
+  const linkLine=messages[0].text.split('\n').find(line=>line.startsWith(origin+'/'));
+  assert.ok(linkLine,'reset link must use the configured Console origin');
+  const link=new URL(linkLine);
+  assert.equal(link.origin,origin);
+  const resetToken=new URLSearchParams(link.hash.slice(1)).get('reset');
+  assert.ok(resetToken);
+  assert.notEqual((await request('reset-password',{token:randomBytes(32).toString('hex'),newPassword})).status,200);
+  assert.notEqual((await request('reset-password',{token:resetToken,newPassword:'short'})).status,200);
+  assert.equal((await request('reset-password',{token:resetToken,newPassword})).status,200);
+  assert.notEqual((await request('reset-password',{token:resetToken,newPassword:password})).status,200);
+  assert.equal(await readSession(loginCookie),null,'reset must revoke original session');
+  assert.equal(await readSession(replacementCookie),null,'reset must revoke other session');
+  await db.query('TRUNCATE flex_auth."rateLimit"');
+  minted=undefined;
+  assert.equal((await tryPassword(password)).status,401);
+  assert.equal(minted,undefined);
+  await db.query('TRUNCATE flex_auth."rateLimit"');
+  const recovered=await tryPassword(newPassword);
+  assert.equal(recovered.status,200);
+  assert.equal((await recovered.clone().json()).platform_session,true);
+  assert.equal((await readSession(cookieHeader(recovered)))?.user?.id,subject);
+  console.log('PASS canonical password recovery, one-time token, prior session revocation and fresh bound login (stub mail)');
+} finally {
+  globalThis.fetch=originalFetch;
+  for(const [key,value] of Object.entries(mailEnv)){
+    if(value===undefined)delete process.env[key];else process.env[key]=value;
+  }
+}
+// Exercise the new QA-only owner invitation using the existing disposable DB.
+// It must not replace the first administrator or grant commercial roles itself.
+const secondEmail='qa-owner@example.test',secondSubject='qa-owner:'+crypto.randomUUID();
+const secondToken=randomBytes(32).toString('base64url');
+await db.query('INSERT INTO flex_auth.verification(id,identifier,value,"expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval \'10 minutes\',now(),now())',
+  [crypto.randomUUID(),'flex-owner:'+createHash('sha256').update(secondToken).digest('hex'),JSON.stringify({kind:'QA_HOTEL_OWNER',subject:secondSubject,email:secondEmail})]);
+// The first invitation can be re-delivered through normal account mail only.
+const deliveries=[];
+const deliver=async(mail,token)=>deliveries.push({mail,token});
+await db.query(`UPDATE flex_auth.verification SET "updatedAt"=now()-interval '3 minutes',"expiresAt"=now()-interval '1 minute' WHERE identifier=$1`,['flex-owner:'+createHash('sha256').update(secondToken).digest('hex')]);
+await resendOwnerInvite(db,secondEmail,deliver);
+await resendOwnerInvite(db,'unknown@example.test',deliver,{allowOwnerInvite:true});
+assert.equal(deliveries.length,0);
+await Promise.all([1,2].map(()=>resendOwnerInvite(db,secondEmail,deliver,{allowOwnerInvite:true})));
+assert.equal(deliveries.length,1);
+assert.equal(deliveries[0].mail,secondEmail);
+const renewedToken=deliveries[0].token;
+assert.notEqual(renewedToken,secondToken);
+assert.equal(await redeemFirstInvite(db,secondToken,randomBytes(24).toString('hex'),hashPassword,{allowOwnerInvite:true,email:secondEmail}),false);
+const secondPassword=randomBytes(24).toString('hex');
+assert.equal(await redeemFirstInvite(db,renewedToken,secondPassword,hashPassword),false);
+assert.equal(await redeemFirstInvite(db,renewedToken,secondPassword,hashPassword,{allowOwnerInvite:true,email:'other@example.test'}),false);
+assert.deepEqual((await Promise.all([1,2].map(()=>redeemFirstInvite(db,renewedToken,secondPassword,hashPassword,{allowOwnerInvite:true,email:secondEmail})))).sort(),[false,true]);
+assert.equal((await db.query('SELECT count(*)::int AS n FROM flex_auth."user"')).rows[0].n,2);
+assert.equal((await db.query('SELECT id FROM flex_auth."user" WHERE email=$1',[secondEmail])).rows[0].id,secondSubject);
+assert.equal(await redeemFirstInvite(db,renewedToken,secondPassword,hashPassword,{allowOwnerInvite:true,email:secondEmail}),false);
+await resendOwnerInvite(db,secondEmail,deliver,{allowOwnerInvite:true});
+assert.equal(deliveries.length,1);
+const ownerLogin=await request('sign-in/email',{email:secondEmail,password:secondPassword});
+assert.equal(ownerLogin.status,200);
+assert.equal((await readSession(cookieHeader(ownerLogin)))?.user?.id,secondSubject);
+console.log('PASS QA owner invite: restricted mode, email binding, concurrency, replay, existing admin retained, password login');
 await db.end(); console.log('PASS invite concurrency, mailbox-bound credentials, TOTP enrollment, login, negative TOTP, Ed25519 JWT');

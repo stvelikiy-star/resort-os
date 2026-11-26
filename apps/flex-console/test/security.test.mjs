@@ -323,3 +323,55 @@ test('shared template proxy accepts only a source package and a validated refere
  assert.equal(testRouteAllowed('/v1/platform/tariff-templates',new URLSearchParams()),'catalog_admin');
  assert.equal(testRouteAllowed('/v1/platform/tariff-templates',new URLSearchParams('hotel_id='+id)),null);
 });
+
+
+test('legacy admin catalog history remains visible with every editor disabled',async()=>{
+ const src=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ const server=readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
+ const extract=(start,end)=>{
+   const a=src.indexOf(start),b=src.indexOf(end,a+1);
+   assert.ok(a>=0&&b>a);
+   return src.slice(a,b).trim();
+ };
+ const requests=[];
+ const context={
+   state:{me:{role:'SUPER_ADMIN'},status:{qa_catalog_read_only_enabled:true,qa_catalog_admin_enabled:false},priceSku:'PMS'},
+   safe:String,t:String,heading:()=>'',toolbar:()=>'',metric:()=>'',empty:()=>'',info:()=>'',money:String,
+   table:(_headers,rows)=>rows.join(''),
+   api:async path=>{
+     requests.push(path);
+     if(path==='/v1/platform/catalog')return [{sku:'PMS',name:'PMS',status:'AVAILABLE',latest_price:{monthly_price:'5000',currency:'KGS'}}];
+     if(path==='/v1/platform/catalog/skus/PMS/versions')return {versions:[{version:1,monthly_price:'5000',currency:'KGS',valid_from:'2026-11-01',valid_to:null}]};
+     throw Error('unexpected request '+path);
+   }
+ };
+ context.adminCatalogButtons=vm.runInNewContext('('+extract('function adminCatalogButtons(){','function skuForm(){')+')',context);
+ const catalog=vm.runInNewContext('('+extract('async function catalog(){','function earningsSummary(')+')',context);
+ const versions=vm.runInNewContext('('+extract('async function versionsPage(){','function dateValue(')+')',context);
+ const html=await catalog();
+ assert.match(html,/data-sku-versions="PMS"/);
+ assert.doesNotMatch(html,/data-sku-price|catalog-new/);
+ assert.match(await versions(),/5000/);
+ assert.deepEqual(requests,['/v1/platform/catalog','/v1/platform/catalog/skus/PMS/versions']);
+ assert.match(server,/qa_catalog_read_only_enabled:configured&&qaEnvironment/);
+ assert.match(server,/if\(target==='catalog_admin'&&!qaCatalogAdmin&&!readOnlyCatalog\)/);
+ assert.match(server,/target==='catalog_admin'&&qaCatalogAdmin\?catalogAdminApiOrigin:apiOrigin/);
+});
+
+test('canonical recovery retains three locales, clears URL token and first login bypasses enrollment in password mode',()=>{
+ const src=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ const enroll=readFileSync(new URL('../public/enroll.js',import.meta.url),'utf8');
+ const match=src.match(/const recoveryCopy=(\{[^\n]+\});/);
+ assert.ok(match);
+ const copy=JSON.parse(match[1]),keys=Object.keys(copy.ru).sort();
+ for(const lang of ['ru','kg','en']){
+   assert.deepEqual(Object.keys(copy[lang]).sort(),keys);
+   for(const value of Object.values(copy[lang]))assert.ok(typeof value==='string'&&value.length>2);
+ }
+ assert.match(src,/if\(recoveryToken\)history\.replaceState\(null,'',location\.pathname\+location\.search\)/);
+ assert.match(src,/identityRequest\('reset-password'/);
+ assert.match(src,/autocomplete="new-password"/);
+ const success=enroll.indexOf('if(session.platform_session)'),totp=enroll.indexOf("post('two-factor/enable'");
+ assert.ok(success>=0&&totp>success);
+ assert.match(enroll.slice(success,totp),/location\.replace\('\/'\);return;/);
+});

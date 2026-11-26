@@ -1,0 +1,126 @@
+{
+  "version": "2026-11-24",
+  "currency": "KGS",
+  "monthly_packages": {
+    "BASE": {
+      "price": 5000,
+      "modules": []
+    },
+    "BUSINESS": {
+      "price": 15000,
+      "modules": [
+        "QR_ZONE",
+        "RESTAURANT",
+        "WAREHOUSE",
+        "FINANCE_PRO",
+        "STAFF_PRO",
+        "HOUSEKEEPING",
+        "SERVICES"
+      ]
+    },
+    "PREMIUM": {
+      "price": 25000,
+      "modules": [
+        "QR_ZONE",
+        "RESTAURANT",
+        "WAREHOUSE",
+        "FINANCE_PRO",
+        "STAFF_PRO",
+        "HOUSEKEEPING",
+        "SERVICES",
+        "TRAVEL_AGENCY",
+        "CRM_MARKETING",
+        "ONLINE_BOOKING",
+        "ANALYTICS_PRO",
+        "MARINA_AI",
+        "WHATSAPP_AI"
+      ]
+    },
+    "CUSTOM": {
+      "minimum": 5000,
+      "base_price": 5000,
+      "modules": []
+    }
+  },
+  "module_monthly_prices": {
+    "QR_ZONE": 2000,
+    "RESTAURANT": 3000,
+    "WAREHOUSE": 3000,
+    "FINANCE_PRO": 5000,
+    "STAFF_PRO": 2000,
+    "HOUSEKEEPING": 2000,
+    "SERVICES": 2000,
+    "TRAVEL_AGENCY": 3000,
+    "CRM_MARKETING": 3000,
+    "ONLINE_BOOKING": 3000,
+    "ANALYTICS_PRO": 3000,
+    "MARINA_AI": 2000,
+    "WHATSAPP_AI": 5000,
+    "MULTI_HOTEL": 5000
+  },
+  "term_discounts_pct": {
+    "1": 0,
+    "3": 10,
+    "6": 20,
+    "12": 30
+  },
+  "launch_offer": {
+    "discount_pct": 40,
+    "months": 12,
+    "first_hotels": 50,
+    "first_year_only": true,
+    "prepayment_required": true
+  },
+  "implementation_fee": 25000,
+  "trial": {
+    "calendar_days": 5,
+    "starts": "INSTALLATION_AND_CONFIGURATION_COMPLETED"
+  },
+  "one_time_services": {
+    "ADDITIONAL_TRAINING": {
+      "minimum": 2000
+    },
+    "SPECIALIST_VISIT": {
+      "minimum": 3000,
+      "transport_extra": true
+    },
+    "DATA_MIGRATION": {
+      "minimum": 5000
+    },
+    "BRANDING": {
+      "minimum": 5000
+    },
+    "CUSTOM_DESIGN": {
+      "minimum": 10000
+    },
+    "LOCKS_INTEGRATION": {
+      "negotiated": true
+    },
+    "PAYMENT_INTEGRATION": {
+      "negotiated": true
+    },
+    "OTA_INTEGRATION": {
+      "negotiated": true
+    },
+    "CUSTOM_DEVELOPMENT": {
+      "negotiated": true
+    }
+  },
+  "rules": {
+    "pms_required": true,
+    "per_hotel": true,
+    "no_duplicate_billing": true,
+    "whatsapp_includes_guest_ai": true,
+    "multi_hotel_always_separate": true,
+    "preserve_disabled_module_data": true,
+    "admin_overrides_allowed": true,
+    "technical_release_required": true,
+    "ai_usage_limits": null,
+    "whatsapp_usage_limits": null
+  },
+  "unresolved": [
+    "launch offer eligibility and discount scope for CUSTOM and add-ons",
+    "tax treatment",
+    "AI and WhatsApp limits"
+  ]
+}

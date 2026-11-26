@@ -1,20 +1,55 @@
 /* MARINA SMART FLEX · role-bound read-only client. No browser access tokens. */
 'use strict';
 const translations = {
- ru:{frozen:'Заморожено',commercial:'КОММЕРЧЕСКАЯ ПЛАТФОРМА',warning:'Нет реальных платежей и выплат. Доступ к гостиничной PMS не изменяется.',lang:'Язык',login:'Войти',logout:'Выйти',welcome:'Центр управления',overview:'Обзор',hotels:'Гостиницы',catalog:'Каталог функций',obligations:'Начисления партнёрам',subscription:'Моя подписка',earnings:'Мои начисления',notConfigured:'Отдельная QA-среда ещё не подключена',configHelp:'Для настоящих данных нужен отдельный FLEX API и платформенный OIDC/MFA. Пока здесь не показываются вымышленные финансы.',loginPrompt:'Для просмотра данных войдите через защищённый платформенный доступ.',hotelList:'Реестр гостиниц',search:'Поиск по названию',hotel:'Гостиница',status:'Статус',currency:'Валюта',actions:'Действия',open:'Открыть',noHotels:'Гостиницы ещё не зарегистрированы.',back:'Все гостиницы',invoices:'Счета',invoice:'Номер счёта',total:'Сумма',due:'Срок',noInvoices:'Счетов нет',noSubscription:'Активная подписка отсутствует.',planStatus:'Подписка',enforcement:'Режим контроля',periodStart:'Начало периода',periodEnd:'Конец периода',grace:'Льготный период',features:'Опубликованные функции',sku:'Код SKU',price:'Цена в месяц',noCatalog:'Опубликованных функций пока нет',accessDenied:'Нет доступа к этим данным',error:'Не удалось получить данные',retry:'Повторить',agent:'Агент продаж',investor:'Инвестор',net:'Начислено с учётом возвратов',gross:'Начислено',refunds:'Сторнировано',paid:'Фактически выплачено',events:'Операций',notImplemented:'Подтверждённые выплаты пока не подключены.',periodDay:'День',periodWeek:'Неделя',periodMonth:'Месяц',role:'Роль',billingHold:'Роль BILLING: управление платежами отключено до отдельного решения.',readOnly:'Только чтение',noData:'Данных за период нет',activeHotels:'Гостиниц в реестре',activeSku:'Опубликованных функций',groups:'Категория',sum:'Начисления',helpQa:'Все значения поступают исключительно из FLEX QA API, не из PMS и не из макетов.',ownerHotels:'Ваши отели',selected:'Карточка гостиницы',openBack:'Вернуться',noSelected:'Нет закреплённых гостиниц',go:'Перейти',period:'Период',expires:'Истекает',count:'Количество',noPartners:'Начислений нет',emptyTitle:'Данных нет',addHotel:'Добавить гостиницу',createHotel:'Создать тестовую гостиницу',registerHotel:'Зарегистрировать в QA',name:'Название гостиницы',cancel:'Отмена',refresh:'Обновить',export:'Экспорт CSV',onlyQa:'Регистрация создаёт только PENDING-запись в отдельном FLEX QA. Она не активирует подписку и не изменяет PMS.',notEnabled:'Создание гостиницы станет доступно после подключения изолированного FLEX QA и MFA.',created:'Гостиница зарегистрирована в QA',saving:'Сохранение...',allStatuses:'Все статусы',registered:'Регистрация',qaScope:'Только синтетические тестовые данные. Не используйте реальные имена, договоры и платежи.',linkHotel:'Связать с MARINA SMART',linkTitle:'Подтверждение связи гостиницы',linkHelp:'Подключение требует доверенной подписи MARINA SMART. Заявка сама не подключает и не активирует гостиницу.',linkDisabled:'Доверенное подключение доступно только в изолированной FLEX QA после настройки подписывающего сервера.',deployment:'ID проверенного развёртывания',property:'ID гостиницы в MARINA SMART',createChallenge:'Запросить проверку связи',challenge:'Подписываемое сообщение',expiresAt:'Действительно до',signature:'Подпись доверенного сервера (Base64)',confirmLink:'Подтвердить подпись',linked:'Связь криптографически подтверждена; подписка НЕ активирована.',challengeResult:'Запрос на подпись создан. Передайте сообщение доверенному серверу MARINA SMART.',linkError:'Проверка связи отклонена',badSignature:'Нужна подпись от доверенного сервера, нельзя вводить произвольную строку.',hotelError:'Регистрация отклонена сервером',searchHelp:'Фильтр по названию и статусу',adminCatalog:'Управление каталогом',createSku:'Добавить функцию (план)',newPrice:'Новая версия цены',priceHistory:'История цен',skuTitle:'Название функции',capability:'Серверная возможность',startPrice:'Дата начала действия цены',savePlanned:'Создать PLANNED SKU',savePrice:'Сохранить будущую цену',skuVersion:'Версия',sourceStatus:'Каталог',configure:'Черновик подписки',configurationDraft:'Новый черновик подписки',draftList:'История черновиков',draftTitle:'Название пакета',selectFunctions:'Функции для предложения',saveDraft:'Сохранить черновик',draftOnly:'Это коммерческий черновик без оплаты, активации подписки и изменения доступа. Не создаёт договор или счёт.',notPublished:'Созданная функция имеет статус PLANNED; нельзя считать её доступной гостиницам до отдельной публикации.',priceChanged:'Новая версия цены записана; прежняя история сохранена.',draftCreated:'Черновик сохранён. Доступ не изменён.',noDrafts:'Черновиков пока нет',noSelectable:'Сначала необходимо наличие утверждённых доступных SKU с ценами на дату начала.',draftSettings:'Параметры подписки',yearPrice:'Цена в KGS за месяц',operationBlocked:'Администрирование каталога доступно только в отдельной FLEX QA после настройки MFA.',adminError:'Сервер отклонил операцию',openHistory:'История',monthlyEstimate:'Предварительная стоимость за месяц',draftDatesError:'Проверьте даты черновика: начало не раньше вчерашнего дня и не дальше года; окончание не раньше начала и не более чем через 366 дней.',hotelTabOverview:'Обзор',hotelTabFinance:'Финансы',hotelTabUsage:'Использование',hotelTabRelations:'Агенты и партнёры',hotelTabHistory:'История',hotelTabPending:'Источник данных ещё не подключён к FLEX QA. Здесь нет вымышленных показателей.',draftEstimate:'Предварительная сумма за месяц (KGS)',draftEstimateDisclaimer:'Предварительная сумма по доступным ценам на дату начала. Не счёт, не договор и не подтверждённая выручка.',draftPriceUnavailable:'Для выбранной даты нет подтверждённой цены. Измените дату или состав модулей.',draftSelectModules:'Выберите дополнительные модули.',packageType:'Тип тарифного предложения',packageCustom:'Индивидуальный',sharedTemplate:'Общий шаблон модулей',manualSelection:'Выбрать модули вручную',publishTemplate:'Сохранить состав как общий шаблон',templateSaved:'Шаблон сохранён',packageNote:'BASE, BUSINESS и PREMIUM — названия предложений. Состав, цены и подключение модулей не назначаются автоматически.',packageLabel:'Название предложения',packageTitleRequired:'Укажите название предложения.',packageDiscount:'Скидка (%)',packageTrial:'Пробный период (дней)',packageCustomPrice:'Индивидуальная цена за месяц (сом)',packageSave:'Сохранить версию тарифа',packageSaved:'Версия тарифного предложения сохранена. Подписка не активирована.',packageHistory:'История версий тарифов',packagePriceOverride:'Индивидуальная цена допустима только в CUSTOM без процентной скидки.',onlyFuture:'Стоимость вступит в силу только с указанной будущей даты.'},
- kg:{frozen:'Токтотулган',commercial:'КОММЕРЦИЯЛЫК ПЛАТФОРМА',warning:'Чыныгы төлөмдөр жана которуулар жок. Мейманкананын PMS тутуму өзгөрбөйт.',lang:'Тил',login:'Кирүү',logout:'Чыгуу',welcome:'Башкаруу борбору',overview:'Жалпы көрүнүш',hotels:'Мейманканалар',catalog:'Функциялар каталогу',obligations:'Өнөктөштөрдүн эсептөөлөрү',subscription:'Менин жазылуум',earnings:'Менин эсептөөлөрүм',notConfigured:'Өзүнчө QA чөйрөсү туташа элек',configHelp:'Чыныгы маалымат үчүн FLEX API жана OIDC/MFA керек. Бул жерде ойдон чыгарылган каржы маалыматтары жок.',loginPrompt:'Маалымат көрүү үчүн коопсуз каттоо аркылуу кириңиз.',hotelList:'Мейманканалар тизмеси',search:'Аты боюнча издөө',hotel:'Мейманкана',status:'Абалы',currency:'Валюта',actions:'Аракеттер',open:'Ачуу',noHotels:'Азырынча мейманканалар жок.',back:'Бардык мейманканалар',invoices:'Эсеп-фактуралар',invoice:'Эсеп номери',total:'Сумма',due:'Мөөнөт',noInvoices:'Эсептер жок',noSubscription:'Активдүү жазылуу жок.',planStatus:'Жазылуу',enforcement:'Көзөмөл режими',periodStart:'Мөөнөттүн башы',periodEnd:'Мөөнөттүн аягы',grace:'Жеңилдетилген мөөнөт',features:'Жарыяланган функциялар',sku:'SKU коду',price:'Айлык баа',noCatalog:'Азырынча функциялар жок',accessDenied:'Уруксат жок',error:'Маалымат алынбады',retry:'Кайра аракеттенүү',agent:'Сатуу агенти',investor:'Инвестор',net:'Кайтарууларды эске алган эсептөө',gross:'Эсептелди',refunds:'Жокко чыгарылды',paid:'Иш жүзүндө төлөндү',events:'Операциялар',notImplemented:'Ырасталган төлөмдөр туташа элек.',periodDay:'Күн',periodWeek:'Жума',periodMonth:'Ай',role:'Роль',billingHold:'BILLING ролу: төлөмдөрдү башкаруу өзүнчө чечимге чейин өчүрүлгөн.',readOnly:'Окуу гана',noData:'Бул мезгилге маалымат жок',activeHotels:'Мейманканалар',activeSku:'Жарыяланган функциялар',groups:'Топ',sum:'Эсептөөлөр',helpQa:'Баардык маалымат FLEX QA API аркылуу алынат.',ownerHotels:'Сиздин мейманканалар',selected:'Мейманкана картасы',openBack:'Артка',noSelected:'Бекитилген мейманкана жок',go:'Өтүү',period:'Мезгил',expires:'Бүтөт',count:'Саны',noPartners:'Эсептөөлөр жок',emptyTitle:'Маалымат жок',addHotel:'Мейманкана кошуу',createHotel:'QA мейманканасын түзүү',registerHotel:'QA каттоо',name:'Мейманкананын аталышы',cancel:'Жокко чыгаруу',refresh:'Жаңыртуу',export:'CSV чыгаруу',onlyQa:'QA ичинде PENDING гана түзүлөт. Жазылууга жана PMSке таасир этпейт.',notEnabled:'Жаңы мейманкана үчүн өзүнчө QA жана MFA керек.',created:'QA мейманкана катталды',saving:'Сакталууда...',allStatuses:'Бардык абалдар',registered:'Каттоо',qaScope:'Синтетикалык тесттик гана маалымат. Чыныгы келишимдерди колдонбоңуз.',linkHotel:'MARINA SMART менен туташтыруу',linkTitle:'Мейманкананы байланыштыруу',linkHelp:'MARINA SMART кол тамгасы керек. Суроо автоматтык кошпойт.',linkDisabled:'QA жана ишенимдүү кол тамга сервери керек.',deployment:'Текшерилген жайгаштыруу ID',property:'MARINA SMART ичиндеги мейманкана ID',createChallenge:'Байланышты текшерүү',challenge:'Кол коюлуучу билдирүү',expiresAt:'Мөөнөтү',signature:'Ишенимдүү сервердин кол тамгасы (Base64)',confirmLink:'Кол тамганы текшерүү',linked:'Байланыш ырасталды, жазылуу иштетилген жок.',challengeResult:'Суроо түзүлдү. Билдирүүнү ишенимдүү MARINA SMART серверине бериңиз.',linkError:'Байланыш четке кагылды',badSignature:'Ишенимдүү сервердин кол тамгасы керек.',hotelError:'Сервер каттоодон баш тартты',searchHelp:'Аты жана абалы боюнча чыпка',adminCatalog:'Каталогду башкаруу',createSku:'Функция кошуу (план)',newPrice:'Жаңы баа версиясы',priceHistory:'Баалардын тарыхы',skuTitle:'Функциянын аты',capability:'Сервер мүмкүнчүлүгү',startPrice:'Баанын башталышы',savePlanned:'PLANNED SKU түзүү',savePrice:'Келечектеги бааны сактоо',skuVersion:'Версия',sourceStatus:'Каталог',configure:'Жазылуунун долбоору',configurationDraft:'Жазылуунун долбоору',draftList:'Долбоорлор тарыхы',draftTitle:'Пакеттин аталышы',selectFunctions:'Сунуш функциялары',saveDraft:'Долбоорду сактоо',draftOnly:'Бул төлөмсүз жана активдешүүсүз коммерциялык долбоор. Келишим же эсеп түзбөйт.',notPublished:'Функция PLANNED абалында, мейманканаларга ачылбайт.',priceChanged:'Жаңы версия сакталды, мурунку баалар өзгөргөн жок.',draftCreated:'Долбоор сакталды, укуктар өзгөргөн жок.',noDrafts:'Долбоор жок',noSelectable:'Алгач жеткиликтүү SKU баалары керек.',draftSettings:'Жазылуу параметрлери',yearPrice:'Айына сом',operationBlocked:'Бул үчүн өзүнчө FLEX QA жана MFA керек.',adminError:'Сервер четке какты',openHistory:'Тарых',monthlyEstimate:'Айлык болжол',draftDatesError:'Долбоордун күндөрүн текшериңиз: башталышы кечээки күндөн эрте эмес, бир жылдан кеч эмес; аягы башталыштан эрте эмес жана 366 күндөн ашпайт.',hotelTabOverview:'Жалпы маалымат',hotelTabFinance:'Каржы',hotelTabUsage:'Колдонуу',hotelTabRelations:'Агенттер жана өнөктөштөр',hotelTabHistory:'Тарых',hotelTabPending:'FLEX QA үчүн маалымат булагы азырынча кошула элек. Бул жерде жасалма көрсөткүчтөр жок.',draftEstimate:'Айына алдын ала сумма (сом)',draftEstimateDisclaimer:'Башталган күнгө карата баалар боюнча болжол. Эсеп, келишим же ырасталган киреше эмес.',draftPriceUnavailable:'Тандалган күнгө ырасталган баа жок. Күндү же модулдарды өзгөртүңүз.',draftSelectModules:'Кошумча модулдарды тандаңыз.',packageType:'Тарифтик сунуштун түрү',packageCustom:'Жеке тариф',sharedTemplate:'Жалпы модулдар шаблону',manualSelection:'Модулдарды кол менен тандоо',publishTemplate:'Курамды жалпы шаблон катары сактоо',templateSaved:'Шаблон сакталды',packageNote:'BASE, BUSINESS жана PREMIUM — сунуштардын аталыштары гана. Модулдар, баалар жана туташтыруу автоматтык дайындалбайт.',packageLabel:'Сунуштун аталышы',packageTitleRequired:'Сунуштун аталышын киргизиңиз.',packageDiscount:'Арзандатуу (%)',packageTrial:'Сыноо мезгили (күн)',packageCustomPrice:'Жеке айлык баа (сом)',packageSave:'Тарифтин версиясын сактоо',packageSaved:'Тарифтик сунуштун версиясы сакталды. Жазылуу иштетилген жок.',packageHistory:'Тарифтердин версияларынын тарыхы',packagePriceOverride:'Жеке баа арзандатуусуз CUSTOM үчүн гана.',onlyFuture:'Баанын күчү көрсөтүлгөн күнү башталат.'},
- en:{frozen:'Frozen',commercial:'COMMERCIAL CONTROL PLANE',warning:'Live payments and payouts are disabled. Hotel PMS data remains untouched.',lang:'Language',login:'Sign in',logout:'Sign out',welcome:'Control center',overview:'Overview',hotels:'Hotels',catalog:'Feature catalog',obligations:'Partner earnings',subscription:'My subscription',earnings:'My earnings',notConfigured:'Isolated QA environment is not configured',configHelp:'Real data requires the dedicated FLEX API and OIDC/MFA. No fictional financial data is displayed.',loginPrompt:'Sign in through the separate platform identity provider to view data.',hotelList:'Hotel registry',search:'Search hotels',hotel:'Hotel',status:'Status',currency:'Currency',actions:'Actions',open:'Open',noHotels:'No hotels registered yet.',back:'All hotels',invoices:'Invoices',invoice:'Invoice number',total:'Amount',due:'Due date',noInvoices:'No invoices',noSubscription:'No active subscription.',planStatus:'Subscription',enforcement:'Enforcement',periodStart:'Period start',periodEnd:'Period end',grace:'Grace period',features:'Published features',sku:'SKU code',price:'Monthly price',noCatalog:'No published features yet',accessDenied:'Access denied',error:'Unable to load data',retry:'Retry',agent:'Sales agent',investor:'Investor',net:'Net earned after reversals',gross:'Gross earned',refunds:'Reversed',paid:'Actually paid out',events:'Entries',notImplemented:'Verified payouts are not yet implemented.',periodDay:'Day',periodWeek:'Week',periodMonth:'Month',role:'Role',billingHold:'BILLING role: payment management remains disabled until separately approved.',readOnly:'Read-only',noData:'No data this period',activeHotels:'Registered hotels',activeSku:'Published features',groups:'Group',sum:'Earnings',helpQa:'Figures come only from FLEX QA APIs—not from PMS or mockups.',ownerHotels:'Your hotels',selected:'Hotel details',openBack:'Back',noSelected:'No assigned hotels',go:'Go',period:'Period',expires:'Expires',count:'Count',noPartners:'No earnings entries',emptyTitle:'No data',addHotel:'Add hotel',createHotel:'Register QA hotel',registerHotel:'Register in QA',name:'Hotel name',cancel:'Cancel',refresh:'Refresh',export:'Export CSV',onlyQa:'Creates a PENDING record in separate FLEX QA only. Does not activate a subscription or modify PMS.',notEnabled:'Hotel onboarding requires isolated FLEX QA and MFA.',created:'Hotel registered in QA',saving:'Saving...',allStatuses:'All statuses',registered:'Registration',qaScope:'Synthetic test data only. Do not use real contracts or payments.',linkHotel:'Link to MARINA SMART',linkTitle:'Verify hotel ownership',linkHelp:'A trusted MARINA SMART deployment signature is required. Creating a challenge never links or activates a subscription.',linkDisabled:'Trusted linking requires isolated FLEX QA and an approved MARINA SMART signer.',deployment:'Trusted deployment ID',property:'Property ID in MARINA SMART',createChallenge:'Request link verification',challenge:'Message to be signed',expiresAt:'Expires',signature:'Trusted deployment signature (Base64)',confirmLink:'Verify signature',linked:'Trusted link verified; subscription remains inactive.',challengeResult:'Verification request created. Hand this message to the trusted MARINA SMART deployment signer.',linkError:'Link verification rejected',badSignature:'The signature must come from a trusted deployment, not a guessed value.',hotelError:'Hotel registration rejected by server',searchHelp:'Filter by name and status',adminCatalog:'Catalog administration',createSku:'Add planned feature',newPrice:'New price version',priceHistory:'Price history',skuTitle:'Feature title',capability:'Server capability',startPrice:'Price effective from',savePlanned:'Create PLANNED SKU',savePrice:'Save future price',skuVersion:'Version',sourceStatus:'Catalog',configure:'Subscription configuration draft',configurationDraft:'New subscription draft',draftList:'Draft version history',draftTitle:'Package title',selectFunctions:'Features to propose',saveDraft:'Save draft',draftOnly:'Commercial proposal only. No payment, subscription activation, entitlement or invoice. Not a signed contract.',notPublished:'New SKU remains PLANNED until separately reviewed and published. It is not available to hotels.',priceChanged:'A new price version was appended; prior history is retained.',draftCreated:'Draft saved. Hotel access remains unchanged.',noDrafts:'No drafts yet',noSelectable:'Approved AVAILABLE SKUs with effective prices are required first.',draftSettings:'Subscription configuration',yearPrice:'Monthly KGS',operationBlocked:'Catalog administration requires isolated FLEX QA and verified admin MFA.',adminError:'Backend rejected the request',openHistory:'History',monthlyEstimate:'Estimated monthly KGS',draftDatesError:'Check draft dates: start no earlier than yesterday and within a year; end no earlier than start and at most 366 days later.',hotelTabOverview:'Overview',hotelTabFinance:'Finances',hotelTabUsage:'Usage',hotelTabRelations:'Agents and partners',hotelTabHistory:'History',hotelTabPending:'This data source is not connected to FLEX QA yet. No figures are fabricated.',draftEstimate:'Estimated monthly total (KGS)',draftEstimateDisclaimer:'Estimate from available prices effective on start date; not an invoice, contract, or received revenue.',draftPriceUnavailable:'No verified effective price for the selected date. Change the date or selected modules.',draftSelectModules:'Select additional modules.',packageType:'Tariff proposal type',packageCustom:'Custom',sharedTemplate:'Shared module template',manualSelection:'Select modules manually',publishTemplate:'Save modules as shared template',templateSaved:'Template saved',packageNote:'BASE, BUSINESS and PREMIUM are proposal labels only. No modules, prices or activation are automatically assigned.',packageLabel:'Proposal title',packageTitleRequired:'Enter a proposal title.',packageDiscount:'Discount (%)',packageTrial:'Trial period (days)',packageCustomPrice:'Custom monthly price (KGS)',packageSave:'Save tariff version',packageSaved:'Tariff proposal version saved. Subscription not activated.',packageHistory:'Tariff version history',packagePriceOverride:'A custom price is permitted only for CUSTOM without a percentage discount.',onlyFuture:'Price becomes effective only on the selected future date.'}
+ ru:{partner:'Мои предложения',financeCenter:'Финансовый центр',frozen:'Заморожено',commercial:'КОММЕРЧЕСКАЯ ПЛАТФОРМА',warning:'Нет реальных платежей и выплат. Доступ к гостиничной PMS не изменяется.',lang:'Язык',login:'Войти',logout:'Выйти',welcome:'Центр управления',overview:'Обзор',hotels:'Гостиницы',catalog:'Каталог функций',obligations:'Начисления партнёрам',subscription:'Моя подписка',earnings:'Мои начисления',notConfigured:'Отдельная QA-среда ещё не подключена',configHelp:'Для настоящих данных нужен отдельный FLEX API и платформенный OIDC/MFA. Пока здесь не показываются вымышленные финансы.',loginPrompt:'Для просмотра данных войдите через защищённый платформенный доступ.',hotelList:'Реестр гостиниц',search:'Поиск по названию',hotel:'Гостиница',status:'Статус',currency:'Валюта',actions:'Действия',open:'Открыть',noHotels:'Гостиницы ещё не зарегистрированы.',back:'Все гостиницы',invoices:'Счета',invoice:'Номер счёта',total:'Сумма',due:'Срок',noInvoices:'Счетов нет',noSubscription:'Активная подписка отсутствует.',planStatus:'Подписка',enforcement:'Режим контроля',periodStart:'Начало периода',periodEnd:'Конец периода',grace:'Льготный период',features:'Опубликованные функции',sku:'Код SKU',price:'Цена в месяц',noCatalog:'Опубликованных функций пока нет',accessDenied:'Нет доступа к этим данным',error:'Не удалось получить данные',retry:'Повторить',agent:'Агент продаж',investor:'Инвестор',net:'Начислено с учётом возвратов',gross:'Начислено',refunds:'Сторнировано',paid:'Фактически выплачено',events:'Операций',notImplemented:'Подтверждённые выплаты пока не подключены.',periodDay:'День',periodWeek:'Неделя',periodMonth:'Месяц',role:'Роль',billingHold:'Роль BILLING: управление платежами отключено до отдельного решения.',readOnly:'Только чтение',noData:'Данных за период нет',activeHotels:'Гостиниц в реестре',activeSku:'Опубликованных функций',groups:'Категория',sum:'Начисления',helpQa:'Все значения поступают исключительно из FLEX QA API, не из PMS и не из макетов.',ownerHotels:'Ваши отели',selected:'Карточка гостиницы',openBack:'Вернуться',noSelected:'Нет закреплённых гостиниц',go:'Перейти',period:'Период',expires:'Истекает',count:'Количество',noPartners:'Начислений нет',emptyTitle:'Данных нет',addHotel:'Добавить гостиницу',createHotel:'Создать тестовую гостиницу',registerHotel:'Зарегистрировать в QA',name:'Название гостиницы',cancel:'Отмена',refresh:'Обновить',export:'Экспорт CSV',onlyQa:'Регистрация создаёт только PENDING-запись в отдельном FLEX QA. Она не активирует подписку и не изменяет PMS.',notEnabled:'Создание гостиницы станет доступно после подключения изолированного FLEX QA и MFA.',created:'Гостиница зарегистрирована в QA',saving:'Сохранение...',allStatuses:'Все статусы',registered:'Регистрация',qaScope:'Только синтетические тестовые данные. Не используйте реальные имена, договоры и платежи.',linkHotel:'Связать с MARINA SMART',linkTitle:'Подтверждение связи гостиницы',linkHelp:'Подключение требует доверенной подписи MARINA SMART. Заявка сама не подключает и не активирует гостиницу.',linkDisabled:'Доверенное подключение доступно только в изолированной FLEX QA после настройки подписывающего сервера.',deployment:'ID проверенного развёртывания',property:'ID гостиницы в MARINA SMART',createChallenge:'Запросить проверку связи',challenge:'Подписываемое сообщение',expiresAt:'Действительно до',signature:'Подпись доверенного сервера (Base64)',confirmLink:'Подтвердить подпись',linked:'Связь криптографически подтверждена; подписка НЕ активирована.',challengeResult:'Запрос на подпись создан. Передайте сообщение доверенному серверу MARINA SMART.',linkError:'Проверка связи отклонена',badSignature:'Нужна подпись от доверенного сервера, нельзя вводить произвольную строку.',hotelError:'Регистрация отклонена сервером',searchHelp:'Фильтр по названию и статусу',adminCatalog:'Управление каталогом',createSku:'Добавить функцию (план)',newPrice:'Новая версия цены',priceHistory:'История цен',skuTitle:'Название функции',capability:'Серверная возможность',startPrice:'Дата начала действия цены',savePlanned:'Создать PLANNED SKU',savePrice:'Сохранить будущую цену',skuVersion:'Версия',sourceStatus:'Каталог',configure:'Черновик подписки',configurationDraft:'Новый черновик подписки',draftList:'История черновиков',draftTitle:'Название пакета',selectFunctions:'Функции для предложения',saveDraft:'Сохранить черновик',draftOnly:'Это коммерческий черновик без оплаты, активации подписки и изменения доступа. Не создаёт договор или счёт.',notPublished:'Созданная функция имеет статус PLANNED; нельзя считать её доступной гостиницам до отдельной публикации.',priceChanged:'Новая версия цены записана; прежняя история сохранена.',draftCreated:'Черновик сохранён. Доступ не изменён.',noDrafts:'Черновиков пока нет',noSelectable:'Сначала необходимо наличие утверждённых доступных SKU с ценами на дату начала.',draftSettings:'Параметры подписки',yearPrice:'Цена в KGS за месяц',operationBlocked:'Администрирование каталога доступно только в отдельной FLEX QA после настройки MFA.',adminError:'Сервер отклонил операцию',openHistory:'История',monthlyEstimate:'Предварительная стоимость за месяц',draftDatesError:'Проверьте даты черновика: начало не раньше вчерашнего дня и не дальше года; окончание не раньше начала и не более чем через 366 дней.',hotelTabOverview:'Обзор',hotelTabFinance:'Финансы',hotelTabUsage:'Использование',hotelTabRelations:'Агенты и партнёры',hotelTabHistory:'История',hotelTabPending:'Источник данных ещё не подключён к FLEX QA. Здесь нет вымышленных показателей.',draftEstimate:'Предварительная сумма за месяц (KGS)',draftEstimateDisclaimer:'Предварительная сумма по доступным ценам на дату начала. Не счёт, не договор и не подтверждённая выручка.',draftPriceUnavailable:'Для выбранной даты нет подтверждённой цены. Измените дату или состав модулей.',draftSelectModules:'Выберите дополнительные модули.',packageType:'Тип тарифного предложения',packageCustom:'Индивидуальный',sharedTemplate:'Общий шаблон модулей',manualSelection:'Выбрать модули вручную',publishTemplate:'Сохранить состав как общий шаблон',templateSaved:'Шаблон сохранён',packageNote:'BASE, BUSINESS и PREMIUM — названия предложений. Состав, цены и подключение модулей не назначаются автоматически.',packageLabel:'Название предложения',packageTitleRequired:'Укажите название предложения.',packageDiscount:'Скидка (%)',packageTrial:'Пробный период (дней)',packageCustomPrice:'Индивидуальная цена за месяц (сом)',packageSave:'Сохранить версию тарифа',packageSaved:'Версия тарифного предложения сохранена. Подписка не активирована.',packageHistory:'История версий тарифов',packagePriceOverride:'Индивидуальная цена допустима только в CUSTOM без процентной скидки.',onlyFuture:'Стоимость вступит в силу только с указанной будущей даты.'},
+ kg:{partner:'Менин сунуштарым',financeCenter:'Каржы борбору',frozen:'Токтотулган',commercial:'КОММЕРЦИЯЛЫК ПЛАТФОРМА',warning:'Чыныгы төлөмдөр жана которуулар жок. Мейманкананын PMS тутуму өзгөрбөйт.',lang:'Тил',login:'Кирүү',logout:'Чыгуу',welcome:'Башкаруу борбору',overview:'Жалпы көрүнүш',hotels:'Мейманканалар',catalog:'Функциялар каталогу',obligations:'Өнөктөштөрдүн эсептөөлөрү',subscription:'Менин жазылуум',earnings:'Менин эсептөөлөрүм',notConfigured:'Өзүнчө QA чөйрөсү туташа элек',configHelp:'Чыныгы маалымат үчүн FLEX API жана OIDC/MFA керек. Бул жерде ойдон чыгарылган каржы маалыматтары жок.',loginPrompt:'Маалымат көрүү үчүн коопсуз каттоо аркылуу кириңиз.',hotelList:'Мейманканалар тизмеси',search:'Аты боюнча издөө',hotel:'Мейманкана',status:'Абалы',currency:'Валюта',actions:'Аракеттер',open:'Ачуу',noHotels:'Азырынча мейманканалар жок.',back:'Бардык мейманканалар',invoices:'Эсеп-фактуралар',invoice:'Эсеп номери',total:'Сумма',due:'Мөөнөт',noInvoices:'Эсептер жок',noSubscription:'Активдүү жазылуу жок.',planStatus:'Жазылуу',enforcement:'Көзөмөл режими',periodStart:'Мөөнөттүн башы',periodEnd:'Мөөнөттүн аягы',grace:'Жеңилдетилген мөөнөт',features:'Жарыяланган функциялар',sku:'SKU коду',price:'Айлык баа',noCatalog:'Азырынча функциялар жок',accessDenied:'Уруксат жок',error:'Маалымат алынбады',retry:'Кайра аракеттенүү',agent:'Сатуу агенти',investor:'Инвестор',net:'Кайтарууларды эске алган эсептөө',gross:'Эсептелди',refunds:'Жокко чыгарылды',paid:'Иш жүзүндө төлөндү',events:'Операциялар',notImplemented:'Ырасталган төлөмдөр туташа элек.',periodDay:'Күн',periodWeek:'Жума',periodMonth:'Ай',role:'Роль',billingHold:'BILLING ролу: төлөмдөрдү башкаруу өзүнчө чечимге чейин өчүрүлгөн.',readOnly:'Окуу гана',noData:'Бул мезгилге маалымат жок',activeHotels:'Мейманканалар',activeSku:'Жарыяланган функциялар',groups:'Топ',sum:'Эсептөөлөр',helpQa:'Баардык маалымат FLEX QA API аркылуу алынат.',ownerHotels:'Сиздин мейманканалар',selected:'Мейманкана картасы',openBack:'Артка',noSelected:'Бекитилген мейманкана жок',go:'Өтүү',period:'Мезгил',expires:'Бүтөт',count:'Саны',noPartners:'Эсептөөлөр жок',emptyTitle:'Маалымат жок',addHotel:'Мейманкана кошуу',createHotel:'QA мейманканасын түзүү',registerHotel:'QA каттоо',name:'Мейманкананын аталышы',cancel:'Жокко чыгаруу',refresh:'Жаңыртуу',export:'CSV чыгаруу',onlyQa:'QA ичинде PENDING гана түзүлөт. Жазылууга жана PMSке таасир этпейт.',notEnabled:'Жаңы мейманкана үчүн өзүнчө QA жана MFA керек.',created:'QA мейманкана катталды',saving:'Сакталууда...',allStatuses:'Бардык абалдар',registered:'Каттоо',qaScope:'Синтетикалык тесттик гана маалымат. Чыныгы келишимдерди колдонбоңуз.',linkHotel:'MARINA SMART менен туташтыруу',linkTitle:'Мейманкананы байланыштыруу',linkHelp:'MARINA SMART кол тамгасы керек. Суроо автоматтык кошпойт.',linkDisabled:'QA жана ишенимдүү кол тамга сервери керек.',deployment:'Текшерилген жайгаштыруу ID',property:'MARINA SMART ичиндеги мейманкана ID',createChallenge:'Байланышты текшерүү',challenge:'Кол коюлуучу билдирүү',expiresAt:'Мөөнөтү',signature:'Ишенимдүү сервердин кол тамгасы (Base64)',confirmLink:'Кол тамганы текшерүү',linked:'Байланыш ырасталды, жазылуу иштетилген жок.',challengeResult:'Суроо түзүлдү. Билдирүүнү ишенимдүү MARINA SMART серверине бериңиз.',linkError:'Байланыш четке кагылды',badSignature:'Ишенимдүү сервердин кол тамгасы керек.',hotelError:'Сервер каттоодон баш тартты',searchHelp:'Аты жана абалы боюнча чыпка',adminCatalog:'Каталогду башкаруу',createSku:'Функция кошуу (план)',newPrice:'Жаңы баа версиясы',priceHistory:'Баалардын тарыхы',skuTitle:'Функциянын аты',capability:'Сервер мүмкүнчүлүгү',startPrice:'Баанын башталышы',savePlanned:'PLANNED SKU түзүү',savePrice:'Келечектеги бааны сактоо',skuVersion:'Версия',sourceStatus:'Каталог',configure:'Жазылуунун долбоору',configurationDraft:'Жазылуунун долбоору',draftList:'Долбоорлор тарыхы',draftTitle:'Пакеттин аталышы',selectFunctions:'Сунуш функциялары',saveDraft:'Долбоорду сактоо',draftOnly:'Бул төлөмсүз жана активдешүүсүз коммерциялык долбоор. Келишим же эсеп түзбөйт.',notPublished:'Функция PLANNED абалында, мейманканаларга ачылбайт.',priceChanged:'Жаңы версия сакталды, мурунку баалар өзгөргөн жок.',draftCreated:'Долбоор сакталды, укуктар өзгөргөн жок.',noDrafts:'Долбоор жок',noSelectable:'Алгач жеткиликтүү SKU баалары керек.',draftSettings:'Жазылуу параметрлери',yearPrice:'Айына сом',operationBlocked:'Бул үчүн өзүнчө FLEX QA жана MFA керек.',adminError:'Сервер четке какты',openHistory:'Тарых',monthlyEstimate:'Айлык болжол',draftDatesError:'Долбоордун күндөрүн текшериңиз: башталышы кечээки күндөн эрте эмес, бир жылдан кеч эмес; аягы башталыштан эрте эмес жана 366 күндөн ашпайт.',hotelTabOverview:'Жалпы маалымат',hotelTabFinance:'Каржы',hotelTabUsage:'Колдонуу',hotelTabRelations:'Агенттер жана өнөктөштөр',hotelTabHistory:'Тарых',hotelTabPending:'FLEX QA үчүн маалымат булагы азырынча кошула элек. Бул жерде жасалма көрсөткүчтөр жок.',draftEstimate:'Айына алдын ала сумма (сом)',draftEstimateDisclaimer:'Башталган күнгө карата баалар боюнча болжол. Эсеп, келишим же ырасталган киреше эмес.',draftPriceUnavailable:'Тандалган күнгө ырасталган баа жок. Күндү же модулдарды өзгөртүңүз.',draftSelectModules:'Кошумча модулдарды тандаңыз.',packageType:'Тарифтик сунуштун түрү',packageCustom:'Жеке тариф',sharedTemplate:'Жалпы модулдар шаблону',manualSelection:'Модулдарды кол менен тандоо',publishTemplate:'Курамды жалпы шаблон катары сактоо',templateSaved:'Шаблон сакталды',packageNote:'BASE, BUSINESS жана PREMIUM — сунуштардын аталыштары гана. Модулдар, баалар жана туташтыруу автоматтык дайындалбайт.',packageLabel:'Сунуштун аталышы',packageTitleRequired:'Сунуштун аталышын киргизиңиз.',packageDiscount:'Арзандатуу (%)',packageTrial:'Сыноо мезгили (күн)',packageCustomPrice:'Жеке айлык баа (сом)',packageSave:'Тарифтин версиясын сактоо',packageSaved:'Тарифтик сунуштун версиясы сакталды. Жазылуу иштетилген жок.',packageHistory:'Тарифтердин версияларынын тарыхы',packagePriceOverride:'Жеке баа арзандатуусуз CUSTOM үчүн гана.',onlyFuture:'Баанын күчү көрсөтүлгөн күнү башталат.'},
+ en:{partner:'My proposals',financeCenter:'Financial center',frozen:'Frozen',commercial:'COMMERCIAL CONTROL PLANE',warning:'Live payments and payouts are disabled. Hotel PMS data remains untouched.',lang:'Language',login:'Sign in',logout:'Sign out',welcome:'Control center',overview:'Overview',hotels:'Hotels',catalog:'Feature catalog',obligations:'Partner earnings',subscription:'My subscription',earnings:'My earnings',notConfigured:'Isolated QA environment is not configured',configHelp:'Real data requires the dedicated FLEX API and OIDC/MFA. No fictional financial data is displayed.',loginPrompt:'Sign in through the separate platform identity provider to view data.',hotelList:'Hotel registry',search:'Search hotels',hotel:'Hotel',status:'Status',currency:'Currency',actions:'Actions',open:'Open',noHotels:'No hotels registered yet.',back:'All hotels',invoices:'Invoices',invoice:'Invoice number',total:'Amount',due:'Due date',noInvoices:'No invoices',noSubscription:'No active subscription.',planStatus:'Subscription',enforcement:'Enforcement',periodStart:'Period start',periodEnd:'Period end',grace:'Grace period',features:'Published features',sku:'SKU code',price:'Monthly price',noCatalog:'No published features yet',accessDenied:'Access denied',error:'Unable to load data',retry:'Retry',agent:'Sales agent',investor:'Investor',net:'Net earned after reversals',gross:'Gross earned',refunds:'Reversed',paid:'Actually paid out',events:'Entries',notImplemented:'Verified payouts are not yet implemented.',periodDay:'Day',periodWeek:'Week',periodMonth:'Month',role:'Role',billingHold:'BILLING role: payment management remains disabled until separately approved.',readOnly:'Read-only',noData:'No data this period',activeHotels:'Registered hotels',activeSku:'Published features',groups:'Group',sum:'Earnings',helpQa:'Figures come only from FLEX QA APIs—not from PMS or mockups.',ownerHotels:'Your hotels',selected:'Hotel details',openBack:'Back',noSelected:'No assigned hotels',go:'Go',period:'Period',expires:'Expires',count:'Count',noPartners:'No earnings entries',emptyTitle:'No data',addHotel:'Add hotel',createHotel:'Register QA hotel',registerHotel:'Register in QA',name:'Hotel name',cancel:'Cancel',refresh:'Refresh',export:'Export CSV',onlyQa:'Creates a PENDING record in separate FLEX QA only. Does not activate a subscription or modify PMS.',notEnabled:'Hotel onboarding requires isolated FLEX QA and MFA.',created:'Hotel registered in QA',saving:'Saving...',allStatuses:'All statuses',registered:'Registration',qaScope:'Synthetic test data only. Do not use real contracts or payments.',linkHotel:'Link to MARINA SMART',linkTitle:'Verify hotel ownership',linkHelp:'A trusted MARINA SMART deployment signature is required. Creating a challenge never links or activates a subscription.',linkDisabled:'Trusted linking requires isolated FLEX QA and an approved MARINA SMART signer.',deployment:'Trusted deployment ID',property:'Property ID in MARINA SMART',createChallenge:'Request link verification',challenge:'Message to be signed',expiresAt:'Expires',signature:'Trusted deployment signature (Base64)',confirmLink:'Verify signature',linked:'Trusted link verified; subscription remains inactive.',challengeResult:'Verification request created. Hand this message to the trusted MARINA SMART deployment signer.',linkError:'Link verification rejected',badSignature:'The signature must come from a trusted deployment, not a guessed value.',hotelError:'Hotel registration rejected by server',searchHelp:'Filter by name and status',adminCatalog:'Catalog administration',createSku:'Add planned feature',newPrice:'New price version',priceHistory:'Price history',skuTitle:'Feature title',capability:'Server capability',startPrice:'Price effective from',savePlanned:'Create PLANNED SKU',savePrice:'Save future price',skuVersion:'Version',sourceStatus:'Catalog',configure:'Subscription configuration draft',configurationDraft:'New subscription draft',draftList:'Draft version history',draftTitle:'Package title',selectFunctions:'Features to propose',saveDraft:'Save draft',draftOnly:'Commercial proposal only. No payment, subscription activation, entitlement or invoice. Not a signed contract.',notPublished:'New SKU remains PLANNED until separately reviewed and published. It is not available to hotels.',priceChanged:'A new price version was appended; prior history is retained.',draftCreated:'Draft saved. Hotel access remains unchanged.',noDrafts:'No drafts yet',noSelectable:'Approved AVAILABLE SKUs with effective prices are required first.',draftSettings:'Subscription configuration',yearPrice:'Monthly KGS',operationBlocked:'Catalog administration requires isolated FLEX QA and verified admin MFA.',adminError:'Backend rejected the request',openHistory:'History',monthlyEstimate:'Estimated monthly KGS',draftDatesError:'Check draft dates: start no earlier than yesterday and within a year; end no earlier than start and at most 366 days later.',hotelTabOverview:'Overview',hotelTabFinance:'Finances',hotelTabUsage:'Usage',hotelTabRelations:'Agents and partners',hotelTabHistory:'History',hotelTabPending:'This data source is not connected to FLEX QA yet. No figures are fabricated.',draftEstimate:'Estimated monthly total (KGS)',draftEstimateDisclaimer:'Estimate from available prices effective on start date; not an invoice, contract, or received revenue.',draftPriceUnavailable:'No verified effective price for the selected date. Change the date or selected modules.',draftSelectModules:'Select additional modules.',packageType:'Tariff proposal type',packageCustom:'Custom',sharedTemplate:'Shared module template',manualSelection:'Select modules manually',publishTemplate:'Save modules as shared template',templateSaved:'Template saved',packageNote:'BASE, BUSINESS and PREMIUM are proposal labels only. No modules, prices or activation are automatically assigned.',packageLabel:'Proposal title',packageTitleRequired:'Enter a proposal title.',packageDiscount:'Discount (%)',packageTrial:'Trial period (days)',packageCustomPrice:'Custom monthly price (KGS)',packageSave:'Save tariff version',packageSaved:'Tariff proposal version saved. Subscription not activated.',packageHistory:'Tariff version history',packagePriceOverride:'A custom price is permitted only for CUSTOM without a percentage discount.',onlyFuture:'Price becomes effective only on the selected future date.'}
 };
 const main=document.getElementById('content'), nav=document.getElementById('nav');
 
 /* Separate Better Auth identity sign-in. This never authorizes FLEX API,
  * assigns a role, produces a JWT or marks MFA complete based on browser state.
  */
+for(const [locale,copy] of Object.entries({"ru":{"qaDemo":"Тестовая среда","qaReadonly":"Только чтение","footerBrand":"MARINA SMART FLEX · Коммерческое управление","footerFrozen":"Платежи, QR и выплаты отключены","theme":"Переключить тему","loading":"Загрузка","navigation":"Навигация","controlPlane":"Центр коммерческого управления","authRequired":"Требуется вход","noLiveData":"Тестовая среда не подключена"},"kg":{"qaDemo":"Сыноо чөйрөсү","qaReadonly":"Окуу гана","footerBrand":"MARINA SMART FLEX · Коммерциялык башкаруу","footerFrozen":"Төлөмдөр, QR жана которуулар өчүрүлгөн","theme":"Теманы алмаштыруу","loading":"Жүктөлүүдө","navigation":"Навигация","controlPlane":"Коммерциялык башкаруу борбору","authRequired":"Кирүү талап кылынат","noLiveData":"Сыноо чөйрөсү туташкан эмес"},"en":{"qaDemo":"Test environment","qaReadonly":"Read only","footerBrand":"MARINA SMART FLEX · Commercial management","footerFrozen":"Payments, QR and payouts disabled","theme":"Switch theme","loading":"Loading","navigation":"Navigation","controlPlane":"Commercial management center","authRequired":"Sign-in required","noLiveData":"Test environment not connected"}})) Object.assign(translations[locale],copy);
 const identityCopy={
  ru:{heading:'Вход в MARINA SMART FLEX',email:'Электронная почта',password:'Пароль',signIn:'Продолжить',mfa:'Код из приложения-аутентификатора',verify:'Подтвердить код',onlyIdentity:'Вход в учётную запись не предоставляет доступ SUPER ADMIN. Права откроются только после проверенного MFA и серверного подтверждения роли.',signedIn:'Почта подтверждена, но доступ к кабинету ещё не выдан сервером. Выйдите и войдите снова, если сессия устарела.',signOut:'Выйти из учётной записи',failed:'Не удалось подтвердить учётную запись',disabled:'Вход ещё не настроен',totpHint:'Введите шесть цифр из приложения-аутентификатора.'},
  kg:{heading:'MARINA SMART FLEX системасына кирүү',email:'Электрондук почта',password:'Сырсөз',signIn:'Улантуу',mfa:'Аутентификатор колдонмосундагы код',verify:'Кодду ырастоо',onlyIdentity:'Каттоо эсебине кирүү SUPER ADMIN укугун бербейт. Укук MFA жана серверде роль текшерилгенден кийин гана берилет.',signedIn:'Каттоо эсебиңиз ырасталды, бирок кабинетке кирүүгө сервер али уруксат берген жок. Сессия эскирсе, чыгып кайра кириңиз.',signOut:'Каттоо эсебинен чыгуу',failed:'Каттоо эсеби ырасталган жок',disabled:'Кирүү али жөндөлө элек',totpHint:'Аутентификатор колдонмосундагы алты орундуу кодду киргизиңиз.'},
  en:{heading:'Sign in to MARINA SMART FLEX',email:'Email',password:'Password',signIn:'Continue',mfa:'Authenticator code',verify:'Verify code',onlyIdentity:'Signing in does not grant SUPER ADMIN access. Commercial permissions require verified MFA and a server-authorized role.',signedIn:'Identity verified, but the server has not granted dashboard access. Sign out and sign in again if the session is stale.',signOut:'Sign out of identity',failed:'Unable to verify identity',disabled:'Identity sign-in is not configured yet',totpHint:'Enter the six-digit code from your authenticator app.'}
 };
+const recoveryCopy={"ru":{"forgot":"Забыли пароль?","resetTitle":"Восстановление пароля","send":"Отправить ссылку","sent":"Если аккаунт существует, письмо с инструкцией будет отправлено.","back":"Вернуться ко входу","newPassword":"Новый пароль","confirm":"Повторите пароль","save":"Сохранить пароль","done":"Пароль изменён. Войдите снова.","mismatch":"Пароли не совпадают.","error":"Не удалось выполнить операцию. Повторите попытку или обратитесь в поддержку."},"kg":{"forgot":"Сырсөздү унуттуңузбу?","resetTitle":"Сырсөздү калыбына келтирүү","send":"Шилтемени жөнөтүү","sent":"Каттоо эсеби бар болсо, нускама электрондук почтага жөнөтүлөт.","back":"Кирүү бетине кайтуу","newPassword":"Жаңы сырсөз","confirm":"Сырсөздү кайталаңыз","save":"Сырсөздү сактоо","done":"Сырсөз өзгөртүлдү. Кайра кириңиз.","mismatch":"Сырсөздөр дал келбейт.","error":"Аракет аткарылган жок. Кайра аракет кылыңыз же колдоо кызматына кайрылыңыз."},"en":{"forgot":"Forgot password?","resetTitle":"Reset password","send":"Send reset link","sent":"If the account exists, recovery instructions will be sent.","back":"Back to sign in","newPassword":"New password","confirm":"Confirm password","save":"Save password","done":"Password changed. Please sign in again.","mismatch":"Passwords do not match.","error":"Unable to complete the request. Try again or contact support."}};
+for(const [lang,copy] of Object.entries({
+ ru:{invalidLink:'Ссылка недействительна или уже использована. Запросите новую ссылку восстановления.',passwordPolicy:'Пароль должен содержать от 12 до 128 символов.',tooMany:'Слишком много попыток. Повторите через минуту.',unavailable:'Сервис восстановления временно недоступен. Повторите позже.'},
+ kg:{invalidLink:'Шилтеме жараксыз же колдонулган. Жаңы шилтеме сураңыз.',passwordPolicy:'Сырсөз 12–128 белгиден турушу керек.',tooMany:'Аракеттер өтө көп. Бир мүнөттөн кийин кайталаңыз.',unavailable:'Калыбына келтирүү кызматы убактылуу жеткиликсиз.'},
+ en:{invalidLink:'This link is invalid or has already been used. Request a new reset link.',passwordPolicy:'Use a password between 12 and 128 characters.',tooMany:'Too many attempts. Retry in one minute.',unavailable:'Password recovery is temporarily unavailable. Try again later.'}
+}))Object.assign(recoveryCopy[lang],copy);
+const recoveryText=k=>(recoveryCopy[state.lang]||recoveryCopy.ru)[k];
+function recoveryFailure(error,resetting){
+ const code=error?.identityCode;
+ if(error?.status===429)return 'tooMany';
+ if(error?.status>=500)return 'unavailable';
+ if(resetting&&['INVALID_TOKEN','TOKEN_EXPIRED','INVALID_RESET_TOKEN','RESET_PASSWORD_TOKEN_EXPIRED'].includes(code))return 'invalidLink';
+ if(resetting&&['PASSWORD_TOO_SHORT','PASSWORD_TOO_LONG','INVALID_PASSWORD','PASSWORD_VALIDATION_FAILED'].includes(code))return 'passwordPolicy';
+ return 'error';
+}
+let recoveryToken=new URLSearchParams(location.hash.slice(1)).get('reset');
+if(recoveryToken)history.replaceState(null,'',location.pathname+location.search);
+function recoveryPanel(){
+ const t=recoveryText;
+ const resetting=state.identityStep==='reset';
+ const field=(name,label,type,attrs='')=>'<label>'+safe(label)+'<input name="'+name+'" type="'+type+'" '+attrs+' required></label>';
+ return '<section class="panel gold identity-card"><h2>'+safe(t('resetTitle'))+'</h2><form id="flex-recovery-form">'+(resetting?field('password',t('newPassword'),'password','minlength="12" maxlength="128" autocomplete="new-password"')+field('confirm',t('confirm'),'password','minlength="12" maxlength="128" autocomplete="new-password"'):field('email',identityText('email'),'email','maxlength="254" autocomplete="email"'))+'<button class="primary" type="submit">'+safe(t(resetting?'save':'send'))+'</button></form>'+(state.recoveryMessage?'<p role="status">'+safe(t(state.recoveryMessage))+'</p>':'')+'<button class="subtle" type="button" data-recovery-back="1">'+safe(t('back'))+'</button></section>';
+}
+async function submitRecovery(form){
+ const btn=form.querySelector('button[type=submit]');btn.disabled=true;
+ try{
+  if(state.identityStep==='reset'){
+   if(form.elements.password.value!==form.elements.confirm.value){state.recoveryMessage='mismatch';render();return;}
+   if(!recoveryToken){state.identityStep='forgot';state.recoveryMessage='invalidLink';return;}
+   await identityRequest('reset-password',{token:recoveryToken,newPassword:form.elements.password.value});
+   recoveryToken=null;state.identityStep='email';state.recoveryMessage='done';
+  }else{await identityRequest('request-password-reset',{email:form.elements.email.value.trim(),redirectTo:location.origin+'/'});state.recoveryMessage='sent';}
+ }catch(error){state.recoveryMessage=recoveryFailure(error,state.identityStep==='reset');if(state.recoveryMessage==='invalidLink'){recoveryToken=null;state.identityStep='forgot';}}finally{btn.disabled=false;render();}
+}
 function identityText(key){return (identityCopy[state.lang]||identityCopy.ru)[key];}
 async function identityRequest(endpoint,body){
  const response=await fetch('/api/identity/'+endpoint,{
@@ -23,7 +58,12 @@ async function identityRequest(endpoint,body){
    body:JSON.stringify(body)
  });
  const payload=await response.json().catch(()=>({}));
- if(!response.ok)throw Error('IDENTITY_REJECTED');
+ if(!response.ok){
+   const error=Error('IDENTITY_REJECTED');
+   error.status=response.status;
+   error.identityCode=typeof payload.code==='string'?payload.code:'';
+   throw error;
+ }
  return payload;
 }
 async function identitySession(){
@@ -63,26 +103,27 @@ async function submitIdentityForm(form){
  }
 }
 function identityPanel(){
+ if(state.identityStep==='forgot'||state.identityStep==='reset')return recoveryPanel();
  const text=identityText;
  const note=state.status?.password_login?'':'<p class="muted">'+safe(text('onlyIdentity'))+'</p>';
  // A verified identity cookie is not a platform session. Never show another
  // password form over an existing identity session: offer a safe sign-out.
- if(state.identitySession?.user)return '<section class="panel gold"><h2>'+safe(text('heading'))+'</h2>'+
+ if(state.identitySession?.user)return '<section class="panel gold identity-card"><h2>'+safe(text('heading'))+'</h2>'+
    '<p>'+safe(text('signedIn'))+'</p>'+note+
    '<button type="button" class="outline" data-identity-logout="yes">'+safe(text('signOut'))+'</button></section>';
- if(state.identityStep==='totp')return '<section class="panel gold"><h2>'+safe(text('mfa'))+'</h2>'+
+ if(state.identityStep==='totp')return '<section class="panel gold identity-card"><h2>'+safe(text('mfa'))+'</h2>'+
    '<p class="muted">'+safe(text('totpHint'))+'</p><form id="flex-identity-totp">'+
    '<label>'+safe(text('mfa'))+'<input name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" required></label>'+
    '<button class="primary" type="submit">'+safe(text('verify'))+'</button></form>'+
    (state.identityError?'<p role="alert">'+safe(state.identityError)+'</p>':'')+note+'</section>';
- return '<section class="panel gold"><h2>'+safe(text('heading'))+'</h2><form id="flex-identity-signin">'+
+ return '<section class="panel gold identity-card"><h2>'+safe(text('heading'))+'</h2><form id="flex-identity-signin">'+
    '<label>'+safe(text('email'))+'<input name="email" type="email" autocomplete="username" required maxlength="254"></label>'+
    '<label>'+safe(text('password'))+'<input name="password" type="password" autocomplete="current-password" required minlength="12"></label>'+
-   '<button class="primary" type="submit">'+safe(text('signIn'))+'</button></form>'+
+   '<button class="primary" type="submit">'+safe(text('signIn'))+'</button></form><button class="subtle" type="button" data-recovery-open="1">'+safe(recoveryText('forgot'))+'</button>'+(state.recoveryMessage?'<p role="status">'+safe(recoveryText(state.recoveryMessage))+'</p>':'')+
    (state.identityError?'<p role="alert">'+safe(state.identityError)+'</p>':'')+note+'</section>';
 }
 
-const state={lang:localStorage.getItem('flex_lang')||'ru',theme:localStorage.getItem('flex_theme')||'dark',view:'overview',period:'month',me:null,status:null,hotelId:null,search:'',serial:0,hotelStatus:'',lastCreated:null,registerKey:null,registerName:null,linkChallenge:null,linkSuccess:false,catalogItems:[],priceSku:null,identityStep:'email',identityError:'',identitySession:null,hotelTab:'overview',draftPriceRows:[]};
+const state={lang:localStorage.getItem('flex_lang')||'ru',theme:localStorage.getItem('flex_theme')||'dark',view:'overview',period:'month',me:null,status:null,hotelId:null,search:'',serial:0,hotelStatus:'',lastCreated:null,registerKey:null,registerName:null,linkChallenge:null,linkSuccess:false,catalogItems:[],priceSku:null,identityStep:recoveryToken?'reset':'email',recoveryMessage:'',identityError:'',identitySession:null,hotelTab:'overview',draftPriceRows:[]};
 const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const t=k=>(translations[state.lang]||translations.ru)[k]||translations.ru[k]||k;
 const fmt=v=>v===null||v===undefined?'—':new Intl.NumberFormat(state.lang==='kg'?'ky-KG':state.lang==='en'?'en-US':'ru-RU',{maximumFractionDigits:2}).format(Number(v));
@@ -147,28 +188,41 @@ function registrationForm(){
  '<div class="formbar"><button class="primary" type="submit">'+safe(t('registerHotel'))+'</button><button class="outline" type="button" data-view="hotels">'+safe(t('cancel'))+'</button></div>'+
  '<div id="registration-result" role="status" aria-live="polite"></div></form></section>';
 }
+const registrationErrors={
+ ru:{network:'Связь с сервером прервана. Повторите сохранение с тем же названием; повторный запрос не создаст дубль.',session:'Сессия истекла. Войдите снова.',conflict:'Запрос конфликтует с сохранённой регистрацией. Проверьте реестр гостиниц.',denied:'Сервер отклонил права доступа.',server:'Сервис регистрации временно недоступен. Повторите сохранение с тем же названием.',invalid:'Проверьте название гостиницы.'},
+ kg:{network:'Сервер менен байланыш үзүлдү. Ошол эле аталыш менен кайра сактаңыз; дубликат түзүлбөйт.',session:'Сессиянын мөөнөтү бүттү. Кайра кириңиз.',conflict:'Каттоо сурамы сакталган жазууга каршы келет. Тизмени текшериңиз.',denied:'Сервер уруксат берген жок.',server:'Каттоо кызматы убактылуу жеткиликсиз. Ошол эле аталыш менен кайталаңыз.',invalid:'Мейманкананын аталышын текшериңиз.'},
+ en:{network:'Connection interrupted. Retry with the same hotel name; the same request will not create a duplicate.',session:'Session expired. Sign in again.',conflict:'Registration conflicts with an existing request. Check the hotel registry.',denied:'Server denied access.',server:'Registration service temporarily unavailable. Retry with the same name.',invalid:'Check the hotel name.'}
+};
+function registrationError(status){
+ return status===401?'session':status===403?'denied':status===409?'conflict':status===422?'invalid':'server';
+}
 async function submitRegistration(form){
  if(state.me?.role!=='SUPER_ADMIN'||!state.status?.qa_onboarding_enabled)return;
  const name=form.querySelector('[name="display_name"]').value.trim();
  if(name.length<2||name.length>180)return;
- const button=form.querySelector('[type="submit"]');button.disabled=true;button.textContent=t('saving');
- const output=document.getElementById('registration-result');
+ const button=form.querySelector('[type="submit"]');
+ if(button.disabled)return;
+ button.disabled=true;button.textContent=t('saving');
+ const output=form.querySelector('#registration-result');
+ output.replaceChildren();
+ const message=key=>info((registrationErrors[state.lang]||registrationErrors.ru)[key],'error');
  try{
-   const tokenReply=await fetch('/api/session',{cache:'no-store'});
-   if(!tokenReply.ok)throw Error('Session expired. Please sign in again.');
+   const tokenReply=await fetch('/api/session',{cache:'no-store',credentials:'same-origin',signal:AbortSignal.timeout(20000)});
+   if(!tokenReply.ok){output.innerHTML=message(registrationError(tokenReply.status));return;}
    const session=await tokenReply.json();
-   if(!session.csrf)throw Error('CSRF session missing; sign in again.');
+   if(!session.csrf){output.innerHTML=message('session');return;}
    if(name!==state.registerName){state.registerName=name;state.registerKey=crypto.randomUUID();}
-   const r=await fetch('/api/actions/hotels',{method:'POST',credentials:'same-origin',cache:'no-store',
+   const r=await fetch('/api/actions/hotels',{method:'POST',credentials:'same-origin',cache:'no-store',signal:AbortSignal.timeout(25000),
      headers:{'Content-Type':'application/json','X-Flex-CSRF':session.csrf,'Idempotency-Key':state.registerKey},
      body:JSON.stringify({display_name:name,currency:'KGS'})});
+   if(!r.ok){output.innerHTML=message(registrationError(r.status));return;}
    const data=await r.json();
-   if(!r.ok)throw Error(data.detail||data.error||('HTTP '+r.status));
+   if(!data.hotel_id||data.status!=='PENDING'||data.billable!==false){output.innerHTML=message('server');return;}
    state.lastCreated=data.hotel_id;
    state.registerName=null;state.registerKey=null;
    output.innerHTML=info(t('created')+': '+data.hotel_id+' — PENDING','info');
    form.reset();
- }catch(e){output.innerHTML=info(t('hotelError')+': '+e.message,'error')}
+ }catch{output.innerHTML=message('network');}
  finally{button.disabled=false;button.textContent=t('registerHotel')}
 }
 
@@ -281,7 +335,7 @@ function futurePriceForm(){
  '<div id="admin-action-status" role="status" aria-live="polite"></div></form></section>';
 }
 async function versionsPage(){
- if(state.me?.role!=='SUPER_ADMIN'||!state.status?.qa_catalog_admin_enabled)
+ if(state.me?.role!=='SUPER_ADMIN'||!(state.status?.qa_catalog_read_only_enabled||state.status?.qa_catalog_admin_enabled))
    return heading(t('priceHistory'))+info(t('operationBlocked'));
  const sku=state.priceSku;
  if(!sku||!/^[A-Z][A-Z0-9_]{1,79}$/.test(sku))return heading(t('priceHistory'))+empty(t('noSelected'));
@@ -358,6 +412,44 @@ function applyPackageProposal(form){
   title.value=kind==='CUSTOM'?'':kind;
  }else if(kind!=='CUSTOM' && !title.value.trim())title.value=kind;
  // Preserve explicitly entered custom names when switching package kind.
+}
+async function installationTrialPanel(){
+ const labels={ru:{title:'Установка и пробный период',confirm:'Подтвердить завершение установки и настройки',from:'Начало пробного периода',until:'Окончание (не включительно)'},kg:{title:'Орнотуу жана сыноо мөөнөтү',confirm:'Орнотуу жана жөндөө аяктаганын ырастоо',from:'Сыноонун башталышы',until:'Аяктоо (бул күн кирбейт)'},en:{title:'Installation and trial',confirm:'Confirm installation and configuration complete',from:'Trial start',until:'End (exclusive)'}};
+ const l=labels[state.lang]||labels.ru;
+ const hotel=state.hotelId,r=await api('/v1/platform/installation-trial?hotel_id='+hotel);
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+(r?'<div class="grid two">'+kv(l.from,r.trial_start)+kv(l.until,r.trial_end_exclusive)+'</div>':'<form id="hotel-installation-trial"><input type="hidden" name="hotel_id" value="'+safe(hotel)+'"><label class="check-row"><input type="checkbox" required>'+safe(l.confirm)+'</label><button class="primary" type="submit">'+safe(t('packageSave'))+'</button><div role="status" aria-live="polite"></div></form>')+'</section>';
+}
+async function saveInstallationTrial(form){
+ const button=form.querySelector('button'),status=form.querySelector('[role=status]');
+ button.disabled=true;
+ try{await saveQaCatalogAction('installation-trial',{hotel_id:String(new FormData(form).get('hotel_id'))});await render();}
+ catch(e){status.textContent=e.message;button.disabled=false;}
+}
+async function launchOfferPanel(){
+ const l=({ru:{title:'Стартовая акция',reserved:'Зарезервировано',available:'Свободно',slot:'Место',hotel:'Гостиница',note:'Резервация не подтверждает оплату или активацию.',annual:'Подписка за год',setup:'Внедрение'},kg:{title:'Баштапкы акция',reserved:'Ээлеген орундар',available:'Бош орундар',slot:'Орун',hotel:'Мейманкана',note:'Орун ээлөө төлөмдү же активдештирүүнү ырастабайт.',annual:'Жылдык жазылуу',setup:'Орнотуу'},en:{title:'Launch offer',reserved:'Reserved',available:'Available',slot:'Slot',hotel:'Hotel',note:'Reservation does not confirm payment or activation.',annual:'Annual subscription',setup:'Implementation'}})[state.lang];
+ const r=await api('/v1/platform/launch-offer');
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2><div class="grid two">'+kv(l.reserved,r.reserved+' / '+r.capacity)+kv(l.available,r.available)+'</div>'+info(l.note,'info')+(r.reservations.length?table([l.slot,l.hotel,t('packageType'),l.annual,l.setup,t('periodStart')],r.reservations.map(x=>'<tr><td>'+safe(x.slot)+'</td><td>'+safe(x.display_name)+'</td><td>'+safe(x.package_kind)+'</td><td>'+money(x.subscription_term_total,'KGS')+'</td><td>'+money(x.implementation_total,'KGS')+'</td><td>'+safe(date(x.created_at))+'</td></tr>')):empty(t('noData')))+'</section>';
+}
+async function commercialHotelOfferForm(){
+ const r=await api('/v1/platform/commercial-policy'), p=r.policy;
+ const labels={ru:{title:'Коммерческий тариф',note:'Предложение без активации подписки',extras:'Дополнительные модули'},kg:{title:'Коммерциялык тариф',note:'Жазылууну активдештирбеген сунуш',extras:'Кошумча модулдар'},en:{title:'Commercial tariff',note:'Offer without subscription activation',extras:'Additional modules'}};
+ const l=labels[state.lang]||labels.ru;
+ return '<section class="panel gold"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+
+ '<form id="hotel-commercial-offer" class="admin-form"><input type="hidden" name="policy_version" value="'+safe(r.version)+'"><label>'+safe(t('packageType'))+'<select name="package_kind">'+Object.entries(p.monthly_packages).map(([k,v])=>'<option value="'+safe(k)+'">'+safe(k)+' · '+money(v.price??v.base_price,p.currency)+'</option>').join('')+'</select></label>'+
+ '<label>'+safe(t('periodStart'))+'<input type="date" name="period_start" required value="'+safe(dateValue(2))+'"></label>'+
+ '<fieldset><legend>'+safe(l.extras)+'</legend>'+Object.entries(p.module_monthly_prices).map(([k,v])=>'<label class="check-row"><input type="checkbox" name="extras" value="'+safe(k)+'"><span>'+safe(k)+' · '+money(v,p.currency)+'</span></label>').join('')+'</fieldset>'+
+ '<label>'+safe(t('packageDiscount'))+'<input name="discount_pct" type="number" min="0" max="100" step="0.01" value="0" required></label>'+'<label>'+safe(t('packageCustomPrice'))+'<input name="custom_monthly_price" inputmode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" maxlength="15"></label><p>'+safe(t('packagePriceOverride'))+'</p><p class="renewal-context" role="status"></p>'+
+ '<label>'+safe({ru:'Месяцев',kg:'Ай',en:'Months'}[state.lang]||'Месяцев')+'<select name="term_months">'+[1,3,6,12].map(n=>'<option value="'+n+'">'+n+'</option>').join('')+'</select></label><label class="check-row"><input type="checkbox" name="standard_term_discount">'+safe({ru:'Стандартная скидка за срок',kg:'Мөөнөт үчүн стандарттык арзандатуу',en:'Standard term discount'}[state.lang]||'Стандартная скидка')+'</label><label class="check-row"><input type="checkbox" name="launch_offer">'+safe({ru:'Стартовая акция: 40% на первый год (резервация)',kg:'Баштапкы акция: биринчи жылга 40% (орун ээлөө)',en:'Launch offer: 40% off first year (reservation)'}[state.lang]||'Launch offer')+'</label><label class="check-row"><input type="checkbox" name="include_implementation">'+safe({ru:'Включить внедрение',kg:'Орнотууну кошуу',en:'Include implementation'}[state.lang]||'Включить внедрение')+'</label><button class="primary" type="submit">'+safe(t('packageSave'))+'</button><div role="status" aria-live="polite"></div></form></section>';
+}
+async function saveCommercialHotelOffer(form){
+ const d=new FormData(form),button=form.querySelector('button[type=submit]'),status=form.querySelector('[role=status]');
+ button.disabled=true;
+ try{
+ const kind=String(d.get('package_kind')),custom=String(d.get('custom_monthly_price')||'').trim();
+ if(custom&&(kind!=='CUSTOM'||Number(d.get('discount_pct'))!==0||d.has('standard_term_discount')||d.has('launch_offer')))throw Error(t('packagePriceOverride'));
+ await saveQaCatalogAction('tariff-packages',{hotel_id:state.hotelId,package_kind:kind,title:kind,period_start:String(d.get('period_start')),skus:d.getAll('extras'),discount_pct:String(d.get('discount_pct')),trial_days:form.dataset.renewalPrepared==='true'?0:5,custom_monthly_price:custom||null,commercial_policy_version:Number(d.get('policy_version')),term_months:Number(d.get('term_months')),launch_offer:d.has('launch_offer'),standard_term_discount:d.has('standard_term_discount'),include_implementation:d.has('include_implementation')});
+ await render();
+ }catch(e){status.textContent=e.message;button.disabled=false;}
 }
 async function subscriptionDraftForm(){
  if(state.me?.role!=='SUPER_ADMIN'||!state.status?.qa_catalog_admin_enabled)
@@ -458,14 +550,55 @@ async function submitAdminForm(form,kind){
 function billingHold(){
  return heading('BILLING',t('billingHold'))+info(t('billingHold'),'info');
 }
+const profileCopy={
+ ru:{title:'Мой профиль',name:'Имя и фамилия',email:'Электронная почта',role:'Роль',save:'Сохранить имя',saved:'Имя сохранено',failed:'Не удалось сохранить имя',unavailable:'Сессия недоступна. Войдите снова.',security:'Безопасность аккаунта',"newEmail": "Новая почта", "changeEmail": "Изменить почту", "checkInbox": "Проверьте новый почтовый ящик для подтверждения.", "currentPassword": "Текущий пароль", "newPassword": "Новый пароль", "changePassword": "Изменить пароль", "accountError": "Не удалось сохранить изменение. Проверьте данные."},
+ kg:{title:'Менин профилим',name:'Аты-жөнү',email:'Электрондук почта',role:'Роль',save:'Атты сактоо',saved:'Аты сакталды',failed:'Атты сактоо мүмкүн болгон жок',unavailable:'Сессия жеткиликсиз. Кайра кириңиз.',security:'Аккаунттун коопсуздугу',"newEmail": "Жаңы электрондук почта", "changeEmail": "Почтаны өзгөртүү", "checkInbox": "Ырастоо үчүн жаңы почтаңызды текшериңиз.", "currentPassword": "Учурдагы сырсөз", "newPassword": "Жаңы сырсөз", "changePassword": "Сырсөздү өзгөртүү", "accountError": "Өзгөртүү сакталган жок. Маалыматтарды текшериңиз."},
+ en:{title:'My profile',name:'Full name',email:'Email',role:'Role',save:'Save name',saved:'Name saved',failed:'Unable to save name',unavailable:'Session unavailable. Sign in again.',security:'Account security',"newEmail": "New email address", "changeEmail": "Change email", "checkInbox": "Check the new inbox to confirm your address.", "currentPassword": "Current password", "newPassword": "New password", "changePassword": "Change password", "accountError": "The change could not be saved. Check your details."}
+};
+const profileText=k=>(profileCopy[state.lang]||profileCopy.ru)[k];
+async function profile(){
+ const session=await identitySession();
+ const p=profileText;
+ if(!session?.user)return heading(p('title'))+info(p('unavailable'));
+ return heading(p('title'))+'<section class="panel"><form id="flex-profile-form"><label>'+safe(p('name'))+'<input name="name" required maxlength="120" autocomplete="name" value="'+safe(session.user.name)+'"></label><label>'+safe(p('email'))+'<input type="email" readonly value="'+safe(session.user.email)+'"></label><p>'+safe(p('role'))+': '+safe(state.me.role)+'</p><button class="primary" type="submit">'+safe(p('save'))+'</button><p role="status" id="flex-profile-result"></p></form></section><section class="panel"><h2>'+safe(p('security'))+'</h2><form id="profile-email"><label>'+safe(p('newEmail'))+'<input required type="email" name="newEmail" autocomplete="email"></label><button type="submit">'+safe(p('changeEmail'))+'</button><p role="status"></p></form><form id="profile-password"><label>'+safe(p('currentPassword'))+'<input required type="password" name="currentPassword" autocomplete="current-password"></label><label>'+safe(p('newPassword'))+'<input required type="password" name="newPassword" minlength="12" maxlength="128" autocomplete="new-password"></label><button type="submit">'+safe(p('changePassword'))+'</button><p role="status"></p></form></section>';
+}
+async function saveProfile(form){
+ const button=form.querySelector('button[type="submit"]'), result=form.querySelector('[role="status"]');
+ button.disabled=true;
+ try{const name=form.elements.name.value.trim();if(!name)throw Error('EMPTY_NAME');await identityRequest('update-user',{name});state.identitySession=await identitySession();result.textContent=profileText('saved');}catch{result.textContent=profileText('failed');}finally{button.disabled=false;}
+}
+async function saveAccountSettings(form) {
+ const button=form.querySelector('button');
+ const status=form.querySelector('[role="status"]');
+ button.disabled=true;
+ try {
+   if(form.id==='profile-email') {
+     await identityRequest('change-email',{newEmail:form.elements.newEmail.value.trim(),callbackURL:'/'});
+     form.reset();
+     status.textContent=profileText('checkInbox');
+   } else {
+     await identityRequest('change-password',{currentPassword:form.elements.currentPassword.value,
+       newPassword:form.elements.newPassword.value,revokeOtherSessions:true});
+     form.reset();
+     await identityRequest('sign-out',{});
+     location.replace('/api/auth/logout');
+   }
+ } catch {
+   status.textContent=profileText('accountError');
+ } finally {
+   button.disabled=false;
+ }
+}
 function renderNav(){
  const r=state.me?.role;
- const choices=r==='SUPER_ADMIN'?[['overview','overview','◈'],['hotels','hotels','⌂'],['catalog','catalog','◇'],['obligations','obligations','↗']]:
+ const choices=r==='SUPER_ADMIN'?[['overview','overview','◈'],['hotels','hotels','⌂'],['catalog','catalog','◇'],['finance-center','financeCenter','▤'],['obligations','obligations','↗']]:
  r==='HOTEL_OWNER'?[['subscription','subscription','⌂'],['catalog','catalog','◇']]:
- r==='SALES_AGENT'||r==='INVESTOR'?[['earnings','earnings','↗']]:[];
- nav.innerHTML=choices.map(([id,label,icon])=>'<button type="button" data-view="'+id+'" class="'+(state.view===id?'active':'')+'"><span>'+icon+'</span>'+safe(t(label))+'</button>').join('');
+ r==='SALES_AGENT'||r==='INVESTOR'?[['earnings','earnings','↗']]:r==='PARTNER'?[['partner','partner','◇']]:[];
+ if(state.me&&state.status?.identity_ready)choices.push(['profile','profile','◎']);
+ nav.innerHTML=choices.map(([id,label,icon])=>'<button type="button" data-view="'+id+'" class="'+(state.view===id?'active':'')+'"><span>'+icon+'</span>'+safe(label==='profile'?profileText('title'):t(label))+'</button>').join('');
  document.getElementById('session-button').textContent=t(state.me?'logout':'login');
  document.querySelectorAll('[data-i18n]').forEach(x=>x.textContent=t(x.dataset.i18n));
+ const themeButton=document.getElementById('theme');themeButton.title=t('theme');themeButton.setAttribute('aria-label',t('theme'));document.getElementById('lang').setAttribute('aria-label',t('lang'));nav.setAttribute('aria-label',t('navigation'));document.title=t('footerBrand');
 }
 function showLogin(){
  nav.innerHTML='';
@@ -478,12 +611,25 @@ function showLogin(){
    return;
  }
  main.innerHTML=heading(configured?t('loginPrompt'):t('notConfigured'))+
- '<div class="panel gold"><h2>MARINA FLEX · CONTROL PLANE</h2><p class="muted">'+safe(configured?t('loginPrompt'):t('configHelp'))+'</p>'+
+ '<div class="panel gold"><h2>'+safe(t('controlPlane'))+'</h2><p class="muted">'+safe(configured?t('loginPrompt'):t('configHelp'))+'</p>'+
  (configured?'<button class="primary" type="button" data-login="yes">'+safe(t('login'))+'</button>':'')+'</div>'+
- info('DATA STATUS: '+(configured?'AUTH REQUIRED':'NO QA ISSUER / NO LIVE DATA'),'info');
+ info(t(configured?'authRequired':'noLiveData'),'info');
 }
 function periodButtons(){return '<div class="period" role="group" aria-label="'+safe(t('period'))+'">'+[['day','periodDay'],['week','periodWeek'],['month','periodMonth']].map(([p,k])=>'<button type="button" data-period="'+p+'" class="'+(state.period===p?'active':'')+'">'+safe(t(k))+'</button>').join('')+'</div>'}
 function errorPage(err){const msg=err?.status===403?t('accessDenied'):t('error');main.innerHTML=heading(msg)+info(err.message||msg,'error')+'<button class="outline" type="button" data-retry="1">'+safe(t('retry'))+'</button>';}
+function financeCenterLabels(){
+ return ({ru:{drafts:'Тестовые остатки · последние принятые предложения',ledger:'Реестр выставленных счетов QA',note:'Суммы только по гостиницам на текущей странице. Черновики не являются долгами, а реестр QA не подтверждает банковские поступления. История предыдущих версий доступна в карточке гостиницы.',subscription:'Подписка по предложению',setup:'Внедрение',cash:'Тестовые поступления',debt:'Тестовый остаток',credit:'Тестовая переплата',invoiceDebt:'Остаток по выставленным счетам QA',invoiceCash:'Поступления по реестру QA',preview:'Предварительные счета',trial:'Активные пробные периоды',actual:'Фактическая выручка',actualPayout:'Фактические выплаты',liability:'Подтверждённые обязательства',unknown:'Не подтверждено',previous:'Назад',next:'Далее',all:'Всего гостиниц',agents:'Активные агенты',investors:'Активные инвесторы',partners:'Активные партнёры',testPlan:'Тестовый план',reconcile:'Сверка реестра',ok:'Баланс сходится',bad:'Расхождение'},kg:{drafts:'Тесттик калдыктар · акыркы кабыл алынган сунуштар',ledger:'QA берилген эсептер реестри',note:'Суммалар ушул беттеги мейманканалар үчүн гана. Долбоор карыз эмес, QA реестри банк түшүүлөрүн ырастабайт.',subscription:'Сунуш боюнча жазылуу',setup:'Орнотуу',cash:'Тесттик түшүүлөр',debt:'Тесттик калдык',credit:'Тесттик ашыкча төлөм',invoiceDebt:'QA эсептеринин калдыгы',invoiceCash:'QA реестринин түшүүлөрү',preview:'Алдын ала эсептер',trial:'Активдүү сыноо мөөнөттөрү',actual:'Чыныгы киреше',actualPayout:'Чыныгы төлөмдөр',liability:'Ырасталган милдеттенмелер',unknown:'Ырасталган жок',previous:'Артка',next:'Алдыга',all:'Бардык мейманканалар',agents:'Активдүү агенттер',investors:'Активдүү инвесторлор',partners:'Активдүү өнөктөштөр',testPlan:'Тесттик план',reconcile:'Реестрди салыштыруу',ok:'Баланс туура',bad:'Айырма'},en:{drafts:'Test balances · latest accepted proposals',ledger:'Issued QA invoice ledger',note:'Totals cover hotels on this page only. Drafts are not receivables; the QA ledger is not bank-verified. Earlier versions remain in hotel history.',subscription:'Proposed subscription',setup:'Implementation',cash:'Test receipts',debt:'Test outstanding',credit:'Test credit',invoiceDebt:'Outstanding on issued QA invoices',invoiceCash:'QA ledger receipts',preview:'Invoice previews',trial:'Active trials',actual:'Actual revenue',actualPayout:'Actual payouts',liability:'Verified obligations',unknown:'Not verified',previous:'Previous',next:'Next',all:'Total hotels',agents:'Active agents',investors:'Active investors',partners:'Active partners',testPlan:'Test plan',reconcile:'Ledger reconciliation',ok:'Balanced',bad:'Discrepancy'}})[state.lang];
+}
+async function financeCenter(){
+ const l=financeCenterLabels(),offset=state.financeOffset||0,r=await api('/v1/platform/commercial-center?offset='+offset);
+ const d=r.test_plan_totals,g=r.ledger_totals,c=r.participant_counts;
+ return heading(t('financeCenter'),t('helpQa'))+toolbar(false)+info(l.note,'info')+
+ '<div class="grid spacing-top">'+metric(l.all,r.hotel_count)+metric(l.agents,c.active_agents)+metric(l.investors,c.active_investors)+metric(l.partners,c.active_partners)+'</div>'+
+ '<section class="panel"><h2>'+safe(l.drafts)+'</h2><div class="grid two">'+kv(l.subscription,money(d.subscription))+kv(l.setup,money(d.implementation))+kv(l.cash,money(d.net_simulated_cash))+kv(l.debt,money(d.outstanding))+kv(l.credit,money(d.credit))+kv(l.preview,r.preview_count_on_page)+kv(l.trial,r.trial_active_on_page)+'</div></section>'+
+ '<section class="panel"><h2>'+safe(l.ledger)+'</h2><div class="grid two">'+kv(t('invoices'),r.ledger_invoice_count)+kv(l.invoiceDebt,money(g.outstanding))+kv(l.invoiceCash,money(g.net_confirmed_cash))+kv(l.reconcile,r.ledger_reconciled?l.ok:l.bad)+'</div></section>'+
+ '<section class="panel"><h2>'+safe(t('hotels'))+'</h2>'+(r.rows.length?table([t('hotel'),t('status'),l.testPlan,l.debt,l.credit,l.invoiceDebt,t('actions')],r.rows.map(h=>'<tr><td>'+safe(h.display_name)+'</td><td>'+safe(h.status)+'</td><td>'+safe(h.test_plan?h.test_plan.package_kind+' · v'+h.test_plan.version:'—')+'</td><td>'+money(h.test_plan?.outstanding)+'</td><td>'+money(h.test_plan?.credit)+'</td><td>'+money(h.ledger.outstanding)+'</td><td><button class="outline" type="button" data-hotel="'+safe(h.id)+'">'+safe(t('open'))+'</button></td></tr>')):empty(t('noData')))+'<div class="formbar"><button class="outline" data-finance-offset="'+Math.max(0,offset-r.limit)+'" '+(offset===0?'disabled':'')+'>'+safe(l.previous)+'</button><span>'+safe(r.page_count?offset+1:0)+' — '+safe(offset+r.page_count)+' / '+safe(r.hotel_count)+'</span><button class="outline" data-finance-offset="'+(offset+r.limit)+'" '+(offset+r.limit>=r.hotel_count?'disabled':'')+'>'+safe(l.next)+'</button></div></section>'+
+ '<section class="panel"><div class="grid two">'+kv(l.actual,l.unknown)+kv(l.actualPayout,l.unknown)+kv(l.liability,l.unknown)+'</div><button class="outline" data-view="obligations">'+safe(t('obligations'))+'</button></section>';
+}
 async function overview(){
  const results=await Promise.allSettled([api('/v1/hotels'),api('/v1/catalog'),api('/v1/platform/partner-earnings-summary?period='+state.period)]);
  const h=results[0].status==='fulfilled'?results[0].value:null;
@@ -520,6 +666,259 @@ function hotelReadResult(result,allowNotFound=false){
  if(allowNotFound&&result.reason?.status===404)return null;
  throw result.reason||Error('HOTEL_READ_FAILED');
 }
+function hotelEditText(key){
+ const labels={ru:{edit:'Редактировать гостиницу',save:'Сохранить',saved:'Название сохранено'},kg:{edit:'Мейманкананы түзөтүү',save:'Сактоо',saved:'Аталышы сакталды'},en:{edit:'Edit hotel',save:'Save',saved:'Hotel name saved'}};
+ return (labels[state.lang]||labels.ru)[key];
+}
+async function hotelNameForm(id){
+ if(state.me?.role!=='SUPER_ADMIN'||!state.status?.qa_onboarding_enabled)return '';
+ const hotels=await api('/v1/hotels');
+ const hotel=hotels.find(h=>h.id===id);
+ if(!hotel||!['PENDING','ACTIVE'].includes(hotel.status))return '';
+ return '<section class="panel spacing-top"><h2>'+safe(hotelEditText('edit'))+'</h2><form id="hotel-name-form" data-id="'+safe(id)+'">'+
+ '<label for="hotel-edit-name">'+safe(t('name'))+'</label><br><input id="hotel-edit-name" name="display_name" required minlength="2" maxlength="180" value="'+safe(hotel.name)+'">'+
+ '<input type="hidden" name="expected_name" value="'+safe(hotel.name)+'"><div class="formbar"><button class="primary" type="submit">'+safe(hotelEditText('save'))+'</button></div>'+
+ '<div role="status" aria-live="polite"></div></form></section>';
+}
+async function submitHotelName(form){
+ const button=form.querySelector('button[type=submit]'),output=form.querySelector('[role=status]');
+ button.disabled=true;
+ try{
+  const result=await postQaLink('hotels/'+form.dataset.id+'/name',{display_name:form.elements.display_name.value.trim(),expected_name:form.elements.expected_name.value});
+  form.elements.expected_name.value=result.name;form.elements.display_name.value=result.name;
+  output.textContent=hotelEditText('saved');
+ }catch(e){output.textContent=t('error')+': '+e.message;}
+ finally{button.disabled=false;}
+}
+
+function customerLabels(){
+ return ({ru:{profile:'Контакты гостиницы',contact_name:'Контактное лицо',contact_email:'Email',contact_phone:'Телефон',responsible_name:'Ответственный',save:'Сохранить изменения',history:'История контактов',agreements:'Договоры',draft:'Создать черновик договора',preview:'Создать предварительный счёт',previews:'Предварительные счета',note:'Черновики не подписаны. Налоги не рассчитаны. Оплата и активация отключены.',offer:'Тарифное предложение'},kg:{profile:'Мейманкананын байланыштары',contact_name:'Байланыш адамы',contact_email:'Email',contact_phone:'Телефон',responsible_name:'Жооптуу адам',save:'Өзгөртүүлөрдү сактоо',history:'Байланыштардын тарыхы',agreements:'Келишимдер',draft:'Келишимдин долбоорун түзүү',preview:'Алдын ала эсеп түзүү',previews:'Алдын ала эсептер',note:'Долбоорлорго кол коюлган эмес. Салыктар эсептелген жок. Төлөм жана активдештирүү өчүрүлгөн.',offer:'Тарифтик сунуш'},en:{profile:'Hotel contacts',contact_name:'Contact person',contact_email:'Email',contact_phone:'Phone',responsible_name:'Responsible person',save:'Save changes',history:'Contact history',agreements:'Agreements',draft:'Create agreement draft',preview:'Create invoice preview',previews:'Invoice previews',note:'Drafts are unsigned. Taxes are not calculated. Payments and activation are disabled.',offer:'Tariff offer'}})[state.lang];
+}
+async function customerProfilePanel(historyOnly=false){
+ const l=customerLabels(),r=await api('/v1/platform/customer-profile?hotel_id='+state.hotelId),p=r.current||{};
+ const fields=['contact_name','contact_email','contact_phone','responsible_name'];
+ return '<section class="panel"><h2>'+safe(historyOnly?l.history:l.profile)+'</h2>'+
+ (historyOnly?(r.history.length?table([t('skuVersion'),...fields.map(k=>l[k]),t('periodStart')],r.history.map(x=>'<tr><td>'+safe(x.version)+'</td>'+fields.map(k=>'<td>'+safe(x[k]||'—')+'</td>').join('')+'<td>'+safe(date(x.created_at))+'</td></tr>')):empty(t('noData'))):
+ '<form id="customer-profile-form" class="admin-form"><input type="hidden" name="expected_version" value="'+safe(p.version||0)+'">'+fields.map(k=>'<label>'+safe(l[k])+'<input name="'+k+'" type="'+(k==='contact_email'?'email':k==='contact_phone'?'tel':'text')+'" maxlength="'+({contact_name:180,contact_email:254,contact_phone:40,responsible_name:180}[k])+'" value="'+safe(p[k]||'')+'"></label>').join('')+'<button class="primary" type="submit">'+safe(l.save)+'</button><div role="status" aria-live="polite"></div></form>')+'</section>';
+}
+function customerAcceptanceLabels(){
+ return ({ru:{title:'Подтверждение условий',accept:'Подтвердить условия',check:'Я ознакомился с указанными условиями и принимаю их. Это не юридическая подпись.',accepted:'Условия подтверждены клиентом',note:'Подтверждение не активирует подписку и не создаёт платёж.',setup:'Внедрение',modules:'Модули'},kg:{title:'Шарттарды ырастоо',accept:'Шарттарды ырастоо',check:'Көрсөтүлгөн шарттарды окуп, кабыл алдым. Бул юридикалык кол тамга эмес.',accepted:'Кардар шарттарды ырастаган',note:'Ырастоо жазылууну иштетпейт жана төлөм түзбөйт.',setup:'Орнотуу',modules:'Модулдар'},en:{title:'Confirm commercial terms',accept:'Accept terms',check:'I have reviewed and accept the displayed terms. This is not a legal signature.',accepted:'Customer accepted terms',note:'Acceptance does not activate a subscription or create a payment.',setup:'Implementation',modules:'Modules'}})[state.lang];
+}
+async function customerAcceptancePanel(){
+ const l=customerAcceptanceLabels(),rows=await api('/v1/platform/customer-agreement-acceptances?hotel_id='+state.hotelId);
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+(rows.length?rows.map(a=>{
+ const p=a.terms||{};
+ return '<section class="panel"><h3>'+safe(p.package_kind)+' · v'+safe(a.version)+'</h3><div class="grid two">'+kv(t('period'),p.period_start+' — '+p.period_end_exclusive)+kv(t('total'),money(p.subscription_term_total,'KGS'))+kv(l.setup,money(p.implementation_total,'KGS'))+kv(t('packageDiscount'),String(p.discount_pct)+'%')+'</div><p>'+safe(l.modules)+': '+safe((p.items||[]).map(x=>x.sku).join(', '))+'</p>'+
+ (a.accepted_at?'<p>'+safe(l.accepted)+' · '+safe(date(a.accepted_at))+'</p>':'<form class="customer-acceptance-form"><input type="hidden" name="agreement_id" value="'+safe(a.agreement_id)+'"><input type="hidden" name="terms_digest" value="'+safe(a.terms_digest)+'"><label class="check-row"><input type="checkbox" name="acknowledged" required>'+safe(l.check)+'</label><button type="submit" class="primary">'+safe(l.accept)+'</button><div role="status"></div></form>')+'</section>';
+ }).join(''):empty(t('noData')))+'</section>';
+}
+function approvalLabels(){
+ return ({ru:{title:'Внутреннее согласование',approve:'Согласовать условия',check:'Подтверждаю проверку условий; это не подпись клиента.',approved:'Согласовано внутри FLEX',plan:'План подписки',note:'Только план. Договор не подписан клиентом, подписка и платежи не активированы.',setup:'Внедрение',term:'Месяцев'},kg:{title:'Ички макулдашуу',approve:'Шарттарды макулдашуу',check:'Шарттарды текшердим; бул кардардын кол тамгасы эмес.',approved:'FLEX ичинде макулдашылды',plan:'Жазылуу планы',note:'План гана. Кардар кол койгон жок, жазылуу жана төлөмдөр иштетилген жок.',setup:'Орнотуу',term:'Ай'},en:{title:'Internal review',approve:'Approve terms internally',check:'I reviewed the terms; this is not the client’s signature.',approved:'Internally approved',plan:'Subscription plan',note:'Plan only. No client signature, subscription activation or payment.',setup:'Implementation',term:'Months'}})[state.lang];
+}
+function agreementApprovalForm(a,approvals){
+ const l=approvalLabels(),existing=approvals.find(x=>x.agreement_id===a.id);
+ if(existing)return '<p>'+safe(l.approved)+' · '+safe(date(existing.approved_at))+'</p>';
+ if(a.state!=='DRAFT'||!a.source_offer_id)return '';
+ return '<form class="agreement-approval-form"><input type="hidden" name="agreement_id" value="'+safe(a.id)+'"><input type="hidden" name="terms_digest" value="'+safe(a.terms_digest)+'"><label class="check-row"><input type="checkbox" name="acknowledged" required>'+safe(l.check)+'</label><button type="submit" class="outline">'+safe(l.approve)+'</button><div role="status"></div></form>';
+}
+function subscriptionLifecycleLabels(){
+ return ({ru:{ACCEPTED:'Условия подтверждены',AWAITING_CUSTOMER:'Ожидает подтверждения',NOT_STARTED:'Пробный период не начат',ACTIVE:'Пробный период',EXPIRED:'Пробный период завершён',days:'дн.',off:'Подписка не активирована'},kg:{ACCEPTED:'Шарттар ырасталды',AWAITING_CUSTOMER:'Ырастоо күтүлүүдө',NOT_STARTED:'Сыноо мөөнөтү баштала элек',ACTIVE:'Сыноо мөөнөтү',EXPIRED:'Сыноо мөөнөтү аяктады',days:'күн',off:'Жазылуу иштетиле элек'},en:{ACCEPTED:'Terms accepted',AWAITING_CUSTOMER:'Awaiting acceptance',NOT_STARTED:'Trial not started',ACTIVE:'Trial active',EXPIRED:'Trial ended',days:'days',off:'Subscription not activated'}})[state.lang];
+}
+function subscriptionLifecycleCell(x){
+ const l=subscriptionLifecycleLabels(), trial=l[x.trial_state]||l.NOT_STARTED;
+ return safe(l[x.customer_acceptance_state]||l.AWAITING_CUSTOMER)+'<br>'+safe(trial)+(x.trial_state==='ACTIVE'?' · '+safe(x.trial_days_remaining)+' '+safe(l.days):'')+'<br>'+safe(l.off);
+}
+function subscriptionFinanceLabels(){
+ return ({ru:{title:'Тестовый остаток',next:'Следующий период (проект)',pending:'Нужно подтверждение условий',newOffer:'Требуется новое предложение; продление не выполнено',creditWarning:'Есть незачтённая переплата и задолженность'},kg:{title:'Тесттик калдык',next:'Кийинки мөөнөт (долбоор)',pending:'Шарттарды ырастоо керек',newOffer:'Жаңы сунуш керек; мөөнөт узартылган жок',creditWarning:'Эсепке алынбаган ашыкча төлөм жана карыз бар'},en:{title:'Test balance',next:'Next term (proposal)',pending:'Terms acceptance required',newOffer:'New offer required; renewal not executed',creditWarning:'Unapplied credit and outstanding balance coexist'}})[state.lang];
+}
+function subscriptionFinanceCell(x){
+ const l=subscriptionFinanceLabels(),m=simulationLabels(),f=x.test_finance;
+ if(!f)return safe(l.pending);
+ return safe(m.debt)+': '+money(f.outstanding,'KGS')+'<br>'+safe(m.credit)+': '+money(f.credit,'KGS')+(f.unapplied_credit_with_debt?'<br>'+safe(l.creditWarning):'');
+}
+function subscriptionRenewalCell(x){
+ const l=subscriptionFinanceLabels(),r=x.renewal_preview;
+ const prepare=({ru:'Подготовить продление / изменить тариф',kg:'Узартууну даярдоо / тарифти өзгөртүү',en:'Prepare renewal / change tariff'})[state.lang];
+ if(!r)return '—';
+ const context={hotel_id:x.hotel_id,package_kind:x.package_kind,period_start:r.period_start,term_months:r.term_months,skus:(x.sku_snapshot||[]).filter(v=>v.sku!=='BASE_PMS'&&v.included_in_package!==true).map(v=>v.sku)};
+ return safe(r.period_start)+' — '+safe(r.period_end_exclusive)+'<br>'+safe(l.newOffer)+'<br><button class="outline" type="button" data-renewal-plan="'+safe(JSON.stringify(context))+'">'+safe(prepare)+'</button>';
+}
+function prepareRenewalOffer(button){
+ const form=document.getElementById('hotel-commercial-offer');
+ if(!form)return;
+ const plan=JSON.parse(button.dataset.renewalPlan);
+ if(plan.hotel_id!==state.hotelId)return;
+ const e=form.elements,context=form.querySelector('.renewal-context');
+ const labels=({ru:{ready:'Проект продления: проверьте новый тариф, модули и цену. Прежняя скидка и внедрение не переносятся.',missing:'Модули отсутствуют в текущем каталоге: '},kg:{ready:'Узартуу долбоору: жаңы тарифти, модулдарды жана бааны текшериңиз. Мурунку арзандатуу жана орнотуу көчүрүлбөйт.',missing:'Учурдагы каталогдо жок модулдар: '},en:{ready:'Renewal proposal: review current tariff, modules and price. Previous discount and implementation fee are not carried forward.',missing:'Modules unavailable in current catalog: '}})[state.lang];
+ form.dataset.renewalPrepared='true';
+ e.package_kind.value=plan.package_kind;
+ e.period_start.value=plan.period_start;
+ e.term_months.value=String(plan.term_months);
+ e.discount_pct.value='0';e.custom_monthly_price.value='';
+ for(const name of ['standard_term_discount','launch_offer','include_implementation'])e[name].checked=false;
+ const extras=[...form.querySelectorAll('input[name="extras"]')];
+ for(const input of extras)input.checked=plan.skus.includes(input.value);
+ const missing=plan.skus.filter(sku=>!extras.some(input=>input.value===sku));
+ context.textContent=labels.ready+(missing.length?' '+labels.missing+missing.join(', '):'');
+ form.scrollIntoView({block:'center',behavior:'smooth'});
+ e.package_kind.focus({preventScroll:true});
+}
+async function subscriptionPlanPanel(){
+ const l=approvalLabels(),rows=await api('/v1/platform/subscription-plans?hotel_id='+state.hotelId);
+ return '<section class="panel"><h2>'+safe(l.plan)+'</h2>'+info(l.note,'info')+(rows.length?table([t('packageType'),t('skuVersion'),l.term,t('period'),t('total'),l.setup,t('status'),subscriptionFinanceLabels().title,subscriptionFinanceLabels().next],rows.map(x=>'<tr data-plan-state="'+safe(x.state)+'" data-subscription-activated="'+safe(x.subscription_activated)+'"><td>'+safe(x.package_kind)+'</td><td>v'+safe(x.version)+'</td><td>'+safe(x.term_months)+'</td><td>'+safe(x.period_start)+' — '+safe(x.period_end_exclusive)+'</td><td>'+money(x.subscription_term_total,'KGS')+'</td><td>'+money(x.implementation_total,'KGS')+'</td><td>'+subscriptionLifecycleCell(x)+'</td><td>'+subscriptionFinanceCell(x)+'</td><td>'+subscriptionRenewalCell(x)+'</td></tr>')):empty(t('noData')))+'</section>';
+}
+function invoiceDocumentLabels(){
+ return ({ru:{download:'Скачать предварительный счёт',title:'ПРЕДВАРИТЕЛЬНЫЙ СЧЁТ · QA',warning:'Не является счётом к оплате или фискальным документом. Налоги не рассчитаны. Не оплачивать.',reference:'Идентификатор документа',agreement:'Версия договора',modules:'Модули по зафиксированному предложению',monthly:'Цена модуля в месяц до скидки',subscription:'Подписка за период',implementation:'Внедрение',digest:'Контрольная сумма условий',currency:'Валюта',hotel:'ID гостиницы',created:'Создан',error:'Предварительный счёт недоступен или не соответствует условиям.'},kg:{download:'Алдын ала эсепти жүктөө',title:'АЛДЫН АЛА ЭСЕП · QA',warning:'Бул төлөнүүчү эсеп же фискалдык документ эмес. Салыктар эсептелген жок. Төлөбөңүз.',reference:'Документтин ID',agreement:'Келишимдин версиясы',modules:'Бекитилген сунуштагы модулдар',monthly:'Арзандатууга чейинки айлык баа',subscription:'Мөөнөт үчүн жазылуу',implementation:'Орнотуу',digest:'Шарттардын текшерүү суммасы',currency:'Валюта',hotel:'Мейманкананын ID',created:'Түзүлгөн',error:'Алдын ала эсеп жеткиликсиз же шарттарга туура келбейт.'},en:{download:'Download invoice preview',title:'INVOICE PREVIEW · QA',warning:'Not payable and not a fiscal document. Taxes not calculated. Do not pay.',reference:'Document ID',agreement:'Agreement version',modules:'Modules from immutable offer',monthly:'Monthly module price before discount',subscription:'Subscription term',implementation:'Implementation',digest:'Terms digest',currency:'Currency',hotel:'Hotel ID',created:'Created',error:'Invoice preview unavailable or inconsistent with terms.'}})[state.lang];
+}
+async function downloadInvoicePreview(button){
+ const hotel=state.hotelId,id=button.dataset.invoicePreview,l=invoiceDocumentLabels();
+ button.disabled=true;
+ try{
+  const r=await api('/v1/platform/agreement-drafts?hotel_id='+hotel);
+  if(state.hotelId!==hotel)return;
+  const p=r.previews.find(x=>x.id===id&&x.hotel_id===hotel&&x.status==='NON_ISSUABLE');
+  const a=p&&r.agreements.find(x=>x.id===p.agreement_version_id&&x.hotel_id===hotel&&x.terms_digest===p.quote_sha256);
+  if(!a||!a.terms||a.terms.currency!=='KGS'||p.currency!=='KGS')throw Error(l.error);
+  const terms=a.terms,lang=state.lang;
+  const row=(label,value)=>'<tr><th>'+safe(label)+'</th><td>'+safe(value)+'</td></tr>';
+  const amount=value=>String(value)+' KGS';
+  const content='<!doctype html><html lang="'+safe(lang==='kg'?'ky':lang)+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+safe(l.title)+'</title><style>body{font:15px system-ui,sans-serif;color:#14213d;max-width:800px;margin:40px auto;padding:24px}h1{font-size:24px}table{width:100%;border-collapse:collapse;margin:16px 0}th,td{text-align:left;border-bottom:1px solid #ddd;padding:10px;overflow-wrap:anywhere}.warning{background:#fff2d0;border:1px solid #b58a25;padding:14px;font-weight:bold}.total{font-size:22px;font-weight:bold}@media print{body{margin:0;padding:0}}</style></head><body><header><strong>MARINA SMART FLEX</strong><h1>'+safe(l.title)+'</h1></header><p class="warning">'+safe(l.warning)+'</p><table>'+row(l.reference,p.id)+row(l.hotel,hotel)+row(l.agreement,'v'+a.version)+row(t('packageType'),terms.package_kind)+row(t('period'),p.period_start+' — '+p.period_end)+row(l.created,p.created_at)+row(l.currency,p.currency)+'</table><h2>'+safe(l.modules)+'</h2><table><thead><tr><th>'+safe(t('sku'))+'</th><th>'+safe(l.monthly)+'</th></tr></thead><tbody>'+(terms.items||[]).map(x=>row(x.sku,amount(x.monthly_price))).join('')+'</tbody></table><table>'+row(t('packageDiscount'),String(terms.discount_pct)+'%')+row(l.subscription,amount(terms.subscription_term_total))+row(l.implementation,amount(terms.implementation_total))+'</table><p class="total">'+safe(t('total'))+': '+safe(amount(p.amount_before_unresolved_taxes))+'</p><p>'+safe(l.digest)+': '+safe(p.quote_sha256)+'</p><p class="warning">'+safe(l.warning)+'</p></body></html>';
+  const url=URL.createObjectURL(new Blob([content],{type:'text/html;charset=utf-8'}));
+  const link=document.createElement('a');link.href=url;link.download='FLEX-QA-invoice-preview-'+p.id+'.html';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+ }catch(e){main.insertAdjacentHTML('afterbegin',info(e.message,'error'));}
+ finally{button.disabled=false;}
+}
+async function agreementPanel(){
+ const l=customerLabels(),id=state.hotelId;
+ const [r,offers]=await Promise.all([api('/v1/platform/agreement-drafts?hotel_id='+id),api('/v1/platform/tariff-packages?hotel_id='+id)]);
+ const usable=offers.filter(x=>x.commercial_policy_version&&x.term_months&&!r.agreements.some(a=>a.source_offer_id===x.id));
+ return '<section class="panel"><h2>'+safe(l.agreements)+'</h2>'+info(l.note,'info')+
+ (usable.length?'<form id="agreement-draft-form" class="admin-form"><label>'+safe(l.offer)+'<select name="offer_id">'+usable.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.package_kind)+' · v'+safe(x.version)+' · '+money(x.subscription_term_total,'KGS')+'</option>').join('')+'</select></label><button type="submit" class="primary">'+safe(l.draft)+'</button><div role="status" aria-live="polite"></div></form>':'')+
+ (r.agreements.length?table([t('skuVersion'),t('packageType'),t('status'),t('total'),t('actions')],r.agreements.map(a=>'<tr><td>'+safe(a.version)+'</td><td>'+safe(a.terms?.package_kind||'—')+'</td><td>'+safe(a.state)+agreementApprovalForm(a,r.approvals||[])+((r.acceptances||[]).some(x=>x.agreement_id===a.id)?'<p>'+safe(customerAcceptanceLabels().accepted)+'</p>':'')+'</td><td>'+money(a.terms?.subscription_term_total||0,'KGS')+'</td><td>'+(a.state==='DRAFT'&&a.source_offer_id&&!r.previews.some(p=>p.agreement_version_id===a.id)?'<form class="invoice-preview-form"><input type="hidden" name="agreement_id" value="'+safe(a.id)+'"><button type="submit" class="outline">'+safe(l.preview)+'</button><div role="status"></div></form>':'—')+'</td></tr>')):empty(t('noData')))+
+ '<h3>'+safe(l.previews)+'</h3>'+(r.previews.length?table([t('period'),t('total'),t('status'),t('actions')],r.previews.map(x=>'<tr><td>'+safe(x.period_start)+' — '+safe(x.period_end)+'</td><td>'+money(x.amount_before_unresolved_taxes,'KGS')+'</td><td>'+safe(x.status)+'</td><td><button class="outline" type="button" data-invoice-preview="'+safe(x.id)+'">'+safe(invoiceDocumentLabels().download)+'</button></td></tr>')):empty(t('noData')))+'</section>';
+}
+async function submitCustomerOperation(form,kind){
+ const d=new FormData(form),button=form.querySelector('button[type=submit]'),status=form.querySelector('[role=status]');
+ button.disabled=true;
+ try{
+  const payload={hotel_id:state.hotelId,...Object.fromEntries(d)};
+  if(kind==='customer-profile')payload.expected_version=Number(payload.expected_version);
+  if(['agreement-internal-approvals','customer-agreement-acceptances'].includes(kind))payload.acknowledged=d.has('acknowledged');
+  await saveQaCatalogAction(kind,payload);
+  await render();
+ }catch(e){status.textContent=e.message;button.disabled=false;}
+}
+
+function simulationLabels(){
+ return ({ru:{title:'Тестовый расчёт оплат',note:'Только симуляция. Не создаёт реальные счета, платежи или подписки. Налоги не рассчитаны.',first:'Первая тестовая оплата',second:'Вторая тестовая оплата',refund:'Тестовый возврат',source:'Исходная оплата',run:'Рассчитать',cash:'Тестовые поступления',applied:'Зачтено',debt:'Задолженность',credit:'Переплата',diff:'Расхождение',kind:'Операция',amount:'Сумма',payment:'Оплата',reversal:'Возврат'},kg:{title:'Тесттик төлөм эсептөөсү',note:'Симуляция гана. Чыныгы эсеп, төлөм же жазылуу түзүлбөйт. Салыктар эсептелген жок.',first:'Биринчи тесттик төлөм',second:'Экинчи тесттик төлөм',refund:'Тесттик кайтаруу',source:'Баштапкы төлөм',run:'Эсептөө',cash:'Тесттик түшүм',applied:'Эсепке алынган',debt:'Карыз',credit:'Ашыкча төлөм',diff:'Айырма',kind:'Операция',amount:'Сумма',payment:'Төлөм',reversal:'Кайтаруу'},en:{title:'Test payment simulation',note:'Simulation only. No real invoices, payments or subscriptions. Taxes not calculated.',first:'First test payment',second:'Second test payment',refund:'Test refund',source:'Original payment',run:'Calculate',cash:'Simulated cash',applied:'Applied',debt:'Outstanding',credit:'Credit',diff:'Discrepancy',kind:'Operation',amount:'Amount',payment:'Payment',reversal:'Refund'}})[state.lang];
+}
+async function financeSimulationPanel(){
+ const l=simulationLabels(),r=await api('/v1/platform/agreement-drafts?hotel_id='+state.hotelId);
+ const ids=new Set((r.acceptances||[]).map(x=>x.agreement_id));
+ const agreements=r.agreements.filter(a=>ids.has(a.id));
+ const amount=(name,label)=>'<label>'+safe(label)+'<input name="'+name+'" inputmode="decimal" value="0" pattern="[0-9]+([.][0-9]{1,2})?" maxlength="15" required></label>';
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+(agreements.length?'<form id="finance-simulation-form" class="admin-form"><label>'+safe(customerLabels().agreements)+'<select name="agreement_id">'+agreements.map(a=>'<option value="'+safe(a.id)+'">'+safe(a.terms?.package_kind)+' · v'+safe(a.version)+' · '+money(a.terms?.subscription_term_total,'KGS')+'</option>').join('')+'</select></label>'+amount('first',l.first)+amount('second',l.second)+amount('refund',l.refund)+'<label>'+safe(l.source)+'<select name="payment_id"><option value="p1">'+safe(l.first)+'</option><option value="p2">'+safe(l.second)+'</option></select></label><button class="primary" type="submit">'+safe(l.run)+'</button><div role="status"></div><div class="simulation-result"></div></form>':empty(t('noData')))+'</section>';
+}
+async function submitFinanceSimulation(form){
+ const l=simulationLabels(),d=new FormData(form),status=form.querySelector('[role=status]'),result=form.querySelector('.simulation-result'),button=form.querySelector('button[type=submit]');
+ button.disabled=true;status.textContent='';result.innerHTML='';
+ try{
+  const events=[];
+  for(const [name,id] of [['first','p1'],['second','p2']])if(Number(d.get(name))!==0)events.push({kind:'PAYMENT',event_id:id,amount:d.get(name)});
+  if(Number(d.get('refund'))!==0)events.push({kind:'REFUND',event_id:'r1',amount:d.get('refund'),payment_id:d.get('payment_id')});
+  const r=await saveQaCatalogAction('finance-simulation',{hotel_id:state.hotelId,agreement_id:d.get('agreement_id'),events});
+  result.innerHTML='<div class="grid two">'+kv(l.cash,money(r.net_simulated_cash,'KGS'))+kv(l.debt,money(r.outstanding,'KGS'))+kv(l.credit,money(r.credit,'KGS'))+kv(l.diff,money(r.discrepancy,'KGS'))+'</div>'+table([l.kind,l.amount,l.cash,l.applied,l.debt,l.credit],r.history.map(x=>'<tr><td>'+safe(x.kind==='PAYMENT'?l.payment:l.reversal)+'</td>'+['amount','cash','applied','outstanding','credit'].map(k=>'<td>'+money(x[k],'KGS')+'</td>').join('')+'</tr>'));
+ }catch(e){status.textContent=e.message;}finally{button.disabled=false;}
+}
+function journalLabels(){
+ return ({ru:{title:'Тестовый финансовый журнал',note:'Сохраняемые синтетические операции. Не являются реальными поступлениями или счетами.',open:'Открыть журнал',append:'Добавить тестовую операцию',id:'ID операции',source:'ID исходной оплаты',state:'Тестовый остаток',settled:'Погашен в тесте',due:'Остаток в тесте'},kg:{title:'Тесттик каржы журналы',note:'Сакталган синтетикалык операциялар. Чыныгы түшүм же эсеп эмес.',open:'Журналды ачуу',append:'Тесттик операция кошуу',id:'Операциянын ID',source:'Баштапкы төлөмдүн ID',state:'Тесттик калдык',settled:'Тестте төлөндү',due:'Тесттик карыз'},en:{title:'Synthetic cash journal',note:'Persistent synthetic events, never actual receipts or invoices.',open:'Open journal',append:'Append test event',id:'Event ID',source:'Original payment ID',state:'Test balance',settled:'Settled in test',due:'Outstanding in test'}})[state.lang];
+}
+async function syntheticJournalPanel(){
+ const l=journalLabels(),r=await api('/v1/platform/agreement-drafts?hotel_id='+state.hotelId),ids=new Set((r.acceptances||[]).map(x=>x.agreement_id)),rows=r.agreements.filter(a=>ids.has(a.id));
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+(rows.length?'<form id="synthetic-journal-open"><label>'+safe(customerLabels().agreements)+'<select name="agreement_id">'+rows.map(a=>'<option value="'+safe(a.id)+'">'+safe(a.terms?.package_kind)+' · v'+safe(a.version)+'</option>').join('')+'</select></label><button type="submit" class="outline">'+safe(l.open)+'</button><div role="status"></div><div class="journal-result"></div></form>':empty(t('noData')))+'</section>';
+}
+function creditApplyLabel(){return ({ru:'Зачесть переплату',kg:'Ашыкча төлөмдү эсепке алуу',en:'Apply credit'})[state.lang];}
+function journalOperationLabel(kind){const l=simulationLabels();return kind==='CREDIT_APPLY'?creditApplyLabel():kind==='PAYMENT'?l.payment:l.reversal;}
+function renderSyntheticJournal(container,r){
+ const l=journalLabels(),m=simulationLabels();
+ container.innerHTML='<div class="grid two">'+kv(l.state,r.test_balance_state==='TEST_SETTLED'?l.settled:l.due)+kv(m.cash,money(r.net_simulated_cash,'KGS'))+kv(m.debt,money(r.outstanding,'KGS'))+kv(m.credit,money(r.credit,'KGS'))+kv(m.diff,money(r.discrepancy,'KGS'))+'</div>'+
+ table([l.id,m.kind,m.amount,l.source],r.events.map(e=>'<tr><td>'+safe(e.event_id)+'</td><td>'+safe(journalOperationLabel(e.kind))+'</td><td>'+money(e.amount,'KGS')+'</td><td>'+safe(e.payment_id||'—')+'</td></tr>'))+
+ (r.sequence<100?'<div class="admin-form journal-append"><input type="hidden" name="journal_agreement_id" value="'+safe(r.agreement_id)+'"><input type="hidden" name="expected_sequence" value="'+safe(r.sequence)+'"><label>'+safe(m.kind)+'<select name="event_kind"><option value="PAYMENT">'+safe(m.payment)+'</option><option value="REFUND">'+safe(m.reversal)+'</option><option value="CREDIT_APPLY">'+safe(creditApplyLabel())+'</option></select></label><label>'+safe(l.id)+'<input name="event_id" value="'+safe('event-'+(r.sequence+1))+'" maxlength="64"></label><label>'+safe(m.amount)+'<input name="event_amount" inputmode="decimal" maxlength="15"></label><label>'+safe(l.source)+'<input name="payment_id" maxlength="64"></label><button type="button" class="primary" data-journal-append>'+safe(l.append)+'</button></div>':'');
+}
+async function openSyntheticJournal(form){
+ const d=new FormData(form),status=form.querySelector('[role=status]');
+ status.textContent='';
+ try{const r=await api('/v1/platform/synthetic-cash-journal?hotel_id='+state.hotelId+'&agreement_id='+d.get('agreement_id'));renderSyntheticJournal(form.querySelector('.journal-result'),r);}
+ catch(e){status.textContent=e.message;}
+}
+async function appendSyntheticJournal(button){
+ const form=button.closest('form'),d=new FormData(form),status=form.querySelector('[role=status]');
+ button.disabled=true;status.textContent='';
+ try{
+  const event={kind:d.get('event_kind'),event_id:d.get('event_id'),amount:d.get('event_amount')};
+  if(event.kind!=='PAYMENT')event.payment_id=d.get('payment_id');
+  const r=await saveQaCatalogAction('synthetic-cash-journal',{hotel_id:state.hotelId,agreement_id:d.get('journal_agreement_id'),expected_sequence:Number(d.get('expected_sequence')),event});
+  renderSyntheticJournal(form.querySelector('.journal-result'),r);
+ }catch(e){status.textContent=e.message;button.disabled=false;}
+}
+async function financeReconciliationPanel(){
+ const l=({ru:{title:'Финансовая сверка',amount_due:'Выставлено',net_confirmed_cash:'Получено за вычетом возвратов',net_applied_to_lines:'Зачтено',outstanding:'Задолженность',unapplied_cash_credit:'Переплата',ok:'Сверка пройдена',bad:'Расхождение',note:'Только выставленные счета с подтверждённым выпуском. Черновики не являются задолженностью.'},kg:{title:'Каржылык салыштыруу',amount_due:'Эсептелген',net_confirmed_cash:'Кайтаруулардан кийинки түшүм',net_applied_to_lines:'Эсепке алынган',outstanding:'Карыз',unapplied_cash_credit:'Ашыкча төлөм',ok:'Салыштыруу ийгиликтүү',bad:'Айырма бар',note:'Ырасталган эсептер гана. Долбоорлор карыз болуп эсептелбейт.'},en:{title:'Financial reconciliation',amount_due:'Issued total',net_confirmed_cash:'Net confirmed cash',net_applied_to_lines:'Applied',outstanding:'Outstanding',unapplied_cash_credit:'Unapplied credit',ok:'Reconciled',bad:'Discrepancy',note:'Only invoices with issuance evidence. Drafts are not receivables.'}})[state.lang];
+ const r=await api('/v1/platform/financial-reconciliation?hotel_id='+state.hotelId),keys=['amount_due','net_confirmed_cash','net_applied_to_lines','outstanding','unapplied_cash_credit'];
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+'<div class="grid three">'+keys.map(k=>kv(l[k],money(r.totals[k],r.currency))).join('')+'</div>'+
+ (r.invoice_count?info(r.reconciled?l.ok:l.bad,r.reconciled?'info':'error')+table([t('invoice'),...keys.map(k=>l[k])],r.invoices.map(x=>'<tr><td>'+safe(x.invoice_id)+'</td>'+keys.map(k=>'<td>'+money(x[k],x.currency)+'</td>').join('')+'</tr>')):empty(t('noInvoices')))+'</section>';
+}
+
+function assignmentLabels(){
+ return ({ru:{title:'Закрепление агента',assign:'Закрепить агента',release:'Снять закрепление',none:'Агент не закреплён',history:'История закрепления',note:'Закрепление в QA не подтверждает продажу, комиссию или выплату.',salary:'Зарплата в месяц',connection:'За подключение гостиницы',addon:'За дополнительный модуль в месяц',target:'План гостиниц в месяц',terms:'Условия агента',assigned:'Текущие закрепления QA',eligible:'Начисления требуют подтверждённой оплаты и действующих трудовых условий.'},kg:{title:'Агентти бекитүү',assign:'Агентти бекитүү',release:'Бекитүүнү алып салуу',none:'Агент бекитилген эмес',history:'Бекитүү тарыхы',note:'QA бекитүүсү сатуу, комиссия же төлөмдү ырастабайт.',salary:'Айлык акы',connection:'Мейманкананы кошуу үчүн',addon:'Кошумча модуль үчүн айына',target:'Айлык мейманкана планы',terms:'Агенттин шарттары',assigned:'Учурдагы QA бекитүүлөрү',eligible:'Эсептөөлөр ырасталган төлөмдү жана жарактуу эмгек шарттарын талап кылат.'},en:{title:'Agent assignment',assign:'Assign agent',release:'Release assignment',none:'No assigned agent',history:'Assignment history',note:'QA assignment does not confirm a sale, commission or payout.',salary:'Monthly salary',connection:'Per hotel connection',addon:'Per additional module per month',target:'Monthly hotel target',terms:'Agent terms',assigned:'Current QA assignments',eligible:'Accruals require verified payments and valid employment terms.'}})[state.lang];
+}
+async function agentAssignmentPanel(){
+ const l=assignmentLabels(),r=await api('/v1/platform/agent-assignments?hotel_id='+state.hotelId),a=r.current;
+ const select=a?'<input type="hidden" name="agent_id" value="'+safe(a.agent_id)+'"><p>'+safe(r.agents.find(x=>x.id===a.agent_id)?.platform_subject_id||a.agent_id)+'</p>':'<select name="agent_id" required>'+r.agents.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.platform_subject_id)+'</option>').join('')+'</select>';
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+(!a?'<p>'+safe(l.none)+'</p>':'')+((a||r.agents.length)?'<form id="agent-assignment-form" class="admin-form"><input type="hidden" name="expected_revision" value="'+safe(r.revision)+'"><input type="hidden" name="action" value="'+(a?'RELEASE':'ASSIGN')+'">'+select+'<button class="primary" type="submit">'+safe(a?l.release:l.assign)+'</button><div role="status"></div></form>':'')+'<h3>'+safe(l.history)+'</h3>'+(r.history.length?table([t('skuVersion'),t('agent'),t('actions'),t('periodStart')],r.history.map(x=>'<tr><td>'+safe(x.revision)+'</td><td>'+safe(r.agents.find(a=>a.id===x.agent_id)?.platform_subject_id||x.agent_id)+'</td><td>'+safe(x.action==='ASSIGN'?l.assign:l.release)+'</td><td>'+safe(date(x.created_at))+'</td></tr>')):empty(t('noData')))+'</section>';
+}
+async function saveAgentAssignment(form){
+ const d=new FormData(form),b=form.querySelector('button'),status=form.querySelector('[role=status]');b.disabled=true;
+ try{await saveQaCatalogAction('agent-assignments',{hotel_id:state.hotelId,agent_id:String(d.get('agent_id')),expected_revision:Number(d.get('expected_revision')),action:String(d.get('action'))});await render();}catch(e){status.textContent=e.message;b.disabled=false;}
+}
+function employmentLabels(){
+ return ({ru:{title:'Статус работы агента',WORKING:'Работает',STOPPED:'Работа прекращена',UNRECORDED:'Не оформлено',start:'Начать работу',stop:'Прекратить работу',plan:'Новые закрепления за месяц (QA)',paid:'Подтверждённые продажи',unknown:'Нет подтверждённых данных',note:'Статус QA не отключает аккаунт и не создаёт зарплатные обязательства. Закрепления не равны продажам.'},kg:{title:'Агенттин иш абалы',WORKING:'Иштейт',STOPPED:'Иш токтотулду',UNRECORDED:'Каттала элек',start:'Ишти баштоо',stop:'Ишти токтотуу',plan:'Айдагы жаңы бекитүүлөр (QA)',paid:'Ырасталган сатуулар',unknown:'Ырасталган маалымат жок',note:'QA абалы аккаунтту өчүрбөйт жана эмгек акы милдеттенмесин түзбөйт. Бекитүү сатуу эмес.'},en:{title:'Agent employment',WORKING:'Working',STOPPED:'Stopped',UNRECORDED:'Not recorded',start:'Start employment',stop:'Stop employment',plan:'New monthly assignments (QA)',paid:'Verified sales',unknown:'Not verified',note:'QA status does not disable the account or create payroll liabilities. Assignments are not sales.'}})[state.lang];
+}
+async function agentEmploymentPanel(){
+ const l=employmentLabels(),r=await api('/v1/platform/agent-employment');
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+(r.agents.length?table([t('agent'),t('status'),t('periodStart'),t('actions')],r.agents.map(a=>{
+  const working=a.action==='START',status=working?'WORKING':a.action==='STOP'?'STOPPED':'UNRECORDED';
+  return '<tr><td>'+safe(a.platform_subject_id)+'</td><td>'+safe(l[status])+'</td><td>'+safe(a.created_at?date(a.created_at):'—')+'</td><td>'+((working||a.status==='ACTIVE')?'<form class="agent-employment-form"><input type="hidden" name="agent_id" value="'+safe(a.agent_id)+'"><input type="hidden" name="expected_revision" value="'+safe(a.revision)+'"><input type="hidden" name="action" value="'+(working?'STOP':'START')+'"><button class="outline" type="submit">'+safe(working?l.stop:l.start)+'</button><div role="status"></div></form>':'—')+'</td></tr>';
+ })):empty(t('noData')))+'</section>';
+}
+async function saveAgentEmployment(form){
+ const d=new FormData(form),b=form.querySelector('button'),status=form.querySelector('[role=status]');b.disabled=true;
+ try{await saveQaCatalogAction('agent-employment',{agent_id:String(d.get('agent_id')),expected_revision:Number(d.get('expected_revision')),action:String(d.get('action'))});await render();}catch(e){status.textContent=e.message;b.disabled=false;}
+}
+function agentEmploymentSummary(a){
+ const l=employmentLabels();
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2><div class="grid two">'+kv(t('status'),l[a.employment_state]||l.UNRECORDED)+kv(l.plan,String(a.qa_new_assignments_this_month??0)+' / '+a.monthly_target)+kv(l.paid,a.paid_connections===null?l.unknown:String(a.paid_connections))+'</div>'+info(l.note,'info')+'</section>';
+}
+function agentForecastLabels(){
+ return ({ru:{title:'Калькулятор месячного дохода',note:'Прогноз, не начисление. Введите предполагаемое количество оплаченных новых гостиниц и дополнительных модулей. Расчёт только за полный рабочий месяц.',hotels:'Новые оплаченные гостиницы',modules:'Оплаченные дополнительные модули',calculate:'Рассчитать прогноз',progress:'Выполнение плана в сценарии',total:'Прогноз дохода',blocked:'Прогноз будущего дохода недоступен без действующего статуса работы. Ранее заработанные суммы не аннулируются.',invalid:'Укажите целые неотрицательные количества.'},kg:{title:'Айлык киреше калькулятору',note:'Болжол, эсептөө эмес. Болжолдонгон төлөнгөн жаңы мейманканаларды жана кошумча модулдарды киргизиңиз. Толук иш айы үчүн гана.',hotels:'Жаңы төлөнгөн мейманканалар',modules:'Төлөнгөн кошумча модулдар',calculate:'Болжолду эсептөө',progress:'Сценарийдеги пландын аткарылышы',total:'Киреше болжолу',blocked:'Иштөө абалы жок болсо келечектеги киреше болжолу жеткиликсиз. Мурунку эсептөөлөр жокко чыгарылбайт.',invalid:'Терс эмес бүтүн сандарды киргизиңиз.'},en:{title:'Monthly income calculator',note:'Forecast only, not accrued earnings. Enter hypothetical paid new hotels and paid add-on modules. Full working month only.',hotels:'New paid hotels',modules:'Paid add-on modules',calculate:'Calculate forecast',progress:'Scenario target progress',total:'Projected income',blocked:'Future forecast requires working status. Previously earned amounts are not erased.',invalid:'Enter non-negative whole numbers.'}})[state.lang];
+}
+function agentForecastPanel(a){
+ const l=agentForecastLabels();
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+(a.employment_state==='WORKING'?'<form id="agent-forecast-form" class="admin-form"><label>'+safe(l.hotels)+'<input type="number" name="hotels" min="0" max="10000" step="1" value="0" required></label><label>'+safe(l.modules)+'<input type="number" name="modules" min="0" max="100000" step="1" value="0" required></label><input type="hidden" name="salary" value="'+safe(a.monthly_salary)+'"><input type="hidden" name="connection" value="'+safe(a.connection_fee)+'"><input type="hidden" name="addon" value="'+safe(a.monthly_addon_fee)+'"><input type="hidden" name="target" value="'+safe(a.monthly_target)+'"><button type="submit" class="primary">'+safe(l.calculate)+'</button><div role="status" aria-live="polite"></div></form>':info(l.blocked,'info'))+'</section>';
+}
+function calculateAgentForecast(form){
+ const l=agentForecastLabels(),m=assignmentLabels(),d=new FormData(form),out=form.querySelector('[role=status]');
+ const hotels=Number(d.get('hotels')),modules=Number(d.get('modules')),target=Number(d.get('target'));
+ if(![hotels,modules].every(Number.isSafeInteger)||hotels<0||hotels>10000||modules<0||modules>100000||!Number.isSafeInteger(target)||target<1){out.textContent=l.invalid;return;}
+ const cents=name=>Math.round(Number(d.get(name))*100);
+ const salary=cents('salary'),connections=hotels*cents('connection'),addons=modules*cents('addon');
+ if(![salary,connections,addons,salary+connections+addons].every(v=>Number.isSafeInteger(v)&&v>=0)){out.textContent=l.invalid;return;}
+ out.innerHTML='<div class="grid two">'+kv(m.salary,money(salary/100,'KGS'))+kv(m.connection,money(connections/100,'KGS'))+kv(m.addon,money(addons/100,'KGS'))+kv(l.progress,hotels+' / '+target+' ('+Math.round(hotels/target*100)+'%)')+kv(l.total,money((salary+connections+addons)/100,'KGS'))+'</div>';
+}
+function agentTermsPanel(r){
+ const a=r.agent_terms,l=assignmentLabels(),h=r.qa_assignments||[];
+ if(!a)return '';
+ return agentEmploymentSummary(a)+agentForecastPanel(a)+'<section class="panel"><h2>'+safe(l.terms)+'</h2><div class="grid two">'+kv(l.salary,money(a.monthly_salary,'KGS'))+kv(l.connection,money(a.connection_fee,'KGS'))+kv(l.addon,money(a.monthly_addon_fee,'KGS'))+kv(l.target,a.monthly_target)+'</div>'+info(l.eligible,'info')+'</section><section class="panel"><h2>'+safe(l.assigned)+'</h2>'+(h.length?table([t('hotel'),t('status'),t('periodStart')],h.map(x=>'<tr><td>'+safe(x.display_name)+'</td><td>'+safe(x.status)+'</td><td>'+safe(date(x.assigned_at))+'</td></tr>')):empty(t('noData')))+'</section>';
+}
 function hotelCardTabs(){
  const admin=state.me?.role==='SUPER_ADMIN';
  const sections=[['overview','hotelTabOverview'],['subscription','subscription'],['finance','hotelTabFinance'],['usage','hotelTabUsage']];
@@ -529,6 +928,7 @@ function hotelCardTabs(){
  return '<nav class="toolbar" aria-label="'+safe(t('selected'))+'">'+sections.map(([key,label])=>
    '<button type="button" data-hotel-tab="'+key+'" class="'+(state.hotelTab===key?'primary':'outline')+'" aria-current="'+(state.hotelTab===key?'page':'false')+'">'+safe(t(label))+'</button>').join('')+'</nav>';
 }
+
 async function hotelDetail(){
  const id=state.hotelId;
  if(!/^[0-9a-fA-F-]{36}$/.test(id||'')) return heading(t('noSelected'))+empty(t('noSelected'));
@@ -537,6 +937,8 @@ async function hotelDetail(){
   (state.me?.role==='SUPER_ADMIN'&&state.hotelTab==='subscription'&&state.status?.qa_catalog_admin_enabled?'<button type="button" class="outline" data-view="subscription-draft">'+safe(t('configure'))+'</button>':'')+
   (state.me?.role==='SUPER_ADMIN'&&state.hotelTab==='overview'?'<button type="button" class="outline" data-link="'+safe(id)+'">'+safe(t('linkHotel'))+'</button>':'')+
   '<button type="button" class="subtle" data-view="'+(state.me?.role==='SUPER_ADMIN'?'hotels':'subscription')+'">← '+safe(t('openBack'))+'</button>';
+ if(state.hotelTab==='history'&&state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled)return metadata+await customerProfilePanel(true).catch(e=>info(e.message,'error'))+await agreementPanel().catch(e=>info(e.message,'error'));
+ if(state.hotelTab==='relations'&&state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled)return metadata+await agentAssignmentPanel().catch(e=>info(e.message,'error'));
  if(['usage','relations','history'].includes(state.hotelTab)){
   return metadata+'<section class="panel spacing-top"><h2>'+
    safe(t(state.hotelTab==='usage'?'hotelTabUsage':state.hotelTab==='relations'?'hotelTabRelations':'hotelTabHistory'))+
@@ -546,7 +948,7 @@ async function hotelDetail(){
  const subscription=hotelReadResult(sub,true);
  const invoices=hotelReadResult(inv);
  let draftHistory='';
- if(state.hotelTab==='subscription'&&state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled){
+ if(state.hotelTab==='subscription'&&state.me?.role==='SUPER_ADMIN'&&(state.status?.qa_catalog_read_only_enabled||state.status?.qa_catalog_admin_enabled)){
   try {
    const drafts=await api('/v1/platform/subscription-drafts?hotel_id='+id);
    draftHistory='<section class="panel"><h2>'+safe(t('draftList'))+'</h2>'+
@@ -555,6 +957,7 @@ async function hotelDetail(){
    '<td>'+safe(d.period_start)+' — '+safe(d.period_end)+'</td><td><span class="chip">'+safe(d.state)+' · OFF</span></td>'+
    '<td>'+money(d.proposed_monthly_total,d.currency)+'</td></tr>')):empty(t('noDrafts')))+
    '</section>'+info(t('draftOnly'),'info');
+   if(state.status?.qa_catalog_admin_enabled){
    const packages=await api('/v1/platform/tariff-packages?hotel_id='+id);
    draftHistory+='<section class="panel"><h2>'+safe(t('packageHistory'))+'</h2>'+
     (packages.length?table([t('packageType'),t('skuVersion'),t('draftTitle'),
@@ -564,6 +967,7 @@ async function hotelDetail(){
      '<td>'+safe(d.trial_days)+'</td><td>'+money(d.proposed_monthly_total,d.currency)+
      '</td><td>'+safe(d.state)+' · OFF'+(d.package_kind==='CUSTOM'?'':' <button type="button" data-publish-template="'+safe(d.id)+'">'+safe(t('publishTemplate'))+'</button>')+'</td></tr>')):empty(t('noDrafts')))+
     '</section>';
+   }
   } catch(e){ draftHistory+=info(t('error')+': '+e.message,'error'); }
  }
 
@@ -579,23 +983,39 @@ async function hotelDetail(){
    '<tr><td>'+safe(i.number||i.id)+'</td><td><span class="chip">'+safe(i.status)+
    '</span></td><td>'+money(i.total,i.currency)+'</td><td>'+safe(date(i.due_at))+'</td></tr>')):
    empty(t('noInvoices')))+'</section>';
- if(state.hotelTab==='finance')return metadata+invoicesInfo+info(t('warning'),'info');
- if(state.hotelTab==='subscription')return metadata+summary+subscriptionInfo+draftHistory+info(t('draftOnly'),'info');
- return metadata+summary+subscriptionInfo+info(t('warning'),'info');
+ if(state.hotelTab==='finance')return metadata+invoicesInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await financeReconciliationPanel().catch(e=>info(e.message,'error'))+await financeSimulationPanel().catch(e=>info(e.message,'error'))+await syntheticJournalPanel().catch(e=>info(e.message,'error')):'')+info(t('warning'),'info');
+ if(state.hotelTab==='subscription')return metadata+summary+subscriptionInfo+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await installationTrialPanel().catch(e=>info(e.message,'error'))+await commercialHotelOfferForm().catch(e=>info(e.message,'error'))+await subscriptionPlanPanel().catch(e=>info(e.message,'error')):state.me?.role==='HOTEL_OWNER'&&state.status?.qa_catalog_admin_enabled?await customerAcceptancePanel().catch(e=>info(e.message,'error')):'')+draftHistory+info(t('draftOnly'),'info');
+ return metadata+await hotelNameForm(id)+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await customerProfilePanel().catch(e=>info(e.message,'error')):'')+summary+subscriptionInfo+info(t('warning'),'info');
+}
+
+
+async function commercialPolicyPanel(){
+ const labels={ru:{title:'Утверждённые тарифы',note:'Коммерческие цены. Техническая доступность модулей проверяется отдельно.',setup:'Внедрение',trial:'Пробный период (дней)',term:'Месяцев',discount:'Скидка'},kg:{title:'Бекитилген тарифтер',note:'Коммерциялык баалар. Модулдардын техникалык жеткиликтүүлүгү өзүнчө текшерилет.',setup:'Орнотуу',trial:'Сыноо мезгили (күн)',term:'Ай',discount:'Арзандатуу'},en:{title:'Approved tariffs',note:'Commercial prices. Technical module availability is verified separately.',setup:'Implementation',trial:'Trial (days)',term:'Months',discount:'Discount'}};
+ const l=labels[state.lang]||labels.ru;
+ const edit={ru:'Изменить коммерческую цену',kg:'Коммерциялык бааны өзгөртүү',en:'Edit commercial price'}[state.lang]||'Изменить коммерческую цену';
+ try{
+  const r=await api('/v1/platform/commercial-policy'),p=r.policy;
+  return '<section class="panel spacing-top"><h2>'+safe(l.title)+' · v'+safe(r.version)+'</h2>'+
+   table([t('packageType'),t('price')],Object.entries(p.monthly_packages).map(([k,v])=>'<tr><td>'+safe(k)+'</td><td>'+money(v.price??v.base_price,p.currency)+'</td></tr>'))+
+   '<h3>'+safe(t('features'))+'</h3>'+table([t('sku'),t('price')],Object.entries(p.module_monthly_prices).map(([k,v])=>'<tr><td>'+safe(k)+'</td><td>'+money(v,p.currency)+'</td></tr>'))+
+   '<form id="commercial-price-form" class="admin-form"><h3>'+safe(edit)+'</h3><input type="hidden" name="expected_version" value="'+safe(r.version)+'"><label>'+safe(t('sku'))+'<select name="item">'+['BASE','BUSINESS','PREMIUM'].map(k=>'<option value="PACKAGE:'+safe(k)+'">'+safe(k)+'</option>').join('')+Object.keys(p.module_monthly_prices).map(k=>'<option value="MODULE:'+safe(k)+'">'+safe(k)+'</option>').join('')+'</select></label><label>'+safe(t('price'))+'<input name="monthly_price" type="number" min="0.01" max="999999999999.99" step="0.01" required></label><button type="submit" class="primary">'+safe(t('savePlanned'))+'</button><div role="status" aria-live="polite"></div></form>'+ 
+   table([l.term,l.discount],Object.entries(p.term_discounts_pct).map(([k,v])=>'<tr><td>'+safe(k)+'</td><td>'+safe(v)+'%</td></tr>'))+
+   '<div class="grid two">'+kv(l.setup,money(p.implementation_fee,p.currency))+kv(l.trial,p.trial.calendar_days)+'</div>'+info(l.note,'info')+'</section>';
+ }catch(e){return '<section class="panel">'+info(t('error')+': '+e.message,'error')+'</section>';}
 }
 
 async function catalog(){
- if(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled){
+ if(state.me?.role==='SUPER_ADMIN'&&(state.status?.qa_catalog_read_only_enabled||state.status?.qa_catalog_admin_enabled)){
   const items=await api('/v1/platform/catalog');
   state.catalogItems=items;
-  return heading(t('adminCatalog'),t('helpQa'))+toolbar()+adminCatalogButtons()+
+  return heading(t('adminCatalog'),t('helpQa'))+toolbar()+adminCatalogButtons()+(state.status?.qa_catalog_admin_enabled?await commercialPolicyPanel()+await launchOfferPanel().catch(e=>info(e.message,'error')):'')+
     '<div class="grid three">'+metric(t('activeSku'),items.length,'cyan-text')+
     metric(t('currency'),'KGS')+metric(t('readOnly'),'QA')+'</div>'+
     '<section class="panel">'+(items.length?table([t('sku'),t('skuTitle'),t('status'),t('price'),t('actions')],
       items.map(i=>'<tr><td>'+safe(i.sku)+'</td><td>'+safe(i.name)+'</td>'+
        '<td><span class="chip">'+safe(i.status)+'</span></td>'+
        '<td>'+safe(i.latest_price?money(i.latest_price.monthly_price,i.latest_price.currency):'—')+'</td>'+
-       '<td><button type="button" class="subtle" data-sku-price="'+safe(i.sku)+'">'+safe(t('newPrice'))+'</button> / '+
+       '<td>'+(state.status?.qa_catalog_admin_enabled?'<button type="button" class="subtle" data-sku-price="'+safe(i.sku)+'">'+safe(t('newPrice'))+'</button> / ':'')+
        '<button type="button" class="subtle" data-sku-versions="'+safe(i.sku)+'">'+safe(t('openHistory'))+'</button></td></tr>'
       )):empty(t('noCatalog')))+'</section>'+info(t('notPublished'),'info');
  }
@@ -604,13 +1024,84 @@ async function catalog(){
  '<section class="panel">'+(items.length?table([t('sku'),t('features'),t('price'),t('status')],items.map(i=>'<tr><td>'+safe(i.sku)+'</td><td>'+safe(i.name)+'</td><td>'+money(i.monthly_list_price,i.currency)+'</td><td><span class="chip">v'+safe(i.price_version)+'</span></td></tr>')):empty(t('noCatalog')))+'</section>';
 }
 function earningsSummary(o){return (o.groups?.length?table([t('groups'),t('gross'),t('refunds'),t('net')],o.groups.map(g=>'<tr><td>'+safe(g.role)+'</td><td>'+money(g.accrued_gross_kg)+'</td><td>'+money(g.reversed_kg)+'</td><td>'+money(g.net_accrued_kg)+'</td></tr>')):empty(t('noPartners')))+info('QA_ONLY_NOT_BANK_RECONCILED','info')}
-async function obligations(){const r=await api('/v1/platform/partner-earnings-summary?period='+state.period);return heading(t('obligations'),t('helpQa'))+toolbar()+periodButtons()+'<section class="panel spacing-top">'+earningsSummary(r)+'</section>'+info(t('notImplemented'))}
+function investorPlanLabels(){
+ return ({ru:{title:'Инвестиционные предложения',create:'Сохранить новую версию',capital:'Сумма вклада по предложению',share:'Доля подписочной выручки',bonus:'Дополнительный срок после возврата (мес.)',hotels:'Гостиницы по предложению',note:'Черновик условий, не подписанный договор. Проценты только от подписочной выручки закреплённых гостиниц. Получение вклада и возврат средств не подтверждены.',received:'Получение вклада',repaid:'Возврат вклада',unknown:'Не подтверждено',choose:'Выберите гостиницы',draft:'Черновик'},kg:{title:'Инвестициялык сунуштар',create:'Жаңы версияны сактоо',capital:'Сунуштагы салымдын суммасы',share:'Жазылуу кирешесинин үлүшү',bonus:'Салым кайтарылгандан кийинки кошумча мөөнөт (ай)',hotels:'Сунуштагы мейманканалар',note:'Бул шарттардын долбоору, кол коюлган келишим эмес. Үлүш бекитилген мейманканалардын жазылуу кирешесинен гана. Салым жана кайтарым ырасталган жок.',received:'Салымдын түшүшү',repaid:'Салымды кайтаруу',unknown:'Ырасталган жок',choose:'Мейманканаларды тандаңыз',draft:'Долбоор'},en:{title:'Investment proposals',create:'Save new version',capital:'Proposed principal',share:'Share of subscription revenue',bonus:'Additional term after repayment (months)',hotels:'Hotels in proposal',note:'Draft terms, not a signed contract. Share applies only to subscription revenue from assigned hotels. Principal receipt and repayment are unverified.',received:'Principal received',repaid:'Principal repaid',unknown:'Not verified',choose:'Select hotels',draft:'Draft'}})[state.lang];
+}
+function investorPlanTable(plans,investors=[]){
+ const l=investorPlanLabels();
+ return plans.length?table([t('investor'),t('skuVersion'),l.capital,l.share,l.bonus,l.hotels,t('status')],plans.map(p=>'<tr><td>'+safe(investors.find(i=>i.id===p.investor_id)?.platform_subject_id||p.investor_id)+'</td><td>'+safe(p.revision)+'</td><td>'+money(p.principal,'KGS')+'</td><td>'+safe(p.share_bps/100)+'%</td><td>'+safe(p.bonus_months)+'</td><td>'+safe((p.hotels||[]).map(h=>h.hotel_name_snapshot).join(', '))+'</td><td>'+safe(l.draft)+'</td></tr>')):empty(t('noData'));
+}
+async function investorPlanAdminPanel(){
+ const l=investorPlanLabels(),r=await api('/v1/platform/investor-plans'),active=r.investors.filter(i=>i.status==='ACTIVE');
+ const form=active.length&&r.hotels.length?'<form id="investor-plan-form" class="admin-form"><label>'+safe(t('investor'))+'<select name="investor_id">'+active.map(i=>'<option value="'+safe(i.id)+'" data-revision="'+safe(Math.max(0,...r.plans.filter(p=>p.investor_id===i.id).map(p=>p.revision)))+'">'+safe(i.platform_subject_id)+'</option>').join('')+'</select></label><label>'+safe(l.capital)+'<select name="principal_kg">'+[[150000,25],[250000,35],[400000,50]].map(([v,share])=>'<option value="'+v+'">'+money(v,'KGS')+' · '+share+'%</option>').join('')+'</select></label><fieldset><legend>'+safe(l.hotels)+'</legend>'+r.hotels.map(h=>'<label class="check-row"><input type="checkbox" name="hotel_ids" value="'+safe(h.id)+'">'+safe(h.display_name)+'</label>').join('')+'</fieldset><button type="submit" class="primary">'+safe(l.create)+'</button><div role="status"></div></form>':'';
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+form+investorPlanTable(r.plans,r.investors)+'</section>'+investmentProjectionPanel(r.plans,true);
+}
+async function saveInvestorPlan(form){
+ const l=investorPlanLabels(),d=new FormData(form),b=form.querySelector('button'),status=form.querySelector('[role=status]'),hotel_ids=d.getAll('hotel_ids');
+ if(!hotel_ids.length||hotel_ids.length>50){status.textContent=l.choose;return;}
+ b.disabled=true;
+ try{await saveQaCatalogAction('investor-plans',{investor_id:String(d.get('investor_id')),expected_revision:Number(form.elements.investor_id.selectedOptions[0].dataset.revision),principal_kg:Number(d.get('principal_kg')),hotel_ids});await render();}catch(e){status.textContent=e.message;b.disabled=false;}
+}
+function projectionLabels(){
+ return ({ru:{title:'Прогноз возврата инвестиции',note:'Сценарий: постоянная ежемесячная выручка закреплённых гостиниц без налогов и возвратов, выплаты в конце месяца. Не подтверждённые выплаты. Горизонт 120 месяцев.',revenue:'Подписочная выручка в месяц (сом)',start:'Месяц начала сценария',elapsed:'Месяцев прошло',calculate:'Рассчитать',monthly:'Доля в месяц',repaid:'Прогноз возврата',remaining:'Прогноз остатка вклада',bonus:'Прогноз бонусного дохода',total:'Всего по сценарию',date:'Предполагаемый возврат вклада',bonusPeriod:'Бонусный период (конец не включён)',RETURN:'Возврат вклада',BONUS:'Бонусный период',ENDED:'Сценарий завершён',unknown:'За пределами горизонта / не определено'},kg:{title:'Инвестицияны кайтаруу болжолу',note:'Сценарий: бекитилген мейманканалардын туруктуу айлык кирешеси, салыктарсыз жана кайтарууларсыз, айдын аягында төлөм. Ырасталган төлөм эмес. 120 ай.',revenue:'Айлык жазылуу кирешеси (сом)',start:'Сценарий башталган ай',elapsed:'Өткөн айлар',calculate:'Эсептөө',monthly:'Айлык үлүш',repaid:'Кайтаруу болжолу',remaining:'Салымдын калган суммасы',bonus:'Бонус кирешесинин болжолу',total:'Сценарий боюнча жалпы сумма',date:'Салым кайтарылуучу болжолдуу күн',bonusPeriod:'Бонус мөөнөтү (аягы кирбейт)',RETURN:'Салымды кайтаруу',BONUS:'Бонус мөөнөтү',ENDED:'Сценарий аяктады',unknown:'Мөөнөттөн тышкары / белгисиз'},en:{title:'Investment repayment forecast',note:'Scenario: constant monthly assigned-hotel subscription revenue excluding taxes and refunds, paid at month end. No verified payouts. 120-month horizon.',revenue:'Monthly subscription revenue (KGS)',start:'Scenario start month',elapsed:'Months elapsed',calculate:'Calculate',monthly:'Monthly share',repaid:'Projected principal repaid',remaining:'Projected principal remaining',bonus:'Projected bonus income',total:'Scenario total',date:'Estimated repayment date',bonusPeriod:'Bonus term (end exclusive)',RETURN:'Principal repayment',BONUS:'Bonus period',ENDED:'Scenario ended',unknown:'Outside horizon / unknown'}})[state.lang];
+}
+function investmentProjectionPanel(plans,admin=false){
+ if(!plans.length)return '';
+ const l=projectionLabels(),month=dateValue(0).slice(0,7);
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+'<form class="investment-projection-form admin-form" data-admin="'+(admin?'1':'0')+'"><label>'+safe(t('skuVersion'))+'<select name="plan_id">'+plans.map(p=>'<option value="'+safe(p.id)+'">'+safe(p.investor_id.slice(0,8))+' · v'+safe(p.revision)+' · '+money(p.principal,'KGS')+' · '+safe(p.share_bps/100)+'%</option>').join('')+'</select></label><label>'+safe(l.revenue)+'<input name="monthly_revenue" inputmode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" maxlength="15" value="0" required></label><label>'+safe(l.start)+'<input name="start_month" type="month" min="2000-01" max="2090-12" value="'+safe(month)+'" required></label><label>'+safe(l.elapsed)+'<input name="elapsed_months" type="number" min="0" max="120" step="1" value="0" required></label><button type="submit" class="primary">'+safe(l.calculate)+'</button><div role="status" aria-live="polite"></div></form></section>';
+}
+async function runInvestmentProjection(form){
+ const l=projectionLabels(),d=new FormData(form),b=form.querySelector('button'),out=form.querySelector('[role=status]');b.disabled=true;out.textContent='';
+ try{
+  const params=new URLSearchParams({plan_id:String(d.get('plan_id')),monthly_revenue:String(d.get('monthly_revenue')),start_month:String(d.get('start_month'))+'-01',elapsed_months:String(d.get('elapsed_months'))});
+  const r=await api((form.dataset.admin==='1'?'/v1/platform':'/v1/partner/me')+'/investment-projection?'+params.toString());
+  if(r.mode!=='FORECAST_ONLY'||r.payouts_enabled!==false||r.actual_principal_repaid!==null||r.plan_id!==d.get('plan_id'))throw Error(t('error'));
+  out.innerHTML='<div class="grid two">'+kv(t('status'),l[r.stage])+kv(l.monthly,money(r.monthly_share,'KGS'))+kv(l.repaid,money(r.projected_principal_repaid,'KGS'))+kv(l.remaining,money(r.projected_principal_remaining,'KGS'))+kv(l.bonus,money(r.projected_bonus_paid,'KGS'))+kv(l.total,money(r.projected_total_received,'KGS'))+kv(l.date,r.projected_repayment_date||l.unknown)+kv(l.bonusPeriod,r.bonus_start?r.bonus_start+' — '+r.bonus_end_exclusive:l.unknown)+'</div>';
+ }catch(e){out.textContent=e.message;}finally{b.disabled=false;}
+}
+function ownInvestorPlans(r){
+ if(r.role!=='INVESTOR')return '';
+ const l=investorPlanLabels();
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+investorPlanTable(r.investment_plans||[])+'<div class="grid two">'+kv(l.received,l.unknown)+kv(l.repaid,l.unknown)+'</div></section>'+investmentProjectionPanel(r.investment_plans||[]);
+}
+function partnerProposalLabels(){
+ return ({ru:{title:'Партнёрские предложения',name:'Название предложения',terms:'Индивидуальные условия',save:'Сохранить версию',draft:'Черновик',note:'Индивидуальное предложение без подписанного договора, подтверждённых начислений и выплат.',noPartner:'Нет активных партнёров. Сначала требуется предоставить роль через действующий процесс регистрации.',unknown:'Не подтверждено'},kg:{title:'Өнөктөштүк сунуштар',name:'Сунуштун аталышы',terms:'Жеке шарттар',save:'Версияны сактоо',draft:'Долбоор',note:'Кол коюлган келишимсиз жана ырасталган төлөмдөрсүз жеке сунуш.',noPartner:'Активдүү өнөктөштөр жок. Адегенде каттоо аркылуу роль берилиши керек.',unknown:'Ырасталган жок'},en:{title:'Partner proposals',name:'Proposal title',terms:'Individual terms',save:'Save revision',draft:'Draft',note:'Individual proposal, not a signed contract or verified accrual or payout.',noPartner:'No active partners. Assign the role through the existing account provisioning process first.',unknown:'Not verified'}})[state.lang];
+}
+function partnerProposalTable(rows,admin=false){
+ const l=partnerProposalLabels(),heads=[...(admin?[t('role')]:[]),t('hotel'),t('skuVersion'),l.name,l.terms,t('status')];
+ return rows.length?table(heads,rows.map(p=>'<tr>'+(admin?'<td>'+safe(p.partner_subject_id)+'</td>':'')+'<td>'+safe(p.hotel_name_snapshot)+'</td><td>'+safe(p.revision)+'</td><td>'+safe(p.title)+'</td><td>'+safe(p.terms_text)+'</td><td>'+safe(l.draft)+'</td></tr>')):empty(t('noData'));
+}
+async function partnerProposalAdminPanel(){
+ const l=partnerProposalLabels(),r=await api('/v1/platform/partner-proposals'),partners=r.partners.filter(p=>p.active);
+ const form=partners.length&&r.hotels.length?'<form id="partner-proposal-form" class="admin-form"><label>'+safe(t('role'))+'<select name="partner_subject_id">'+partners.map(p=>'<option value="'+safe(p.subject_id)+'">'+safe(p.subject_id)+'</option>').join('')+'</select></label><label>'+safe(t('hotel'))+'<select name="hotel_id">'+r.hotels.map(h=>'<option value="'+safe(h.id)+'">'+safe(h.display_name)+'</option>').join('')+'</select></label><label>'+safe(l.name)+'<input name="title" minlength="2" maxlength="120" required></label><label>'+safe(l.terms)+'<textarea name="terms_text" minlength="2" maxlength="2000" required></textarea></label><button class="primary" type="submit">'+safe(l.save)+'</button><div role="status"></div></form>':info(partners.length?t('noHotels'):l.noPartner,'info');
+ return '<section class="panel"><h2>'+safe(l.title)+'</h2>'+info(l.note,'info')+form+partnerProposalTable(r.proposals,true)+'</section>';
+}
+async function savePartnerProposal(form){
+ const d=new FormData(form),b=form.querySelector('button'),status=form.querySelector('[role=status]'),subject=String(d.get('partner_subject_id')),hotel=String(d.get('hotel_id'));b.disabled=true;
+ try{
+  const r=await api('/v1/platform/partner-proposals');
+  const revision=Math.max(0,...r.proposals.filter(p=>p.partner_subject_id===subject&&p.hotel_id===hotel).map(p=>p.revision));
+  await saveQaCatalogAction('partner-proposals',{partner_subject_id:subject,hotel_id:hotel,expected_revision:revision,title:String(d.get('title')).trim(),terms_text:String(d.get('terms_text')).trim()});
+  await render();
+ }catch(e){status.textContent=e.message;b.disabled=false;}
+}
+async function partner(){
+ const l=partnerProposalLabels(),r=await api('/v1/partner/me/proposals');
+ return heading(l.title,t('helpQa'))+toolbar(false)+info(l.note,'info')+'<section class="panel">'+partnerProposalTable(r.proposals||[])+'<div class="grid two">'+kv(t('paid'),l.unknown)+kv(t('obligations'),l.unknown)+'</div></section>';
+}
+async function obligations(){const r=await api('/v1/platform/partner-earnings-summary?period='+state.period);return heading(t('obligations'),t('helpQa'))+toolbar()+periodButtons()+'<section class="panel spacing-top">'+earningsSummary(r)+'</section>'+(state.me?.role==='SUPER_ADMIN'&&state.status?.qa_catalog_admin_enabled?await agentEmploymentPanel().catch(e=>info(e.message,'error'))+await investorPlanAdminPanel().catch(e=>info(e.message,'error'))+await partnerProposalAdminPanel().catch(e=>info(e.message,'error')):'')+info(t('notImplemented'))}
+function participantDetails(r){
+ const l=({ru:{hotels:'Закреплённые гостиницы',modules:'Закреплённые модули',contracts:'Версии инвестиционных договоров',capital:'Вклад по договору',share:'Доля (%)',history:'История начислений',date:'Дата',accrual:'Начисление',reversal:'Сторно',more:'Показаны последние 100 операций за период.',unverified:'Фактические выплаты и остаток обязательств пока не подтверждаются банковскими данными.'},kg:{hotels:'Бекитилген мейманканалар',modules:'Бекитилген модулдар',contracts:'Инвестициялык келишимдердин версиялары',capital:'Келишим боюнча салым',share:'Үлүш (%)',history:'Эсептөөлөрдүн тарыхы',date:'Күн',accrual:'Эсептөө',reversal:'Жокко чыгаруу',more:'Мезгилдин акыркы 100 операциясы көрсөтүлдү.',unverified:'Чыныгы төлөмдөр жана милдеттенмелер банк маалыматы менен ырастала элек.'},en:{hotels:'Assigned hotels',modules:'Attributed modules',contracts:'Investment contract versions',capital:'Contract principal',share:'Share (%)',history:'Earnings history',date:'Date',accrual:'Accrual',reversal:'Reversal',more:'Latest 100 entries in the period.',unverified:'Actual payouts and outstanding obligations are not yet bank-verified.'}})[state.lang];
+ const h=r.assigned_hotels||[],c=r.contracts||[],e=r.history||[];
+ const body=r.role==='SALES_AGENT'?'<section class="panel"><h2>'+safe(l.hotels)+'</h2>'+(h.length?table([t('hotel'),t('status'),l.modules,l.date],h.map(x=>'<tr><td>'+safe(x.display_name)+'</td><td>'+safe(x.status)+'</td><td>'+safe(x.attributed_modules)+'</td><td>'+safe(date(x.attributed_at))+'</td></tr>')):empty(t('noData')))+'</section>':'<section class="panel"><h2>'+safe(l.contracts)+'</h2>'+(c.length?table([t('invoice'),t('skuVersion'),l.capital,l.share,t('periodStart')],c.map(x=>'<tr><td>'+safe(x.contract_key)+'</td><td>'+safe(x.version)+'</td><td>'+money(x.principal,'KGS')+'</td><td>'+safe(x.share_bps/100)+'%</td><td>'+safe(x.effective_from)+'</td></tr>')):empty(t('noData')))+'</section>';
+ return body+'<section class="panel"><h2>'+safe(l.history)+'</h2>'+(e.length?table([l.date,t('hotel'),t('sku'),t('status'),t('total')],e.map(x=>'<tr><td>'+safe(date(x.recognized_at))+'</td><td>'+safe(x.hotel_id)+'</td><td>'+safe(x.sku)+'</td><td>'+safe(x.entry_type==='ACCRUAL'?l.accrual:l.reversal)+'</td><td>'+money(x.amount,'KGS')+'</td></tr>')):empty(t('noData')))+(r.history_truncated?info(l.more,'info'):'')+'</section>'+info(l.unverified,'info');
+}
 async function earnings(){
  const r=await api('/v1/partner/me/earnings?period='+state.period);
  return heading(state.me.role==='INVESTOR'?t('investor'):t('agent'),t('helpQa'))+toolbar()+periodButtons()+'<div class="grid spacing-top">'+
  metric(t('gross'),money(r.accrued_gross_kg),'cyan-text')+metric(t('refunds'),money(r.reversed_kg))+
  metric(t('net'),money(r.net_accrued_kg),'gold-text')+metric(t('paid'),money(r.actual_paid_kg))+'</div>'+
- '<section class="panel"><h2>'+safe(t('earnings'))+'</h2><div class="grid two">'+kv(t('events'),r.events)+kv(t('role'),r.role)+'</div></section>'+info(t('notImplemented'))+info(safe(r.data_provenance||'QA_ONLY'),'info');
+ '<section class="panel"><h2>'+safe(t('earnings'))+'</h2><div class="grid two">'+kv(t('events'),r.events)+kv(t('role'),r.role)+'</div></section>'+agentTermsPanel(r)+ownInvestorPlans(r)+participantDetails(r)+info(t('notImplemented'))+info(safe(r.data_provenance||'QA_ONLY'),'info');
 }
 async function subscription(){
  const hotels=state.me?.hotels||[];
@@ -623,8 +1114,8 @@ async function render(){
  const serial=++state.serial;
  renderNav();
  if(!state.me){showLogin();return;}
- main.innerHTML='<div class="skeleton" aria-label="Loading"></div>';
- try{const views={overview,'billing-hold':billingHold,hotels:hotelList,catalog,'catalog-new':skuForm,'catalog-price':futurePriceForm,'catalog-versions':versionsPage,'subscription-draft':subscriptionDraftForm,obligations,hotel:hotelDetail,'hotel-new':registrationForm,'hotel-link':linkWizard,subscription,earnings};const html=await (views[state.view]||overview)();if(serial!==state.serial)return;main.innerHTML=html;}
+ main.innerHTML='<div class="skeleton" aria-label="'+safe(t('loading'))+'"></div>';
+ try{const views={overview,'finance-center':financeCenter,'billing-hold':billingHold,hotels:hotelList,catalog,'catalog-new':skuForm,'catalog-price':futurePriceForm,'catalog-versions':versionsPage,'subscription-draft':subscriptionDraftForm,obligations,hotel:hotelDetail,'hotel-new':registrationForm,'hotel-link':linkWizard,subscription,earnings,partner,profile};const html=await (views[state.view]||overview)();if(serial!==state.serial)return;main.innerHTML=html;}
  catch(err){if(serial===state.serial)errorPage(err);}
 }
 async function start(){
@@ -634,12 +1125,16 @@ async function start(){
  try {const r=await fetch('/api/status',{cache:'no-store'});state.status=await r.json();}catch{state.status={configured:false};}
  if(state.status.configured){try{state.me=await api('/v1/me');}catch(e){if(e.status!==401)state.error=e;}}
  if(state.status.identity_ready)state.identitySession=await identitySession();
- if(state.me){const role=state.me.role;state.view=role==='SUPER_ADMIN'?'overview':role==='HOTEL_OWNER'?'subscription':role==='BILLING'?'billing-hold':'earnings';}
+ if(state.me){const role=state.me.role;state.view=role==='SUPER_ADMIN'?'overview':role==='HOTEL_OWNER'?'subscription':role==='BILLING'?'billing-hold':role==='PARTNER'?'partner':'earnings';}
  render();
 }
 nav.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b){state.view=b.dataset.view;state.hotelId=null;state.search='';render();}});
 main.addEventListener('click',e=>{
  const b=e.target.closest('button');if(!b)return;
+ if(b.hasAttribute('data-finance-offset')){state.financeOffset=Number(b.dataset.financeOffset);render();return;}
+ if(b.hasAttribute('data-invoice-preview')){downloadInvoicePreview(b);return;}
+ if(b.hasAttribute('data-renewal-plan')){prepareRenewalOffer(b);return;}
+ if(b.hasAttribute('data-journal-append')){appendSyntheticJournal(b);return;}
  if(b.dataset.view){const target=b.dataset.view;if(!['hotel','hotel-link','subscription-draft','subscription'].includes(target))state.hotelId=null;state.view=target;render();}
  if(b.dataset.hotel){state.hotelId=b.dataset.hotel;state.hotelTab='overview';state.view=state.me.role==='SUPER_ADMIN'?'hotel':'subscription';state.linkChallenge=null;state.linkSuccess=false;render();}
  if(b.dataset.hotelTab && ['overview','subscription','finance','usage','relations','history'].includes(b.dataset.hotelTab)){state.hotelTab=b.dataset.hotelTab;render();}
@@ -657,6 +1152,8 @@ main.addEventListener('click',e=>{
  if(b.dataset.retry)render();
  if(b.dataset.refresh)render();
  if(b.dataset.export){b.disabled=true;exportVisible().catch(err=>{main.insertAdjacentHTML('afterbegin',info(t('error')+': '+err.message,'error'))}).finally(()=>{b.disabled=false})}
+ if(b.dataset.recoveryOpen){state.identityStep='forgot';state.recoveryMessage='';render();return;}
+ if(b.dataset.recoveryBack){recoveryToken=null;state.identityStep='email';state.recoveryMessage='';render();return;}
  if(b.dataset.login)location.assign('/api/auth/login');
  if(b.dataset.identityLogout){
    identityRequest('sign-out',{}).then(()=>{
@@ -684,8 +1181,35 @@ main.addEventListener('change',e=>{
   refreshDraftEstimate(draft);
  }
 });
+async function submitCommercialPrice(form){
+ const d=new FormData(form),[price_kind,code]=String(d.get('item')).split(':');
+ const button=form.querySelector('button[type=submit]'),status=form.querySelector('[role=status]');
+ button.disabled=true;
+ try{await saveQaCatalogAction('commercial-policy',{expected_version:Number(d.get('expected_version')),price_kind,code,monthly_price:String(d.get('monthly_price'))});await render();}
+ catch(err){status.textContent=err.message;button.disabled=false;}
+}
 main.addEventListener('submit',e=>{
+ if(e.target.id==='partner-proposal-form'){e.preventDefault();savePartnerProposal(e.target);return;}
+ if(e.target.classList.contains('investment-projection-form')){e.preventDefault();runInvestmentProjection(e.target);return;}
+ if(e.target.id==='investor-plan-form'){e.preventDefault();saveInvestorPlan(e.target);return;}
+ if(e.target.id==='agent-forecast-form'){e.preventDefault();calculateAgentForecast(e.target);return;}
+ if(e.target.classList.contains('agent-employment-form')){e.preventDefault();saveAgentEmployment(e.target);return;}
+ if(e.target.id==='agent-assignment-form'){e.preventDefault();saveAgentAssignment(e.target);return;}
+ if(e.target.id==='customer-profile-form'){e.preventDefault();submitCustomerOperation(e.target,'customer-profile');return;}
+ if(e.target.id==='agreement-draft-form'){e.preventDefault();submitCustomerOperation(e.target,'agreement-drafts');return;}
+ if(e.target.id==='synthetic-journal-open'){e.preventDefault();openSyntheticJournal(e.target);return;}
+ if(e.target.id==='finance-simulation-form'){e.preventDefault();submitFinanceSimulation(e.target);return;}
+ if(e.target.classList.contains('customer-acceptance-form')){e.preventDefault();submitCustomerOperation(e.target,'customer-agreement-acceptances');return;}
+ if(e.target.classList.contains('agreement-approval-form')){e.preventDefault();submitCustomerOperation(e.target,'agreement-internal-approvals');return;}
+ if(e.target.classList.contains('invoice-preview-form')){e.preventDefault();submitCustomerOperation(e.target,'invoice-previews');return;}
+ if(e.target.id==='hotel-installation-trial'){e.preventDefault();saveInstallationTrial(e.target);return;}
+ if(e.target.id==='hotel-commercial-offer'){e.preventDefault();saveCommercialHotelOffer(e.target);return;}
+ if(e.target.id==='commercial-price-form'){e.preventDefault();submitCommercialPrice(e.target);return;}
+ if(['profile-email','profile-password'].includes(e.target.id)){e.preventDefault();saveAccountSettings(e.target);return;}
+ if(e.target.id==='flex-profile-form'){e.preventDefault();saveProfile(e.target);return;}
+ if(e.target.id==='flex-recovery-form'){e.preventDefault();submitRecovery(e.target);return;}
  if(e.target.id==='flex-identity-signin'||e.target.id==='flex-identity-totp'){e.preventDefault();submitIdentityForm(e.target)}
+ if(e.target.id==='hotel-name-form'){e.preventDefault();submitHotelName(e.target);return;}
  if(e.target.id==='hotel-registration'){e.preventDefault();submitRegistration(e.target)}
  if(e.target.id==='link-challenge-form'){e.preventDefault();handleLinkForm(e.target,'challenge')}
  if(e.target.id==='link-confirm-form'){e.preventDefault();handleLinkForm(e.target,'confirm')}

@@ -19,7 +19,7 @@ SAFE_PATHS = (
     re.compile(r"^apps/flex-console/(?:README\.md|package\.json|server\.(?:mjs|js)|vercel\.json|auth/(?:identity-gate|identity-enabled|schema-config)\.mjs|public/(?:index\.html|app\.js|styles\.css)|test/(?:security|onboarding-e2e|vercel-qa|identity-gate|usage-projection)\.test\.mjs)$"),
     re.compile(r"^apps/flex-console/(?:auth/(?:first-invite|mfa-bridge)\.mjs|public/enroll\.(?:js|html)|test/first-login-postgres\.mjs)$"),
     re.compile(r"^apps/flex-console/(?:package\-lock\.json|public/marina-smart-logo\.webp)$"),
-    re.compile(r"^apps/flex-api-qa/(?:index\.py|requirements\.txt|vercel\.json|app/(?:__init__|flex_(?:control_plane|foundation|partner_portal|onboarding|catalog_admin))\.py|test/test_neon_probe\.py)$"),
+    re.compile(r"^apps/flex-api-qa/(?:index\.py|requirements\.txt|vercel\.json|app/(?:__init__|flex_(?:control_plane|foundation|partner_portal|onboarding|catalog_admin|finance_simulation))\.py|test/test_neon_probe\.py)$"),
     re.compile(r"^scripts/marina_flex_[A-Za-z0-9_.-]+$"),
     re.compile(r"^services/api/app/flex_[A-Za-z0-9_]+\.py$"),
     re.compile(r"^services/api/requirements-flex-control\.txt$"),
@@ -60,6 +60,8 @@ def run() -> int:
         assert safe_file("apps/flex-api-qa/index.py", "A")
         assert safe_file("apps/flex-api-qa/app/flex_control_plane.py", "A")
         assert safe_file("apps/flex-api-qa/app/flex_catalog_admin.py", "A")
+        assert safe_file("apps/flex-api-qa/app/flex_finance_simulation.py", "A")
+        assert not safe_file("apps/flex-api-qa/app/flex_fake_finance.py", "A")
         assert safe_file("apps/flex-api-qa/vercel.json", "A")
         assert not safe_file("apps/flex-api-qa/app/pms_holds.py", "A")
         assert safe_file("apps/flex-api-qa/requirements.txt", "A")

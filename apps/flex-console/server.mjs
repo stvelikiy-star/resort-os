@@ -64,6 +64,17 @@ function unseal(value) {
     return Number.isFinite(o.exp) && o.exp > Date.now() ? o : null;
   } catch { return null; }
 }
+async function commercialSession(req) {
+  const session = unseal(cookiesFrom(req)[cookies.session]);
+  if (!session?.identityBinding) return session;
+  if (!bridgeConfigured) return null;
+  const {currentIdentitySession, passwordMode} = await import('./auth/identity-enabled.mjs');
+  if (session.method === 'password' && !passwordMode()) return null;
+  const identity = await currentIdentitySession(req.headers.cookie);
+  if (!identity?.user?.emailVerified || identity.user.id !== session.subject ||
+      !identity.session?.token || !fixedEqual(sha256(identity.session.token), session.identityBinding)) return null;
+  return {...mfaSigner(session.subject, session.method), csrf:session.csrf};
+}
 function fixedEqual(a,b) { const x=Buffer.from(String(a)), y=Buffer.from(String(b)); return x.length===y.length && timingSafeEqual(x,y); }
 function b64u(b) { return Buffer.from(b).toString('base64url'); }
 function sha256(text) { return b64u(createHash('sha256').update(text).digest()); }
@@ -143,7 +154,7 @@ async function registration(req,res) {
   if(!configured || !qaOnboarding)return json(res,503,{error:'QA_ONBOARDING_NOT_ENABLED'});
   if(!isSameOrigin(req))return json(res,403,{error:'ORIGIN_NOT_ALLOWED'});
   if(!String(req.headers['content-type']||'').startsWith('application/json'))return json(res,415,{error:'JSON_REQUIRED'});
-  const session=unseal(cookiesFrom(req)[cookies.session]);
+  const session=await commercialSession(req);
   if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
   if(!session.csrf || !fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
   const idem=req.headers['idempotency-key'];
@@ -182,6 +193,31 @@ async function registration(req,res) {
 const flexUuidRe=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const linkHotelRoute=/^\/api\/actions\/hotels\/([0-9a-fA-F-]{36})\/challenge$/;
 const linkConfirmRoute=/^\/api\/actions\/challenges\/([0-9a-fA-F-]{36})\/confirm$/;
+
+const hotelNameRoute=/^\/api\/actions\/hotels\/([0-9a-fA-F-]{36})\/name$/;
+async function hotelNameAction(req,res,url) {
+  if(!configured||!qaOnboarding)return json(res,503,{error:'QA_ONBOARDING_NOT_ENABLED'});
+  if(!isSameOrigin(req))return json(res,403,{error:'ORIGIN_NOT_ALLOWED'});
+  if(!/^application\/json(?:\s*;|$)/i.test(String(req.headers['content-type']||'')))return json(res,415,{error:'JSON_REQUIRED'});
+  const session=await commercialSession(req);
+  if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
+  if(!session.csrf||!fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
+  const id=url.pathname.match(hotelNameRoute)?.[1];
+  if(!id||!flexUuidRe.test(id))return json(res,404,{error:'ACTION_NOT_ALLOWED'});
+  let raw='';for await(const part of req){raw+=part.toString();if(Buffer.byteLength(raw,'utf8')>4096)return json(res,413,{error:'BODY_TOO_LARGE'});}
+  let body;try{body=JSON.parse(raw)}catch{return json(res,400,{error:'INVALID_JSON'});}
+  if(!body||Object.keys(body).length!==2||typeof body.display_name!=='string'||typeof body.expected_name!=='string'||
+     body.display_name.trim().length<2||body.display_name.length>180||body.expected_name.length<1||body.expected_name.length>180||
+     /[\u0000-\u001f\u007f]/.test(body.display_name))return json(res,422,{error:'INVALID_HOTEL_NAME'});
+  const upstream=await fetch(onboardingApiOrigin+'/v1/onboarding/hotels/'+id+'/name',{
+    method:'POST',headers:{Authorization:'Bearer '+session.token,'Content-Type':'application/json','Accept':'application/json'},
+    body:JSON.stringify({display_name:body.display_name.trim(),expected_name:body.expected_name}),redirect:'manual',signal:AbortSignal.timeout(10000)});
+  if(!upstream.ok)return json(res,upstream.status>=300&&upstream.status<400?502:upstream.status,{error:upstream.status===409?'HOTEL_NAME_CHANGED':'HOTEL_UPDATE_FAILED'});
+  const result=await upstream.json();
+  if(result.hotel_id!==id.toLowerCase()||typeof result.name!=='string'||!['PENDING','ACTIVE'].includes(result.status))return json(res,502,{error:'UNEXPECTED_HOTEL_RESULT'});
+  return json(res,200,{hotel_id:result.hotel_id,name:result.name,status:result.status});
+}
+
 function validateLinkPayload(kind,payload) {
   if(!payload||typeof payload!=='object'||Array.isArray(payload))return null;
   if(kind==='challenge') {
@@ -204,7 +240,7 @@ async function trustedLinkAction(req,res,url) {
   if(!isSameOrigin(req))return json(res,403,{error:'ORIGIN_NOT_ALLOWED'});
   if(!/^application\/json(?:\s*;|$)/i.test(String(req.headers['content-type']||'')))
     return json(res,415,{error:'JSON_REQUIRED'});
-  const session=unseal(cookiesFrom(req)[cookies.session]);
+  const session=await commercialSession(req);
   if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
   if(!session.csrf||!fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
   const hotelMatch=url.pathname.match(linkHotelRoute);
@@ -260,6 +296,9 @@ const catalogSkuAction=/^\/api\/actions\/catalog\/skus$/;
 const catalogPriceAction=/^\/api\/actions\/catalog\/skus\/([A-Z][A-Z0-9_]{1,79})\/prices$/;
 const configurationDraftAction=/^\/api\/actions\/subscription-drafts$/;
 const tariffPackageAction=/^\/api\/actions\/tariff-packages$/;
+const customerActions=new Map([['/api/actions/customer-profile','customer-profile'],['/api/actions/agreement-drafts','agreement-drafts'],['/api/actions/invoice-previews','invoice-previews'],['/api/actions/agreement-internal-approvals','agreement-internal-approvals'],['/api/actions/customer-agreement-acceptances','customer-agreement-acceptances'],['/api/actions/finance-simulation','finance-simulation'],['/api/actions/synthetic-cash-journal','synthetic-cash-journal'],['/api/actions/agent-assignments','agent-assignments'],['/api/actions/agent-employment','agent-employment'],['/api/actions/investor-plans','investor-plans'],['/api/actions/partner-proposals','partner-proposals']]);
+const installationTrialPath='/api/actions/installation-trial';
+const commercialPolicyPath='/api/actions/commercial-policy';
 const tariffTemplatePath='/api/actions/tariff-templates';
 const catalogVersionsRead=/^\/v1\/platform\/catalog\/skus\/([A-Z][A-Z0-9_]{1,79})\/versions$/;
 const catalogReadOnly=new Set(['/v1/platform/catalog','/v1/platform/subscription-drafts']);
@@ -268,6 +307,34 @@ function validateCatalogAdminAction(kind,body) {
   if(!body || typeof body!=='object'||Array.isArray(body))return null;
   const keys=Object.keys(body);
   const exact=allowed=>keys.length===allowed.length && allowed.every(k=>keys.includes(k));
+  if(kind==='partner-proposals')return exact(['partner_subject_id','hotel_id','expected_revision','title','terms_text'])&&typeof body.partner_subject_id==='string'&&body.partner_subject_id.length>=2&&body.partner_subject_id.length<=180&&typeof body.hotel_id==='string'&&flexUuidRe.test(body.hotel_id)&&Number.isInteger(body.expected_revision)&&body.expected_revision>=0&&body.expected_revision<=2147483646&&typeof body.title==='string'&&body.title.trim().length>=2&&body.title.length<=120&&typeof body.terms_text==='string'&&body.terms_text.trim().length>=2&&body.terms_text.length<=2000?{...body,title:body.title.trim(),terms_text:body.terms_text.trim()}:null;
+  if(kind==='investor-plans')return exact(['investor_id','expected_revision','principal_kg','hotel_ids'])&&typeof body.investor_id==='string'&&flexUuidRe.test(body.investor_id)&&Number.isInteger(body.expected_revision)&&body.expected_revision>=0&&body.expected_revision<=2147483646&&[150000,250000,400000].includes(body.principal_kg)&&Array.isArray(body.hotel_ids)&&body.hotel_ids.length>=1&&body.hotel_ids.length<=50&&new Set(body.hotel_ids).size===body.hotel_ids.length&&body.hotel_ids.every(v=>typeof v==='string'&&flexUuidRe.test(v))?body:null;
+  if(kind==='agent-employment')return exact(['agent_id','expected_revision','action'])&&typeof body.agent_id==='string'&&flexUuidRe.test(body.agent_id)&&Number.isInteger(body.expected_revision)&&body.expected_revision>=0&&body.expected_revision<=2147483646&&['START','STOP'].includes(body.action)?body:null;
+  if(kind==='agent-assignments')return exact(['hotel_id','agent_id','expected_revision','action'])&&[body.hotel_id,body.agent_id].every(v=>typeof v==='string'&&flexUuidRe.test(v))&&Number.isInteger(body.expected_revision)&&body.expected_revision>=0&&body.expected_revision<=2147483646&&['ASSIGN','RELEASE'].includes(body.action)?body:null;
+  if(kind==='synthetic-cash-journal'){
+    const e=body.event,key=/^[a-zA-Z0-9_-]{1,64}$/;
+    return exact(['hotel_id','agreement_id','expected_sequence','event'])&&[body.hotel_id,body.agreement_id].every(v=>typeof v==='string'&&flexUuidRe.test(v))&&Number.isInteger(body.expected_sequence)&&body.expected_sequence>=0&&body.expected_sequence<=100&&e&&typeof e==='object'&&!Array.isArray(e)&&Object.keys(e).every(k=>['kind','event_id','amount','payment_id'].includes(k))&&['PAYMENT','REFUND','CREDIT_APPLY'].includes(e.kind)&&typeof e.event_id==='string'&&key.test(e.event_id)&&typeof e.amount==='string'&&amountPattern.test(e.amount)&&(e.kind==='PAYMENT'?e.payment_id==null:typeof e.payment_id==='string'&&key.test(e.payment_id))?body:null;
+  }
+  if(kind==='finance-simulation'){
+    const keyPattern=/^[a-zA-Z0-9_-]{1,64}$/;
+    return exact(['hotel_id','agreement_id','events'])&&[body.hotel_id,body.agreement_id].every(v=>typeof v==='string'&&flexUuidRe.test(v))&&Array.isArray(body.events)&&body.events.length<=100&&body.events.every(e=>e&&typeof e==='object'&&!Array.isArray(e)&&Object.keys(e).every(k=>['kind','event_id','amount','payment_id'].includes(k))&&['PAYMENT','REFUND','CREDIT_APPLY'].includes(e.kind)&&typeof e.event_id==='string'&&keyPattern.test(e.event_id)&&typeof e.amount==='string'&&amountPattern.test(e.amount)&&(e.kind==='PAYMENT'?e.payment_id==null:typeof e.payment_id==='string'&&keyPattern.test(e.payment_id)))?body:null;
+  }
+  if(kind==='customer-profile'){
+    const fields={contact_name:180,contact_email:254,contact_phone:40,responsible_name:180};
+    return exact(['hotel_id','expected_version',...Object.keys(fields)])&&typeof body.hotel_id==='string'&&flexUuidRe.test(body.hotel_id)&&Number.isInteger(body.expected_version)&&body.expected_version>=0&&body.expected_version<=2147483646&&Object.entries(fields).every(([k,n])=>typeof body[k]==='string'&&body[k].length<=n)?body:null;
+  }
+  if(kind==='agreement-internal-approvals'||kind==='customer-agreement-acceptances'){
+    return exact(['hotel_id','agreement_id','terms_digest','acknowledged'])&&[body.hotel_id,body.agreement_id].every(x=>typeof x==='string'&&flexUuidRe.test(x))&&typeof body.terms_digest==='string'&&/^[a-f0-9]{64}$/.test(body.terms_digest)&&body.acknowledged===true?body:null;
+  }
+  if(kind==='agreement-drafts'||kind==='invoice-previews'){
+    const key=kind==='agreement-drafts'?'offer_id':'agreement_id';
+    return exact(['hotel_id',key])&&[body.hotel_id,body[key]].every(x=>typeof x==='string'&&flexUuidRe.test(x))?body:null;
+  }
+  if(kind==='installation')return exact(['hotel_id'])&&typeof body.hotel_id==='string'&&flexUuidRe.test(body.hotel_id)?{hotel_id:body.hotel_id}:null;
+  if(kind==='commercial') {
+    if(!exact(['expected_version','price_kind','code','monthly_price'])||!Number.isInteger(body.expected_version)||body.expected_version<1||body.expected_version>2147483646||!['PACKAGE','MODULE'].includes(body.price_kind)||typeof body.code!=='string'||!/^[A-Z][A-Z0-9_]{1,79}$/.test(body.code)||typeof body.monthly_price!=='string'||!amountPattern.test(body.monthly_price)||Number(body.monthly_price)<=0)return null;
+    return body;
+  }
   if(kind==='sku') {
     if(!exact(['sku','title','capability_key']))return null;
     if(typeof body.sku!=='string'||!(/^[A-Z][A-Z0-9_]{1,79}$/.test(body.sku)))return null;
@@ -289,15 +356,20 @@ function validateCatalogAdminAction(kind,body) {
   }
   if(kind==='package') {
     const source='source_template_id' in body;
+    const commercial='commercial_policy_version' in body;
+    const termFields=['term_months','include_implementation','standard_term_discount'].filter(k=>k in body);
+    if('launch_offer' in body && (typeof body.launch_offer!=='boolean'||!commercial))return null;
+    if(termFields.length&&(!commercial||termFields.length!==3||![1,3,6,12].includes(body.term_months)||typeof body.include_implementation!=='boolean'||typeof body.standard_term_discount!=='boolean'))return null;
+    if(commercial&&(!Number.isInteger(body.commercial_policy_version)||body.commercial_policy_version<1||source))return null;
     if(source && (typeof body.source_template_id!=='string'||!flexUuidRe.test(body.source_template_id)))return null;
-    if(!exact(['hotel_id','package_kind','title','period_start','skus','discount_pct','trial_days','custom_monthly_price',...(source?['source_template_id']:[])]))return null;
+    if(!exact(['hotel_id','package_kind','title','period_start','skus','discount_pct','trial_days','custom_monthly_price',...(source?['source_template_id']:[]),...(commercial?['commercial_policy_version']:[]),...termFields,...('launch_offer' in body?['launch_offer']:[])]))return null;
     if(typeof body.hotel_id!=='string'||!flexUuidRe.test(body.hotel_id))return null;
     if(!['BASE','BUSINESS','PREMIUM','CUSTOM'].includes(body.package_kind))return null;
     if(typeof body.title!=='string'||body.title.trim().length<2||body.title.trim().length>120)return null;
     if(typeof body.period_start!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(body.period_start)||
        !Number.isFinite(Date.parse(body.period_start))||
        new Date(body.period_start).toISOString().slice(0,10)!==body.period_start)return null;
-    if(!Array.isArray(body.skus)||body.skus.length<1||body.skus.length>50||
+    if(!Array.isArray(body.skus)||(!commercial&&body.skus.length<1)||body.skus.length>50||
        new Set(body.skus).size!==body.skus.length||
        !body.skus.every(x=>typeof x==='string'&&/^[A-Z][A-Z0-9_]{1,79}$/.test(x)))return null;
     if(typeof body.discount_pct!=='string'||!amountPattern.test(body.discount_pct)||
@@ -309,7 +381,7 @@ function validateCatalogAdminAction(kind,body) {
     return {hotel_id:body.hotel_id,package_kind:body.package_kind,title:body.title.trim(),
       period_start:body.period_start,skus:body.skus,discount_pct:body.discount_pct,
       trial_days:body.trial_days,custom_monthly_price:body.custom_monthly_price,
-      ...(source?{source_template_id:body.source_template_id}:{})};
+      ...(source?{source_template_id:body.source_template_id}:{}),...(commercial?{commercial_policy_version:body.commercial_policy_version}:{}),...('launch_offer' in body?{launch_offer:body.launch_offer}:{}),...(termFields.length?{term_months:body.term_months,include_implementation:body.include_implementation,standard_term_discount:body.standard_term_discount}:{})};
   }
   if(kind==='draft') {
     if(!exact(['hotel_id','title','period_start','period_end','skus']))return null;
@@ -331,12 +403,12 @@ async function catalogAdminPost(req,res,url) {
   if(!isSameOrigin(req))return json(res,403,{error:'ORIGIN_NOT_ALLOWED'});
   if(!/^application\/json(?:\s*;|$)/i.test(String(req.headers['content-type']||'')))
     return json(res,415,{error:'JSON_REQUIRED'});
-  const session=unseal(cookiesFrom(req)[cookies.session]);
+  const session=await commercialSession(req);
   if(!session)return json(res,401,{error:'LOGIN_REQUIRED'});
   if(!session.csrf||!fixedEqual(session.csrf,req.headers['x-flex-csrf']||''))return json(res,403,{error:'CSRF_INVALID'});
   const priceMatch=url.pathname.match(catalogPriceAction);
   const kind=catalogSkuAction.test(url.pathname)?'sku':priceMatch?'price':
-    configurationDraftAction.test(url.pathname)?'draft':tariffPackageAction.test(url.pathname)?'package':url.pathname===tariffTemplatePath?'template':null;
+    configurationDraftAction.test(url.pathname)?'draft':tariffPackageAction.test(url.pathname)?'package':url.pathname===tariffTemplatePath?'template':url.pathname===commercialPolicyPath?'commercial':url.pathname===installationTrialPath?'installation':customerActions.get(url.pathname)||null;
   if(!kind)return json(res,404,{error:'ACTION_NOT_ALLOWED'});
   let raw='';
   for await(const part of req) {
@@ -347,7 +419,7 @@ async function catalogAdminPost(req,res,url) {
   try{parsed=JSON.parse(raw)}catch{return json(res,400,{error:'INVALID_JSON'})}
   const payload=validateCatalogAdminAction(kind,parsed);
   if(!payload)return json(res,422,{error:'INVALID_QA_CONFIGURATION'});
-  const path=kind==='sku'?'/v1/platform/catalog/skus':
+  const path=customerActions.has(url.pathname)?'/v1/platform/'+kind:kind==='installation'?'/v1/platform/installation-trial':kind==='commercial'?'/v1/platform/commercial-policy':kind==='sku'?'/v1/platform/catalog/skus':
     kind==='price'?'/v1/platform/catalog/skus/'+priceMatch[1]+'/prices':
     kind==='template'?'/v1/platform/tariff-templates':kind==='package'?'/v1/platform/tariff-packages':'/v1/platform/subscription-drafts';
   const upstream=await fetch(catalogAdminApiOrigin+path,{
@@ -358,11 +430,23 @@ async function catalogAdminPost(req,res,url) {
   if(upstream.status>=300&&upstream.status<400)return json(res,502,{error:'UNEXPECTED_UPSTREAM_REDIRECT'});
   if(!(upstream.headers.get('content-type')||'').includes('application/json'))return json(res,502,{error:'UPSTREAM_NON_JSON'});
   const response=await upstream.text();
-  if(response.length>12000)return json(res,502,{error:'UPSTREAM_TOO_LARGE'});
+  if(response.length>(kind==='synthetic-cash-journal'?100000:12000))return json(res,502,{error:'UPSTREAM_TOO_LARGE'});
   let result;
   try{result=JSON.parse(response)}catch{return json(res,502,{error:'UPSTREAM_INVALID_JSON'})}
   if(!upstream.ok)return json(res,upstream.status,{error:'FLEX_QA_ADMIN_REJECTED',detail:
     typeof result.detail==='string'?result.detail:'Backend rejected the request'});
+  if(kind==='partner-proposals' && !(result.partner_subject_id===payload.partner_subject_id&&result.hotel_id===payload.hotel_id&&result.revision===payload.expected_revision+1&&result.title===payload.title&&result.terms_text===payload.terms_text&&result.state==='DRAFT'&&result.payouts_enabled===false))return json(res,502,{error:'UNEXPECTED_PARTNER_PROPOSAL'});
+  if(kind==='investor-plans' && !(result.investor_id===payload.investor_id&&result.revision===payload.expected_revision+1&&Number(result.principal)===payload.principal_kg&&result.state==='DRAFT'&&result.payouts_enabled===false&&result.principal_received_kg===null&&result.principal_repaid_kg===null&&result.bonus_end===null&&Array.isArray(result.hotels)&&result.hotels.length===payload.hotel_ids.length&&payload.hotel_ids.every(id=>result.hotels.some(h=>h.hotel_id===id))))return json(res,502,{error:'UNEXPECTED_INVESTOR_PLAN'});
+  if(kind==='agent-employment' && !(result.agent_id===payload.agent_id&&result.revision===payload.expected_revision+1&&result.action===payload.action&&result.payouts_enabled===false))return json(res,502,{error:'UNEXPECTED_EMPLOYMENT_STATE'});
+  if(kind==='agent-assignments' && !(result.hotel_id===payload.hotel_id&&result.agent_id===payload.agent_id&&result.revision===payload.expected_revision+1&&result.action===payload.action&&result.payments_enabled===false&&result.payouts_enabled===false))return json(res,502,{error:'UNEXPECTED_ASSIGNMENT_STATE'});
+  if(kind==='synthetic-cash-journal' && !(result.hotel_id===payload.hotel_id&&result.agreement_id===payload.agreement_id&&result.journal==='SYNTHETIC_QA_ONLY'&&result.persisted===true&&result.payments_enabled===false&&result.subscription_activated===false&&result.launch_offer_finalized===false&&result.events?.some(e=>e.event_id===payload.event.event_id)))return json(res,502,{error:'UNEXPECTED_JOURNAL_STATE'});
+  if(kind==='finance-simulation' && !(result.hotel_id===payload.hotel_id&&result.agreement_id===payload.agreement_id&&result.mode==='SYNTHETIC_ONLY'&&result.persisted===false&&result.payments_enabled===false&&result.subscription_activated===false&&result.launch_offer_finalized===false))return json(res,502,{error:'UNEXPECTED_SIMULATION_STATE'});
+  if(kind==='customer-profile' && !(result.hotel_id===payload.hotel_id&&result.version===payload.expected_version+1))return json(res,502,{error:'UNEXPECTED_PROFILE_STATE'});
+  if(kind==='customer-agreement-acceptances' && !(result.hotel_id===payload.hotel_id&&result.agreement_id===payload.agreement_id&&result.terms_digest===payload.terms_digest&&result.state==='CUSTOMER_ACCEPTED'&&result.client_signed===false&&result.subscription_activated===false&&result.payments_enabled===false))return json(res,502,{error:'UNEXPECTED_CUSTOMER_ACCEPTANCE_STATE'});
+  if(kind==='agreement-internal-approvals' && !(result.hotel_id===payload.hotel_id&&result.agreement_id===payload.agreement_id&&result.terms_digest===payload.terms_digest&&result.state==='INTERNALLY_APPROVED'&&result.client_signed===false&&result.subscription_activated===false&&result.payments_enabled===false))return json(res,502,{error:'UNEXPECTED_APPROVAL_STATE'});
+  if(kind==='agreement-drafts' && !(result.hotel_id===payload.hotel_id&&result.source_offer_id===payload.offer_id&&result.state==='DRAFT'&&result.signed_at===null))return json(res,502,{error:'UNEXPECTED_AGREEMENT_STATE'});
+  if(kind==='invoice-previews' && !(result.hotel_id===payload.hotel_id&&result.agreement_version_id===payload.agreement_id&&result.status==='NON_ISSUABLE'&&result.tax_status==='NOT_CALCULATED'))return json(res,502,{error:'UNEXPECTED_PREVIEW_STATE'});
+  if(kind==='commercial' && !(result.version===payload.expected_version+1&&result.entitlement_changed===false&&result.payment_collected===false))return json(res,502,{error:'UNEXPECTED_PRICE_STATE'});
   if(kind==='sku' && !(result.status==='PLANNED'&&result.published===false&&result.entitlement_changed===false))
     return json(res,502,{error:'UNEXPECTED_SKU_STATE'});
   if(kind==='price' && !(result.entitlement_changed===false&&result.payment_collected===false))
@@ -377,12 +461,23 @@ async function catalogAdminPost(req,res,url) {
 }
 
 function routeAllowed(path, search) {
+  if(path==='/v1/platform/commercial-center')return search.size===1&&/^(0|[1-9][0-9]{0,6})$/.test(search.get('offset')||'')&&Number(search.get('offset'))<=1000000?'catalog_admin':null;
+  if(path==='/v1/platform/partner-proposals')return !search.size?'catalog_admin':null;
+  if(path==='/v1/partner/me/proposals')return !search.size?'partner':null;
+  if(['/v1/platform/investment-projection','/v1/partner/me/investment-projection'].includes(path)){
+    const valid=search.size===4&&flexUuidRe.test(search.get('plan_id')||'')&&amountPattern.test(search.get('monthly_revenue')||'')&&/^20[0-9]{2}-[0-9]{2}-01$/.test(search.get('start_month')||'')&&/^(0|[1-9][0-9]{0,2})$/.test(search.get('elapsed_months')||'')&&Number(search.get('elapsed_months'))<=120;
+    return valid?(path.startsWith('/v1/platform/')?'catalog_admin':'partner'):null;
+  }
+  if(path==='/v1/platform/investor-plans')return !search.size?'catalog_admin':null;
+  if(path==='/v1/platform/agent-employment')return !search.size?'catalog_admin':null;
+  if(path==='/v1/platform/agent-assignments')return search.size===1&&flexUuidRe.test(search.get('hotel_id')||'')?'catalog_admin':null;
+  if(path==='/v1/platform/synthetic-cash-journal')return search.size===2&&flexUuidRe.test(search.get('hotel_id')||'')&&flexUuidRe.test(search.get('agreement_id')||'')?'catalog_admin':null;
   if(search && [...search.keys()].some(k=>!['period','hotel_id'].includes(k)))return null;
-  if(search.has('hotel_id')&&!['/v1/platform/subscription-drafts','/v1/platform/tariff-packages'].includes(path))return null;
+  if(search.has('hotel_id')&&!['/v1/platform/subscription-drafts','/v1/platform/tariff-packages','/v1/platform/installation-trial','/v1/platform/customer-profile','/v1/platform/agreement-drafts','/v1/platform/financial-reconciliation','/v1/platform/subscription-plans','/v1/platform/customer-agreement-acceptances'].includes(path))return null;
   if(search.has('period')&&!['/v1/partner/me/earnings','/v1/platform/partner-earnings-summary'].includes(path))return null;
   if(['/v1/me','/v1/hotels','/v1/catalog'].includes(path) && !search.size) return 'core';
-  if((path==='/v1/platform/catalog'||path==='/v1/platform/tariff-templates'||catalogVersionsRead.test(path))&&!search.size)return 'catalog_admin';
-  if(path==='/v1/platform/tariff-packages'&&search.size===1&&
+  if((path==='/v1/platform/catalog'||path==='/v1/platform/commercial-policy'||path==='/v1/platform/launch-offer'||path==='/v1/platform/tariff-templates'||catalogVersionsRead.test(path))&&!search.size)return 'catalog_admin';
+  if((path==='/v1/platform/tariff-packages'||path==='/v1/platform/installation-trial'||path==='/v1/platform/customer-profile'||path==='/v1/platform/agreement-drafts'||path==='/v1/platform/financial-reconciliation'||path==='/v1/platform/subscription-plans'||path==='/v1/platform/customer-agreement-acceptances')&&search.size===1&&
      flexUuidRe.test(search.get('hotel_id')||''))return 'catalog_admin';
   if(path==='/v1/platform/subscription-drafts'&&
      (!search.size||(search.size===1&&flexUuidRe.test(search.get('hotel_id')||''))))
@@ -394,13 +489,14 @@ function routeAllowed(path, search) {
 }
 async function proxy(req,res,url) {
   if(!configured) return json(res,503,{error:'QA_BACKEND_NOT_CONFIGURED'});
-  const session=unseal(cookiesFrom(req)[cookies.session]);
+  const session=await commercialSession(req);
   if(!session) return json(res,401,{error:'LOGIN_REQUIRED'});
   const path=url.pathname.replace(/^\/api\/data/,'');
   const target=routeAllowed(path,url.searchParams);
   if(!target) return json(res,404,{error:'READ_ONLY_ENDPOINT_NOT_AVAILABLE'});
-  if(target==='catalog_admin'&&!qaCatalogAdmin)return json(res,503,{error:'QA_CATALOG_ADMIN_NOT_ENABLED'});
-  const backend=(target==='partner'?partnerApiOrigin:target==='catalog_admin'?catalogAdminApiOrigin:apiOrigin)+path+url.search;
+  const readOnlyCatalog=qaEnvironment&&(catalogReadOnly.has(path)||catalogVersionsRead.test(path));
+  if(target==='catalog_admin'&&!qaCatalogAdmin&&!readOnlyCatalog)return json(res,503,{error:'QA_CATALOG_ADMIN_NOT_ENABLED'});
+  const backend=(target==='partner'?partnerApiOrigin:target==='catalog_admin'&&qaCatalogAdmin?catalogAdminApiOrigin:apiOrigin)+path+url.search;
   const headers={Authorization:'Bearer '+session.token,Accept:'application/json'};
   if(qaEnvironment && process.env.VERCEL_ENV==='preview' && new URL(backend).origin===apiOrigin && process.env.FLEX_QA_API_SERVICE_SECRET)
     headers['x-vercel-protection-bypass']=process.env.FLEX_QA_API_SERVICE_SECRET;
@@ -424,16 +520,19 @@ async function staticFile(res, pathname) {
 export async function handler(req,res) {
   try {
     const url=new URL(req.url,'http://localhost');
-    if(url.pathname==='/api/identity' || url.pathname.startsWith('/api/identity/')) return await handleFlexIdentity(req,res,bridgeConfigured?(subject,method)=>{
-      const session={...mfaSigner(subject,method),csrf:b64u(randomBytes(32))};
-      return cookie(cookies.session,seal(session),300);
+    if(url.pathname==='/api/identity' || url.pathname.startsWith('/api/identity/')) return await handleFlexIdentity(req,res,bridgeConfigured?(subject,method,identityToken)=>{
+      const lifetimeSeconds = 3600;
+      const session = {subject, method, identityBinding:sha256(identityToken), csrf:b64u(randomBytes(32)),
+        exp:Date.now() + lifetimeSeconds * 1000};
+      return cookie(cookies.session,seal(session),lifetimeSeconds);
     }:null);
-    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
-    if(url.pathname==='/api/status') return json(res,200,{configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,password_login:bridgeConfigured && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true',identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
-    if(url.pathname==='/api/session') { const s=unseal(cookiesFrom(req)[cookies.session]);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
+    if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||hotelNameRoute.test(url.pathname)||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath||url.pathname===commercialPolicyPath||url.pathname===installationTrialPath||customerActions.has(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
+    if(url.pathname==='/api/status') return json(res,200,{build_sha:/^[0-9a-f]{40}$/.test(process.env.VERCEL_GIT_COMMIT_SHA||'')?process.env.VERCEL_GIT_COMMIT_SHA:null,configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,qa_catalog_read_only_enabled:configured&&qaEnvironment,password_login:bridgeConfigured && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true',identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
+    if(url.pathname==='/api/session') { const s=await commercialSession(req);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
+    if(req.method==='POST'&&hotelNameRoute.test(url.pathname))return await hotelNameAction(req,res,url);
     if(req.method==='POST'&&(linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)))return await trustedLinkAction(req,res,url);
-    if(req.method==='POST'&&(catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath))return await catalogAdminPost(req,res,url);
+    if(req.method==='POST'&&(catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath||url.pathname===commercialPolicyPath||url.pathname===installationTrialPath||customerActions.has(url.pathname)))return await catalogAdminPost(req,res,url);
     if(url.pathname==='/api/auth/login') return await authLogin(res);
     if(url.pathname==='/api/auth/callback') return await authCallback(req,res,url);
     if(url.pathname==='/api/auth/logout') return redirect(res,'/',{'Set-Cookie':cookie(cookies.session,'',0)});

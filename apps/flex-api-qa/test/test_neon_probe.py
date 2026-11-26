@@ -17,7 +17,7 @@ class NeonProbePolicy(unittest.TestCase):
         names = (
             "flex_control_plane.py", "flex_foundation.py",
             "flex_partner_portal.py", "flex_onboarding.py",
-            "flex_catalog_admin.py",
+            "flex_catalog_admin.py", "flex_finance_simulation.py",
         )
         for name in names:
             with self.subTest(name=name):
@@ -93,6 +93,81 @@ class NeonProbePolicy(unittest.TestCase):
                        cwd=Path(__file__).resolve().parents[1],
                        env={**os.environ, "FLEX_ENVIRONMENT": "qa",
                             "FLEX_ENABLE_QA_CATALOG_DRAFTS": "true"})
+
+    def test_synthetic_routes_are_only_registered_in_enabled_qa(self):
+        import subprocess
+        paths = ("/v1/platform/finance-simulation", "/v1/platform/synthetic-cash-journal",
+                 "/v1/platform/customer-agreement-acceptances")
+        for environment, flag in (("qa", "false"), ("production", "true"), ("qa", "true")):
+            expected = environment == "qa" and flag == "true"
+            check = f"""from index import app
+routes = {{(m, r.path) for r in app.routes for m in getattr(r, 'methods', ())}}
+paths = {paths!r}
+expected = {expected!r}
+assert (('POST', paths[0]) in routes) == expected
+for path in paths[1:]:
+    assert (('POST', path) in routes) == expected
+    assert (('GET', path) in routes) == expected
+assert not any(p.startswith(('/v1/payments', '/v1/payouts', '/v1/settlement')) for _, p in routes)
+"""
+            with self.subTest(environment=environment, flag=flag):
+                subprocess.run([sys.executable, "-c", check], check=True,
+                               cwd=Path(__file__).resolve().parents[1],
+                               env={**os.environ, "FLEX_ENVIRONMENT": environment,
+                                    "FLEX_ENABLE_QA_CATALOG_DRAFTS": flag,
+                                    "FLEX_ENABLE_QA_ONBOARDING": "false"})
+
+    def test_legacy_catalog_reads_survive_disabled_writer_gate(self):
+        import subprocess
+        check = """from index import app
+from fastapi.testclient import TestClient
+import os
+client = TestClient(app)
+paths = ("/v1/platform/catalog", "/v1/platform/catalog/skus/BASE/versions",
+         "/v1/platform/subscription-drafts")
+qa = os.environ["FLEX_ENVIRONMENT"] == "qa"
+for path in paths:
+    assert client.get(path).status_code == (401 if qa else 404)
+    assert client.post(path, json={}).status_code == (405 if qa else 404)
+for route in app.routes:
+    if route.path.startswith("/v1/platform/"):
+        assert "POST" not in getattr(route, "methods", ())
+"""
+        for environment in ("qa", "production"):
+            subprocess.run([sys.executable, "-c", check], check=True,
+                           cwd=Path(__file__).resolve().parents[1],
+                           env={**os.environ, "FLEX_ENVIRONMENT": environment,
+                                "FLEX_ENABLE_QA_CATALOG_DRAFTS": "false",
+                                "FLEX_ENABLE_QA_ONBOARDING": "false"})
+
+    def test_catalog_reader_never_assumes_writer_and_password_exception_is_preview_only(self):
+        import asyncio
+        from unittest.mock import AsyncMock
+        from fastapi import HTTPException
+        from app.flex_catalog_admin import as_catalog_reader, require_admin
+        from app.flex_foundation import PlatformPrincipal
+
+        admin = PlatformPrincipal("ci-admin", "SUPER_ADMIN", mfa_verified=False)
+        owner = PlatformPrincipal("ci-owner", "HOTEL_OWNER", mfa_verified=True)
+        preview = {"FLEX_ENVIRONMENT": "qa", "VERCEL_ENV": "preview",
+                   "FLEX_QA_PASSWORD_LOGIN": "true", "FLEX_ENABLE_QA_CATALOG_DRAFTS": "false"}
+        with patch.dict(os.environ, preview):
+            conn = AsyncMock()
+            asyncio.run(as_catalog_reader(conn, admin))
+            self.assertEqual(conn.execute.await_count, 2)
+            self.assertEqual(conn.execute.await_args_list[-1].args,
+                             ("SET LOCAL ROLE flex_platform_admin_reader",))
+            with self.assertRaises(HTTPException):
+                require_admin(admin)
+            with self.assertRaises(HTTPException):
+                asyncio.run(as_catalog_reader(conn, owner))
+            self.assertEqual(conn.execute.await_count, 2)
+        for override in ({"FLEX_ENVIRONMENT": "production"},
+                         {"VERCEL_ENV": "production"},
+                         {"FLEX_QA_PASSWORD_LOGIN": "false"}):
+            with patch.dict(os.environ, {**preview, **override}):
+                with self.assertRaises(HTTPException):
+                    asyncio.run(as_catalog_reader(AsyncMock(), admin))
 
     def test_core_identity_without_token_fails_closed(self):
         r = TestClient(app).get("/v1/me")
