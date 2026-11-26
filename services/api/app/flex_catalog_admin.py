@@ -25,6 +25,7 @@ from .flex_control_plane import (
     lifespan as core_lifespan,
     resolve_platform_principal,
     qa_password_reads,
+    _switch_to_reader,
 )
 from .flex_foundation import PlatformPrincipal
 
@@ -68,6 +69,16 @@ def require_admin(principal: PlatformPrincipal) -> None:
     allow_qa_password = qa_password_reads() and os.environ.get("FLEX_ENABLE_QA_CATALOG_DRAFTS") == "true"
     if principal.role != "SUPER_ADMIN" or not (principal.mfa_verified or allow_qa_password):
         raise HTTPException(403, detail="Verified FLEX SUPER_ADMIN with MFA required")
+
+
+def require_catalog_reader(principal: PlatformPrincipal) -> None:
+    if principal.role != "SUPER_ADMIN" or not (principal.mfa_verified or qa_password_reads()):
+        raise HTTPException(403, detail="Verified FLEX SUPER_ADMIN required")
+
+
+async def as_catalog_reader(conn, principal: PlatformPrincipal) -> None:
+    require_catalog_reader(principal)
+    await _switch_to_reader(conn, "flex_platform_admin_reader", "flex.unused", "1")
 
 
 async def as_writer(conn, principal: PlatformPrincipal) -> None:
@@ -377,10 +388,10 @@ async def catalog(
     request: Request,
     principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    require_admin(principal)
+    require_catalog_reader(principal)
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            await as_writer(conn, principal)
+            await as_catalog_reader(conn, principal)
             rows = await conn.fetch(
                 "SELECT s.sku,s.title,s.capability_key,s.product_status,s.is_core,"
                 " p.version,p.monthly_price,p.currency,p.valid_from,p.valid_to "
@@ -406,12 +417,12 @@ async def price_versions(
     sku: str, request: Request,
     principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    require_admin(principal)
+    require_catalog_reader(principal)
     if not SKU_RE.fullmatch(sku):
         raise HTTPException(404, detail="Unknown SKU")
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            await as_writer(conn, principal)
+            await as_catalog_reader(conn, principal)
             found = await conn.fetchval("SELECT true FROM flex_skus WHERE sku=$1", sku)
             if not found:
                 raise HTTPException(404, detail="Unknown SKU")
@@ -737,10 +748,10 @@ async def drafts(
     hotel_id: uuid.UUID | None = Query(None),
     principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    require_admin(principal)
+    require_catalog_reader(principal)
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            await as_writer(conn, principal)
+            await as_catalog_reader(conn, principal)
             rows = await conn.fetch(
                 "SELECT id,hotel_id,version,title,period_start,period_end,enforcement,state,"
                 " currency,items,proposed_monthly_total,created_by,created_at "
@@ -1035,25 +1046,62 @@ async def subscription_plans(request: Request,hotel_id: uuid.UUID=Query(...),
     principal: PlatformPrincipal=Depends(resolve_platform_principal)):
     require_admin(principal)
     async with request.app.state.flex_pool.acquire() as conn:
-        async with conn.transaction(readonly=True):
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
             await as_writer(conn,principal)
             rows=await conn.fetch("""SELECT a.id AS agreement_id,a.hotel_id,a.version,a.terms_digest,
                 p.id AS offer_id,p.package_kind,p.commercial_policy_version,p.term_months,p.period_start,
                 p.period_end_exclusive,p.sku_snapshot,p.subscription_term_total,p.implementation_total,
-                r.approved_at
+                r.approved_at,c.accepted_at,
+                i.trial_start,i.trial_end_exclusive
                 FROM flex_agreement_internal_approvals r
                 JOIN flex_commercial_agreement_versions a ON a.id=r.agreement_id AND a.hotel_id=r.hotel_id AND a.terms_digest=r.terms_digest
                 JOIN flex_tariff_package_versions p ON p.id=a.source_offer_id AND p.hotel_id=a.hotel_id
+                LEFT JOIN flex_customer_agreement_acceptances c ON c.agreement_id=a.id AND c.hotel_id=a.hotel_id AND c.terms_digest=a.terms_digest
+                LEFT JOIN flex_installation_completions i ON i.hotel_id=a.hotel_id
                 WHERE a.hotel_id=$1 AND a.state='DRAFT' ORDER BY a.version DESC""",hotel_id)
+            from .flex_finance_simulation import simulate_cash
+            events=await conn.fetch("""SELECT agreement_id,kind,event_id,amount,payment_id
+                FROM flex_qa_cash_events WHERE hotel_id=$1 ORDER BY agreement_id,sequence""",hotel_id)
+            by_agreement={}
+            for event in events:
+                by_agreement.setdefault(event["agreement_id"],[]).append(synthetic_cash_event(event))
             result=[]
+            today=datetime.now(ZoneInfo("Asia/Bishkek")).date()
             for row in rows:
                 data=dict(row)
                 if isinstance(data["sku_snapshot"],str):
                     data["sku_snapshot"]=json.loads(data["sku_snapshot"])
                 for k in ("subscription_term_total","implementation_total"):
                     data[k]=str(data[k])
+                start,end=data["trial_start"],data["trial_end_exclusive"]
+                trial_state=("NOT_STARTED" if start is None or today<start else
+                             "ACTIVE" if today<end else "EXPIRED")
                 data.update(state="PLAN_ONLY",enforcement="OFF",client_signed=False,
+                    customer_acceptance_state="ACCEPTED" if data["accepted_at"] else "AWAITING_CUSTOMER",
+                    trial_state=trial_state,
+                    trial_days_remaining=max(0,(end-today).days) if trial_state=="ACTIVE" else 0,
                     subscription_activated=False,payments_enabled=False)
+                data.update(test_finance=None,renewal_preview=None)
+                if data["accepted_at"]:
+                    events_for_plan=by_agreement.get(data["agreement_id"],[])
+                    total=Decimal(data["subscription_term_total"])+Decimal(data["implementation_total"])
+                    if total==0 and not events_for_plan:
+                        balance={"outstanding":"0.00","credit":"0.00","net_simulated_cash":"0.00","subscription_outstanding":"0.00"}
+                    else:
+                        balance=simulate_cash(data["subscription_term_total"],data["implementation_total"],events_for_plan)
+                    outstanding=Decimal(balance["outstanding"])
+                    credit=Decimal(balance["credit"])
+                    data["test_finance"]={k:balance[k] for k in ("outstanding","credit","net_simulated_cash","subscription_outstanding")}
+                    data["test_finance"].update(mode="SYNTHETIC_ONLY",
+                        state="TEST_SETTLED" if outstanding==0 else "TEST_OUTSTANDING",
+                        unapplied_credit_with_debt=outstanding>0 and credit>0)
+                    next_start=data["period_end_exclusive"]
+                    year,month0=divmod(next_start.year*12+next_start.month-1+data["term_months"],12)
+                    if year<=9999:
+                        next_end=date(year,month0+1,min(next_start.day,monthrange(year,month0+1)[1]))
+                        data["renewal_preview"]={"period_start":next_start,"period_end_exclusive":next_end,
+                            "term_months":data["term_months"],"state":"PROPOSAL_ONLY",
+                            "requires_new_offer":True,"bank_authorized":False}
                 result.append(data)
             return result
 
@@ -1108,7 +1156,7 @@ async def accept_customer_agreement(payload: AgreementInternalApproval,request: 
 
 class SimulationEvent(BaseModel):
     model_config=ConfigDict(extra="forbid")
-    kind: str = Field(pattern=r"^(PAYMENT|REFUND)$")
+    kind: str = Field(pattern=r"^(PAYMENT|REFUND|CREDIT_APPLY)$")
     event_id: str = Field(pattern=r"^[a-zA-Z0-9_-]{1,64}$")
     amount: str = Field(pattern=r"^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$")
     payment_id: str | None = Field(default=None,pattern=r"^[a-zA-Z0-9_-]{1,64}$")
@@ -1220,3 +1268,329 @@ async def append_synthetic_cash_journal(payload: SyntheticCashAppend,request: Re
                 VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *""",payload.agreement_id,payload.hotel_id,len(rows)+1,
                 event["event_id"],event["kind"],Decimal(event["amount"]),event["payment_id"],principal.subject_id)
             return synthetic_cash_snapshot(row,[*rows,saved],payload.hotel_id,payload.agreement_id)
+
+
+# Assignment administration: immutable QA events, one current assignment per hotel.
+class AgentAssignmentRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    hotel_id: uuid.UUID
+    agent_id: uuid.UUID
+    expected_revision: int = Field(strict=True,ge=0,le=2147483646)
+    action: str = Field(pattern=r"^(ASSIGN|RELEASE)$")
+
+
+@app.get("/v1/platform/agent-assignments")
+async def agent_assignments(request: Request,hotel_id: uuid.UUID=Query(...),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
+            await as_writer(conn,principal)
+            if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_hotels WHERE id=$1)",hotel_id):
+                raise HTTPException(404,detail="Hotel unavailable")
+            rows=await conn.fetch("SELECT * FROM flex_qa_agent_assignments WHERE hotel_id=$1 ORDER BY revision DESC",hotel_id)
+            agents=await conn.fetch("SELECT id,platform_subject_id,status FROM flex_agents WHERE status='ACTIVE' ORDER BY platform_subject_id,id")
+            return {"hotel_id":str(hotel_id),"revision":rows[0]["revision"] if rows else 0,
+                "current":dict(rows[0]) if rows and rows[0]["action"]=="ASSIGN" else None,
+                "history":[dict(r) for r in rows],"agents":[dict(r) for r in agents],
+                "payments_enabled":False,"payouts_enabled":False}
+
+
+@app.post("/v1/platform/agent-assignments",status_code=201)
+async def append_agent_assignment(payload: AgentAssignmentRequest,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await commercial_hotel_lock(conn,payload.hotel_id)
+            if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_hotels WHERE id=$1 AND status IN ('PENDING','ACTIVE'))",payload.hotel_id):
+                raise HTTPException(404,detail="Hotel unavailable")
+            last=await conn.fetchrow("SELECT * FROM flex_qa_agent_assignments WHERE hotel_id=$1 ORDER BY revision DESC LIMIT 1",payload.hotel_id)
+            revision=last["revision"] if last else 0
+            if last and revision==payload.expected_revision+1 and last["agent_id"]==payload.agent_id and last["action"]==payload.action:
+                return {**dict(last),"payments_enabled":False,"payouts_enabled":False}
+            if revision!=payload.expected_revision:
+                raise HTTPException(409,detail="Assignment revision changed")
+            active=last is not None and last["action"]=="ASSIGN"
+            if payload.action=="ASSIGN":
+                await conn.fetchval("SELECT pg_advisory_xact_lock(hashtextextended($1,0))","FLEX_EMPLOYMENT_"+str(payload.agent_id))
+                employment=await conn.fetchval("SELECT action FROM flex_qa_agent_employment_events WHERE agent_id=$1 ORDER BY revision DESC LIMIT 1",payload.agent_id)
+                if employment=="STOP":
+                    raise HTTPException(409,detail="Agent employment stopped")
+                if active:
+                    raise HTTPException(409,detail="Release current assignment first")
+                if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_agents WHERE id=$1 AND status='ACTIVE')",payload.agent_id):
+                    raise HTTPException(404,detail="Active agent unavailable")
+            elif not active or last["agent_id"]!=payload.agent_id:
+                raise HTTPException(409,detail="No matching current assignment")
+            row=await conn.fetchrow("""INSERT INTO flex_qa_agent_assignments(hotel_id,revision,agent_id,action,created_by)
+                VALUES($1,$2,$3,$4,$5) RETURNING *""",payload.hotel_id,revision+1,payload.agent_id,payload.action,principal.subject_id)
+            return {**dict(row),"payments_enabled":False,"payouts_enabled":False}
+
+
+class AgentEmploymentRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    agent_id: uuid.UUID
+    expected_revision: int=Field(strict=True,ge=0,le=2147483646)
+    action: str=Field(pattern=r"^(START|STOP)$")
+
+
+@app.get("/v1/platform/agent-employment")
+async def agent_employment(request: Request,principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn,principal)
+            rows=await conn.fetch("""SELECT a.id AS agent_id,a.platform_subject_id,a.status,
+                coalesce(e.revision,0) AS revision,e.action,e.created_at
+                FROM flex_agents a LEFT JOIN LATERAL
+                (SELECT revision,action,created_at FROM flex_qa_agent_employment_events
+                 WHERE agent_id=a.id ORDER BY revision DESC LIMIT 1) e ON true
+                ORDER BY a.platform_subject_id,a.id""")
+            return {"agents":[dict(r) for r in rows],"payouts_enabled":False}
+
+
+@app.post("/v1/platform/agent-employment",status_code=201)
+async def append_agent_employment(payload: AgentEmploymentRequest,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await conn.fetchval("SELECT pg_advisory_xact_lock(hashtextextended($1,0))","FLEX_EMPLOYMENT_"+str(payload.agent_id))
+            agent=await conn.fetchval("SELECT status FROM flex_agents WHERE id=$1",payload.agent_id)
+            if agent is None or (payload.action=="START" and agent!="ACTIVE"):
+                raise HTTPException(404,detail="Agent unavailable")
+            last=await conn.fetchrow("SELECT * FROM flex_qa_agent_employment_events WHERE agent_id=$1 ORDER BY revision DESC LIMIT 1",payload.agent_id)
+            revision=last["revision"] if last else 0
+            if last and revision==payload.expected_revision+1 and last["action"]==payload.action:
+                return {**dict(last),"payouts_enabled":False}
+            if revision!=payload.expected_revision:
+                raise HTTPException(409,detail="Employment revision changed")
+            if (payload.action=="STOP" and (not last or last["action"]!="START")) or (payload.action=="START" and last and last["action"]=="START"):
+                raise HTTPException(409,detail="Employment transition unavailable")
+            row=await conn.fetchrow("""INSERT INTO flex_qa_agent_employment_events(agent_id,revision,action,created_by)
+                VALUES($1,$2,$3,$4) RETURNING *""",payload.agent_id,revision+1,payload.action,principal.subject_id)
+            return {**dict(row),"payouts_enabled":False}
+
+
+INVESTOR_DRAFT_TIERS={150000:2500,250000:3500,400000:5000}
+
+
+class InvestorPlanRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid")
+    investor_id: uuid.UUID
+    expected_revision: int=Field(strict=True,ge=0,le=2147483646)
+    principal_kg: int=Field(strict=True)
+    hotel_ids: list[uuid.UUID]=Field(min_length=1,max_length=50)
+
+
+def investor_plan_response(row,hotels):
+    return {**dict(row),"principal":str(row["principal"]),
+        "hotels":[dict(h) for h in hotels],"payouts_enabled":False,
+        "principal_received_kg":None,"principal_repaid_kg":None,"bonus_end":None}
+
+
+@app.get("/v1/platform/investor-plans")
+async def investor_plans(request: Request,principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
+            await as_writer(conn,principal)
+            investors=await conn.fetch("SELECT id,platform_subject_id,status FROM flex_investors ORDER BY platform_subject_id,id")
+            hotels=await conn.fetch("SELECT id,display_name,status FROM flex_hotels WHERE status IN ('PENDING','ACTIVE') ORDER BY display_name,id")
+            plans=await conn.fetch("SELECT * FROM flex_qa_investor_plans ORDER BY investor_id,revision DESC")
+            links=await conn.fetch("SELECT * FROM flex_qa_investor_plan_hotels ORDER BY plan_id,hotel_id")
+            by_plan={}
+            for h in links:
+                by_plan.setdefault(h["plan_id"],[]).append(h)
+            return {"investors":[dict(i) for i in investors],"hotels":[dict(h) for h in hotels],
+                "plans":[investor_plan_response(p,by_plan.get(p["id"],[])) for p in plans],"payouts_enabled":False}
+
+
+@app.post("/v1/platform/investor-plans",status_code=201)
+async def create_investor_plan(payload: InvestorPlanRequest,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    if payload.principal_kg not in INVESTOR_DRAFT_TIERS or len(set(payload.hotel_ids))!=len(payload.hotel_ids):
+        raise HTTPException(422,detail="Choose approved investment tier and distinct hotels")
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await conn.fetchval("SELECT pg_advisory_xact_lock(hashtextextended($1,0))","FLEX_INVESTOR_PLAN_"+str(payload.investor_id))
+            last=await conn.fetchrow("SELECT * FROM flex_qa_investor_plans WHERE investor_id=$1 ORDER BY revision DESC LIMIT 1",payload.investor_id)
+            revision=last["revision"] if last else 0
+            if last and revision==payload.expected_revision+1 and last["principal"]==payload.principal_kg:
+                old=await conn.fetch("SELECT * FROM flex_qa_investor_plan_hotels WHERE plan_id=$1 ORDER BY hotel_id",last["id"])
+                if {h["hotel_id"] for h in old}==set(payload.hotel_ids):
+                    return investor_plan_response(last,old)
+            if revision!=payload.expected_revision:
+                raise HTTPException(409,detail="Investor plan revision changed")
+            if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_investors WHERE id=$1 AND status='ACTIVE')",payload.investor_id):
+                raise HTTPException(404,detail="Active investor unavailable")
+            hotels=await conn.fetch("SELECT id,display_name FROM flex_hotels WHERE id=ANY($1::uuid[]) AND status IN ('PENDING','ACTIVE') ORDER BY id",payload.hotel_ids)
+            if len(hotels)!=len(payload.hotel_ids):
+                raise HTTPException(404,detail="Commercial hotel unavailable")
+            row=await conn.fetchrow("""INSERT INTO flex_qa_investor_plans(investor_id,revision,principal,share_bps,created_by)
+                VALUES($1,$2,$3,$4,$5) RETURNING *""",payload.investor_id,revision+1,Decimal(payload.principal_kg),INVESTOR_DRAFT_TIERS[payload.principal_kg],principal.subject_id)
+            await conn.executemany("""INSERT INTO flex_qa_investor_plan_hotels(plan_id,investor_id,hotel_id,hotel_name_snapshot)
+                VALUES($1,$2,$3,$4)""",[(row["id"],payload.investor_id,h["id"],h["display_name"]) for h in hotels])
+            links=await conn.fetch("SELECT * FROM flex_qa_investor_plan_hotels WHERE plan_id=$1 ORDER BY hotel_id",row["id"])
+            return investor_plan_response(row,links)
+
+
+@app.get("/v1/platform/investment-projection")
+async def admin_investment_projection(request: Request,plan_id: uuid.UUID=Query(...),
+    monthly_revenue: str=Query(...,pattern=r"^(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,2})?$"),
+    start_month: date=Query(...),elapsed_months: int=Query(...,ge=0,le=120),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    from .flex_partner_portal import investment_projection
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(readonly=True):
+            await as_writer(conn,principal)
+            row=await conn.fetchrow("SELECT principal,share_bps,bonus_months FROM flex_qa_investor_plans WHERE id=$1",plan_id)
+            if row is None:
+                raise HTTPException(404,detail="Investment proposal unavailable")
+            try:
+                return {"plan_id":str(plan_id),**investment_projection(row["principal"],row["share_bps"],row["bonus_months"],Decimal(monthly_revenue),start_month,elapsed_months)}
+            except (ValueError,ArithmeticError):
+                raise HTTPException(422,detail="Invalid forecast scenario") from None
+
+
+class PartnerProposalRequest(BaseModel):
+    model_config=ConfigDict(extra="forbid",str_strip_whitespace=True)
+    partner_subject_id: str=Field(min_length=2,max_length=180)
+    hotel_id: uuid.UUID
+    expected_revision: int=Field(strict=True,ge=0,le=2147483646)
+    title: str=Field(min_length=2,max_length=120)
+    terms_text: str=Field(min_length=2,max_length=2000)
+
+
+@app.get("/v1/platform/partner-proposals")
+async def partner_proposals(request: Request,principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
+            await as_writer(conn,principal)
+            partners=await conn.fetch("SELECT subject_id,active FROM flex_platform_memberships WHERE role='PARTNER' ORDER BY subject_id")
+            hotels=await conn.fetch("SELECT id,display_name FROM flex_hotels WHERE status IN ('PENDING','ACTIVE') ORDER BY display_name,id")
+            proposals=await conn.fetch("SELECT * FROM flex_qa_partner_proposals ORDER BY partner_subject_id,hotel_id,revision DESC")
+            return {"partners":[dict(p) for p in partners],"hotels":[dict(h) for h in hotels],
+                "proposals":[dict(p) for p in proposals],"payouts_enabled":False}
+
+
+@app.post("/v1/platform/partner-proposals",status_code=201)
+async def create_partner_proposal(payload: PartnerProposalRequest,request: Request,
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    require_admin(principal)
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction():
+            await as_writer(conn,principal)
+            await commercial_hotel_lock(conn,payload.hotel_id)
+            if not await conn.fetchval("SELECT EXISTS(SELECT 1 FROM flex_platform_memberships WHERE subject_id=$1 AND role='PARTNER' AND active)",payload.partner_subject_id):
+                raise HTTPException(404,detail="Active partner unavailable")
+            hotel=await conn.fetchval("SELECT display_name FROM flex_hotels WHERE id=$1 AND status IN ('PENDING','ACTIVE')",payload.hotel_id)
+            if hotel is None:
+                raise HTTPException(404,detail="Hotel unavailable")
+            last=await conn.fetchrow("SELECT * FROM flex_qa_partner_proposals WHERE partner_subject_id=$1 AND hotel_id=$2 ORDER BY revision DESC LIMIT 1",payload.partner_subject_id,payload.hotel_id)
+            revision=last["revision"] if last else 0
+            if last and revision==payload.expected_revision+1 and last["title"]==payload.title and last["terms_text"]==payload.terms_text:
+                return {**dict(last),"payouts_enabled":False}
+            if revision!=payload.expected_revision:
+                raise HTTPException(409,detail="Proposal revision changed")
+            row=await conn.fetchrow("""INSERT INTO flex_qa_partner_proposals(partner_subject_id,hotel_id,revision,hotel_name_snapshot,title,terms_text,created_by)
+                VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *""",payload.partner_subject_id,payload.hotel_id,revision+1,hotel,payload.title,payload.terms_text,principal.subject_id)
+            return {**dict(row),"payouts_enabled":False}
+
+
+@app.get("/v1/platform/commercial-center")
+async def commercial_center(request: Request,offset: int=Query(0,ge=0,le=1000000),
+    principal: PlatformPrincipal=Depends(resolve_platform_principal)):
+    """Page-scoped, read-only financial center. Drafts and ledger never combined."""
+    from .flex_finance_simulation import simulate_cash
+    require_admin(principal)
+    limit=25
+    today=datetime.now(ZoneInfo("Asia/Bishkek")).date()
+    fields=("amount_due","net_confirmed_cash","net_applied_to_lines","outstanding","unapplied_cash_credit")
+    zero=Decimal("0.00")
+    draft_fields=("subscription","implementation","net_simulated_cash","outstanding","credit")
+    def amounts(keys): return {k:zero for k in keys}
+    def display(values): return {k:str(v) for k,v in values.items()}
+    async with request.app.state.flex_pool.acquire() as conn:
+        async with conn.transaction(isolation="repeatable_read",readonly=True):
+            await as_writer(conn,principal)
+            count=await conn.fetchval("SELECT count(*) FROM flex_hotels")
+            hotels=await conn.fetch("SELECT id,display_name,status FROM flex_hotels ORDER BY display_name,id LIMIT $1 OFFSET $2",limit,offset)
+            ids=[h["id"] for h in hotels]
+            plans=await conn.fetch("""SELECT DISTINCT ON(a.hotel_id) a.hotel_id,a.id AS agreement_id,a.version,
+                p.package_kind,p.period_start,p.period_end_exclusive,p.subscription_term_total,p.implementation_total
+                FROM flex_commercial_agreement_versions a
+                JOIN flex_customer_agreement_acceptances c ON c.agreement_id=a.id AND c.hotel_id=a.hotel_id AND c.terms_digest=a.terms_digest
+                JOIN flex_tariff_package_versions p ON p.id=a.source_offer_id AND p.hotel_id=a.hotel_id
+                WHERE a.hotel_id=ANY($1::uuid[]) AND a.state='DRAFT'
+                ORDER BY a.hotel_id,a.version DESC""",ids)
+            by_hotel={p["hotel_id"]:p for p in plans}
+            plan_ids=[p["agreement_id"] for p in plans]
+            events=await conn.fetch("""SELECT agreement_id,kind,event_id,amount,payment_id
+                FROM flex_qa_cash_events WHERE agreement_id=ANY($1::uuid[]) ORDER BY agreement_id,sequence""",plan_ids)
+            by_plan={}
+            for event in events:
+                by_plan.setdefault(event["agreement_id"],[]).append(synthetic_cash_event(event))
+            previews=await conn.fetch("""SELECT hotel_id,count(*) AS n FROM flex_non_issuable_invoice_previews
+                WHERE hotel_id=ANY($1::uuid[]) GROUP BY hotel_id""",ids)
+            preview_counts={r["hotel_id"]:r["n"] for r in previews}
+            trials=await conn.fetch("SELECT hotel_id,trial_start,trial_end_exclusive FROM flex_installation_completions WHERE hotel_id=ANY($1::uuid[])",ids)
+            trial_by_hotel={r["hotel_id"]:r for r in trials}
+            roster=await conn.fetchrow("""SELECT
+                (SELECT count(*) FROM flex_agents WHERE status='ACTIVE') AS active_agents,
+                (SELECT count(*) FROM flex_investors WHERE status='ACTIVE') AS active_investors,
+                (SELECT count(*) FROM flex_platform_memberships WHERE role='PARTNER' AND active) AS active_partners,
+                (SELECT count(*) FROM flex_qa_investor_plans) AS investor_draft_versions,
+                (SELECT count(*) FROM flex_qa_partner_proposals) AS partner_draft_versions""")
+            result=[]
+            draft_totals=amounts(draft_fields)
+            for hotel in hotels:
+                hid=hotel["id"]
+                plan=by_hotel.get(hid)
+                trial=trial_by_hotel.get(hid)
+                trial_state="NOT_STARTED" if not trial or today<trial["trial_start"] else "ACTIVE" if today<trial["trial_end_exclusive"] else "EXPIRED"
+                item={**dict(hotel),"preview_count":preview_counts.get(hid,0),"trial_state":trial_state,"test_plan":None}
+                if plan:
+                    sub,setup=plan["subscription_term_total"],plan["implementation_total"]
+                    journal=by_plan.get(plan["agreement_id"],[])
+                    balance=simulate_cash(sub,setup,journal) if sub+setup>zero or journal else {"net_simulated_cash":"0.00","outstanding":"0.00","credit":"0.00"}
+                    values={"subscription":sub,"implementation":setup,**{k:Decimal(balance[k]) for k in ("net_simulated_cash","outstanding","credit")}}
+                    for k,v in values.items(): draft_totals[k]+=v
+                    item["test_plan"]={"agreement_id":plan["agreement_id"],"version":plan["version"],"package_kind":plan["package_kind"],
+                        "period_start":plan["period_start"],"period_end_exclusive":plan["period_end_exclusive"],**display(values)}
+                result.append(item)
+            # Return to original runtime, then use the existing per-hotel ledger scope.
+            await conn.execute("RESET ROLE")
+            await conn.execute("SET LOCAL ROLE flex_platform_admin_reader")
+            ledger_totals=amounts(fields)
+            ledger_count=0
+            reconciled=True
+            for item in result:
+                await conn.execute("SELECT set_config('flex.authorized_hotel_id',$1,true)",str(item["id"]))
+                rows=await conn.fetch("""SELECT b.* FROM flex_refund_adjusted_invoice_balances b
+                    JOIN flex_issued_invoice_records e ON e.invoice_id=b.invoice_id AND e.hotel_id=b.hotel_id
+                    JOIN flex_invoices i ON i.id=b.invoice_id
+                    WHERE b.hotel_id=$1 AND i.status IN ('ISSUED','PARTIALLY_PAID','PAID')""",item["id"])
+                values={k:sum((r[k] for r in rows),zero) for k in fields}
+                ok=all(r["amount_due"]==r["net_applied_to_lines"]+r["outstanding"] and
+                    r["net_confirmed_cash"]==r["net_applied_to_lines"]+r["unapplied_cash_credit"]
+                    and all(r[k]>=zero for k in fields) for r in rows)
+                item["ledger"]={"invoice_count":len(rows),"reconciled":ok,**display(values)}
+                for k,v in values.items(): ledger_totals[k]+=v
+                ledger_count+=len(rows)
+                reconciled=reconciled and ok
+            return {"currency":"KGS","offset":offset,"limit":limit,"hotel_count":count,"page_count":len(result),
+                "rows":result,"trial_active_on_page":sum(r["trial_state"]=="ACTIVE" for r in result),
+                "preview_count_on_page":sum(r["preview_count"] for r in result),
+                "test_plan_totals":display(draft_totals),"test_plan_basis":"LATEST_ACCEPTED_DRAFT_PER_HOTEL_ON_PAGE",
+                "ledger_totals":display(ledger_totals),"ledger_invoice_count":ledger_count,"ledger_reconciled":reconciled,
+                "ledger_basis":"ISSUED_INVOICE_LEDGER_ON_PAGE_NOT_BANK_VERIFIED",
+                "participant_counts":dict(roster),"actual_revenue_kg":None,"actual_payouts_kg":None,
+                "actual_partner_obligations_kg":None,"payments_enabled":False,"payouts_enabled":False}

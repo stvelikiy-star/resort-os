@@ -102,13 +102,13 @@ jobs:
           psql --version
       - name: Refuse installation outside empty disposable PostgreSQL 16 database
         run: psql -X -v ON_ERROR_STOP=1 -d flex_ci -f scripts/marina_flex_qa_db_preflight.sql
-      - name: Install all twenty-five independent FLEX preview migrations in exact order
+      - name: Install all thirty-one independent FLEX preview migrations in exact order
         run: |
           set -euo pipefail
           test -f "docs/flex/sql/0010_flex_partner_earnings_preview.sql"
           test -f "docs/flex/sql/0011_flex_catalog_subscription_drafts_preview.sql"
           test -f "docs/flex/sql/0012_flex_tariff_package_versions_preview.sql"
-          for file in 0001_flex_control_plane_preview.sql 0002_flex_platform_identity_rls_preview.sql 0003_flex_price_version_guard_preview.sql 0004_flex_hotel_onboarding_preview.sql 0005_flex_deployment_attestation_preview.sql 0006_flex_agreements_subscription_preview.sql 0007_flex_invoice_ledger_preview.sql 0008_flex_refund_reconciliation_preview.sql 0009_flex_signed_qa_settlement_preview.sql 0010_flex_partner_earnings_preview.sql 0011_flex_catalog_subscription_drafts_preview.sql 0012_flex_tariff_package_versions_preview.sql 0013_flex_shared_tariff_templates_preview.sql 0014_flex_hotel_name_edit_preview.sql 0015_flex_commercial_policy_preview.sql 0016_flex_commercial_policy_edit.sql 0017_flex_package_term_snapshot.sql 0018_flex_installation_trial.sql 0019_flex_force_financial_rls.sql 0020_flex_launch_offer_reservations.sql 0021_flex_customer_agreement_drafts.sql 0022_flex_admin_reconciliation_read.sql 0023_flex_agreement_internal_approval.sql 0024_flex_customer_terms_acceptance.sql 0025_flex_synthetic_cash_journal.sql; do
+          for file in 0001_flex_control_plane_preview.sql 0002_flex_platform_identity_rls_preview.sql 0003_flex_price_version_guard_preview.sql 0004_flex_hotel_onboarding_preview.sql 0005_flex_deployment_attestation_preview.sql 0006_flex_agreements_subscription_preview.sql 0007_flex_invoice_ledger_preview.sql 0008_flex_refund_reconciliation_preview.sql 0009_flex_signed_qa_settlement_preview.sql 0010_flex_partner_earnings_preview.sql 0011_flex_catalog_subscription_drafts_preview.sql 0012_flex_tariff_package_versions_preview.sql 0013_flex_shared_tariff_templates_preview.sql 0014_flex_hotel_name_edit_preview.sql 0015_flex_commercial_policy_preview.sql 0016_flex_commercial_policy_edit.sql 0017_flex_package_term_snapshot.sql 0018_flex_installation_trial.sql 0019_flex_force_financial_rls.sql 0020_flex_launch_offer_reservations.sql 0021_flex_customer_agreement_drafts.sql 0022_flex_admin_reconciliation_read.sql 0023_flex_agreement_internal_approval.sql 0024_flex_customer_terms_acceptance.sql 0025_flex_synthetic_cash_journal.sql 0026_flex_synthetic_credit_application.sql 0027_flex_participant_details.sql 0028_flex_qa_agent_assignments.sql 0029_flex_qa_agent_employment.sql 0030_flex_qa_investor_plans.sql 0031_flex_qa_partner_proposals.sql; do
             psql -X -v ON_ERROR_STOP=1 -d flex_ci -f "docs/flex/sql/$file"
           done
           sha256sum docs/flex/sql/*.sql
@@ -231,7 +231,9 @@ jobs:
           python scripts/marina_flex_migration_runner.py --ci --schema public --apply
           python scripts/marina_flex_migration_runner.py --ci --schema public --apply | tee /tmp/flex_runner_repeat.log
           grep -q '0 pending' /tmp/flex_runner_repeat.log
-          test "$(psql -X -Atqc 'SELECT count(*) FROM flex_schema_migrations')" = 25
+          test "$(psql -X -Atqc 'SELECT count(*) FROM flex_schema_migrations')" = 31
+          test "$(psql -X -Atqc "SELECT count(*) FROM flex_schema_migrations WHERE disposition='APPLIED'")" = 30
+          test "$(psql -X -Atqc 'SELECT string_agg(migration_id::text,CHR(44) ORDER BY migration_id) FROM flex_schema_migrations')" = "$(seq -s, 1 31)"
           test "$(psql -X -Atqc 'SELECT disposition FROM flex_schema_migrations WHERE migration_id=9')" = SKIPPED_PAYMENT_FREEZE
           test "$(psql -X -Atqc 'SELECT count(*) FROM flex_confirmed_payments')" = 0
       - name: Reject checksum mismatch without changing schema
@@ -240,4 +242,6 @@ jobs:
           psql -X -v ON_ERROR_STOP=1 -c "UPDATE flex_schema_migrations SET git_blob_sha=repeat('0',40) WHERE migration_id=14"
           if python scripts/marina_flex_migration_runner.py --ci --schema public --apply > /tmp/flex_runner_bad.log 2>&1; then exit 1; fi
           grep -q 'SHA or filename mismatch' /tmp/flex_runner_bad.log
-          test "$(psql -X -Atqc 'SELECT count(*) FROM flex_schema_migrations')" = 25
+          test "$(psql -X -Atqc 'SELECT count(*) FROM flex_schema_migrations')" = 31
+          test "$(psql -X -Atqc "SELECT count(*) FROM flex_schema_migrations WHERE disposition='APPLIED'")" = 30
+          test "$(psql -X -Atqc 'SELECT string_agg(migration_id::text,CHR(44) ORDER BY migration_id) FROM flex_schema_migrations')" = "$(seq -s, 1 31)"

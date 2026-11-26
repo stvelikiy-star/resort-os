@@ -265,7 +265,9 @@ def run():
         expect(panel).to_be_visible()
         expect(panel).to_contain_text("36,000 KGS")
         expect(panel).to_contain_text("25,000 KGS")
-        expect(panel).to_contain_text("PLAN_ONLY")
+        expect(panel.locator('tr[data-plan-state="PLAN_ONLY"][data-subscription-activated="false"]')).to_have_count(1)
+        expect(panel).to_contain_text("Awaiting acceptance")
+        expect(panel).to_contain_text("Subscription not activated")
         query="""SELECT json_build_object('approvals',count(*),'signed',(SELECT count(*) FROM flex_private.flex_commercial_agreement_versions WHERE state='SIGNED'),
             'payments',(SELECT count(*) FROM flex_private.flex_confirmed_payments),'subscriptions',(SELECT count(*) FROM flex_private.flex_subscriptions))
             FROM flex_private.flex_agreement_internal_approvals"""

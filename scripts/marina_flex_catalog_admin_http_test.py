@@ -716,6 +716,16 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
         self.assertFalse(data["launch_offer_finalized"])
         self.assertEqual(self.get(read).json(),data)
         self.assertEqual(self.get(read.replace(HOTEL_A,HOTEL_B)).status_code,404)
+        plans=self.get("/v1/platform/subscription-plans?hotel_id="+HOTEL_A).json()
+        plan=next(p for p in plans if p["agreement_id"]==contract["id"])
+        self.assertEqual(plan["customer_acceptance_state"],"ACCEPTED")
+        self.assertEqual(Decimal(plan["test_finance"]["outstanding"]),Decimal("3000"))
+        self.assertEqual(Decimal(plan["test_finance"]["credit"]),Decimal("0"))
+        self.assertEqual(plan["test_finance"]["mode"],"SYNTHETIC_ONLY")
+        self.assertEqual(plan["renewal_preview"]["period_start"],plan["period_end_exclusive"])
+        self.assertTrue(plan["renewal_preview"]["requires_new_offer"])
+        self.assertFalse(plan["renewal_preview"]["bank_authorized"])
+        self.assertFalse(plan["subscription_activated"])
         async def verify():
             con=await asyncpg.connect(os.environ["FLEX_TEST_DB_OWNER_URL"])
             try:
@@ -727,6 +737,33 @@ class ActualDatabaseAdminHTTP(unittest.TestCase):
                     await con.execute("UPDATE flex_qa_cash_events SET amount=1 WHERE event_id='p1'")
             finally: await con.close()
         asyncio.run(verify())
+
+
+    def test_18_explicit_credit_application(self):
+        path="/v1/platform/synthetic-cash-journal"
+        contract=self.get("/v1/platform/agreement-drafts?hotel_id="+HOTEL_A).json()["agreements"][0]
+        base={"hotel_id":HOTEL_A,"agreement_id":contract["id"]}
+        def append(n,key,amount,kind="PAYMENT",payment_id=None):
+            return self.post(path,{**base,"expected_sequence":n,"event":{
+                "kind":kind,"event_id":key,"amount":amount,"payment_id":payment_id}})
+        self.assertEqual(append(3,"p3","8000").status_code,201)
+        before=append(4,"r2","4000","REFUND","p1").json()
+        self.assertEqual(Decimal(before["outstanding"]),Decimal("4000"))
+        self.assertEqual(Decimal(before["credit"]),Decimal("5000"))
+        self.assertEqual(append(5,"bad-credit","4001","CREDIT_APPLY","p3").status_code,422)
+        result=append(5,"c1","4000","CREDIT_APPLY","p3")
+        self.assertEqual(result.status_code,201,result.text)
+        after=result.json()
+        self.assertEqual(Decimal(after["outstanding"]),Decimal("0"))
+        self.assertEqual(Decimal(after["credit"]),Decimal("1000"))
+        self.assertEqual(after["net_simulated_cash"],before["net_simulated_cash"])
+        self.assertEqual(append(5,"c1","4000","CREDIT_APPLY","p3").json(),after)
+        self.assertFalse(after["payments_enabled"])
+        self.assertFalse(after["subscription_activated"])
+        refund=append(6,"r3","2000","REFUND","p3").json()
+        self.assertEqual(Decimal(refund["outstanding"]),Decimal("1000"))
+        self.assertEqual(Decimal(refund["credit"]),Decimal("0"))
+        self.assertEqual(Decimal(refund["discrepancy"]),Decimal("0"))
 
 
 if __name__=="__main__":

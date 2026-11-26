@@ -16,7 +16,9 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from fastapi.testclient import TestClient
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"services"/"api"))
-from app.flex_partner_portal import app
+from app.flex_partner_portal import app, investment_projection
+from datetime import date
+from decimal import Decimal
 
 
 class ScopedCommercialParticipants(unittest.TestCase):
@@ -74,6 +76,11 @@ class ScopedCommercialParticipants(unittest.TestCase):
         self.assertEqual(b.json()["reversed_kg"],"0.00")
         self.assertEqual(a.json()["data_provenance"],"QA_ONLY_NOT_BANK_RECONCILED")
         self.assertIsNone(a.json()["actual_paid_kg"])
+        self.assertIsNone(a.json()["outstanding_payable_kg"])
+        self.assertEqual(len(a.json()["history"]),2)
+        self.assertEqual(len(b.json()["history"]),1)
+        self.assertTrue(set(x["id"] for x in a.json()["history"]).isdisjoint(x["id"] for x in b.json()["history"]))
+        self.assertEqual(a.json()["contracts"],[])
 
     def test_investors_require_mfa_and_never_view_other_investor(self):
         no_mfa=self.get("/v1/partner/me/earnings","investor-1")
@@ -85,6 +92,8 @@ class ScopedCommercialParticipants(unittest.TestCase):
         self.assertEqual(a.json()["net_accrued_kg"],"24.00")
         self.assertEqual(b.json()["net_accrued_kg"],"50.00")
         self.assertEqual(a.json()["payout_status"],"NOT_IMPLEMENTED")
+        self.assertEqual(a.json()["assigned_hotels"],[])
+        self.assertTrue(set(x["id"] for x in a.json()["contracts"]).isdisjoint(x["id"] for x in b.json()["contracts"]))
         self.assertIsNone(a.json()["actual_paid_kg"])
 
     def test_roles_from_token_ignored_and_hotel_owner_forbidden(self):
@@ -114,6 +123,11 @@ class ScopedCommercialParticipants(unittest.TestCase):
         self.assertEqual(rows["INVESTOR"]["net_accrued_kg"],"74.00")
         self.assertFalse(summary.json()["payouts_enabled"])
 
+    def test_partner_proposal_endpoint_denies_other_roles(self):
+        for subject in ("sales-1","investor-1","owner-a","administrator"):
+            self.assertEqual(self.get("/v1/partner/me/proposals",subject,mfa=True).status_code,403)
+        self.assertEqual(self.client.get("/v1/partner/me/proposals").status_code,401)
+
     def test_read_only_and_period_validation(self):
         self.assertEqual(self.get("/v1/partner/me/earnings?period=year",
                                   "sales-1").status_code,422)
@@ -121,6 +135,27 @@ class ScopedCommercialParticipants(unittest.TestCase):
             headers={"Authorization":"Bearer "+self.token("investor-1",mfa=True)},
             json={"amount":9999}).status_code,(404,405))
         self.assertEqual(self.client.get("/health").json()["payouts_enabled"],False)
+
+
+class InvestmentProjectionTest(unittest.TestCase):
+    def test_principal_cap_and_three_month_bonus(self):
+        args=(Decimal("150000"),2500,3,Decimal("160000"),date(2026,12,1))
+        r=investment_projection(*args,4)
+        self.assertEqual(r["projected_principal_repaid"],"150000.00")
+        self.assertEqual(r["final_principal_payment"],"30000.00")
+        self.assertEqual(r["bonus_start"],date(2027,4,1))
+        self.assertEqual(r["bonus_end_exclusive"],date(2027,7,1))
+        self.assertEqual(r["stage"],"BONUS")
+        r=investment_projection(*args,7)
+        self.assertEqual(r["projected_bonus_paid"],"120000.00")
+        self.assertEqual(r["stage"],"ENDED")
+        self.assertIsNone(r["actual_principal_repaid"])
+        self.assertFalse(r["payouts_enabled"])
+    def test_zero_revenue(self):
+        r=investment_projection(Decimal("250000"),3500,3,Decimal("0"),date(2026,12,1),120)
+        self.assertEqual(r["projected_principal_remaining"],"250000.00")
+        self.assertIsNone(r["bonus_start"])
+        self.assertEqual(r["stage"],"RETURN")
 
 
 if __name__=="__main__":
