@@ -1112,7 +1112,10 @@ CUSTOMER_ACCEPTANCE_ROLE="flex_customer_acceptance_writer"
 async def as_customer_acceptance(conn,principal,hotel_id):
     if principal.role!="HOTEL_OWNER" or str(hotel_id) not in principal.hotel_ids:
         raise HTTPException(404,detail="Hotel not found")
-    if not principal.mfa_verified:
+    # resolve_platform_principal has already verified the signed token and live membership.
+    # A non-MFA token is accepted here only under the existing QA Preview password gate.
+    allow_qa_password = qa_password_reads() and os.environ.get("FLEX_ENABLE_QA_CATALOG_DRAFTS") == "true"
+    if not (principal.mfa_verified or allow_qa_password):
         raise HTTPException(403,detail="Verified customer session required")
     if not await conn.fetchval("SELECT pg_has_role(current_user,$1,'MEMBER') AND NOT pg_has_role(current_user,$1,'USAGE')",CUSTOMER_ACCEPTANCE_ROLE):
         raise HTTPException(503,detail="Customer acceptance is not enabled for this runtime")
