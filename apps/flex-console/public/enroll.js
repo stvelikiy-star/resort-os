@@ -39,3 +39,14 @@ el('verify').onsubmit=async event=>{
     el('status').textContent='Приложение-аутентификатор подтверждено.';
   }catch{el('status').textContent='Код не принят. Введите текущий код из приложения.';}
 };
+
+el('resend-invite').onclick=async event=>{
+  const field=el('enroll').elements.email;
+  if(!field.reportValidity())return;
+  const button=event.currentTarget;button.disabled=true;
+  try{
+    await post('resend-owner-invite',{email:field.value.trim()});
+    el('status').textContent='Если приглашение доступно, письмо будет отправлено на указанный адрес. / Чакыруу жеткиликтүү болсо, кат көрсөтүлгөн дарекке жөнөтүлөт. / If an invitation is available, an email will be sent to that address.';
+  }catch{el('status').textContent='Не удалось выполнить запрос. / Сурам аткарылган жок. / Request failed.';}
+  finally{button.disabled=false;}
+};
