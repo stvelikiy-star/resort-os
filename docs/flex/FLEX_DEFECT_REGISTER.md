@@ -24,3 +24,9 @@ Owner roadmap edition 1.0; work strictly in current stage. CODE READY is not TES
 | FLEX-017 | P1 | Full cloud role/language/theme/viewport matrix not accepted. | Stage 8/9. |
  
 No defect closed merely because code exists. No unrelated repo or active cloud changes authorized by this record.
+
+## 2026-11-26 evidence update (append-only)
+- FLEX-018/019: previous candidate dc9c72d scope and admin route contract CI PASS (45748453456, 45748453586). New HEAD requires retest.
+- FLEX-020/021 remain IN PROGRESS: source comparison identified canonical recovery and exact session binding as successors of obsolete alternate implementations; added regression in d46f286 (CI pending). Legacy read-only catalog flag-off behavior and remaining UX differences need verification; preserve old heads.
+- Historical Console translation/helper failures, browser PLAN_ONLY assertion and stale 25-row migration expectation: corrected in dcde564/e35066a/dc9c72d, TEST PASS at dc9c72d (45748453830, 45748453586, 45748453456). No cloud acceptance claimed.
+- FLEX-010: disposable restore PASS, active cloud independent restore NOT RUN.
