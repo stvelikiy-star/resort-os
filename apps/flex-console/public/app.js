@@ -17,7 +17,20 @@ const identityCopy={
  en:{heading:'Sign in to MARINA SMART FLEX',email:'Email',password:'Password',signIn:'Continue',mfa:'Authenticator code',verify:'Verify code',onlyIdentity:'Signing in does not grant SUPER ADMIN access. Commercial permissions require verified MFA and a server-authorized role.',signedIn:'Identity verified, but the server has not granted dashboard access. Sign out and sign in again if the session is stale.',signOut:'Sign out of identity',failed:'Unable to verify identity',disabled:'Identity sign-in is not configured yet',totpHint:'Enter the six-digit code from your authenticator app.'}
 };
 const recoveryCopy={"ru":{"forgot":"Забыли пароль?","resetTitle":"Восстановление пароля","send":"Отправить ссылку","sent":"Если аккаунт существует, письмо с инструкцией будет отправлено.","back":"Вернуться ко входу","newPassword":"Новый пароль","confirm":"Повторите пароль","save":"Сохранить пароль","done":"Пароль изменён. Войдите снова.","mismatch":"Пароли не совпадают.","error":"Не удалось выполнить операцию. Повторите попытку или обратитесь в поддержку."},"kg":{"forgot":"Сырсөздү унуттуңузбу?","resetTitle":"Сырсөздү калыбына келтирүү","send":"Шилтемени жөнөтүү","sent":"Каттоо эсеби бар болсо, нускама электрондук почтага жөнөтүлөт.","back":"Кирүү бетине кайтуу","newPassword":"Жаңы сырсөз","confirm":"Сырсөздү кайталаңыз","save":"Сырсөздү сактоо","done":"Сырсөз өзгөртүлдү. Кайра кириңиз.","mismatch":"Сырсөздөр дал келбейт.","error":"Аракет аткарылган жок. Кайра аракет кылыңыз же колдоо кызматына кайрылыңыз."},"en":{"forgot":"Forgot password?","resetTitle":"Reset password","send":"Send reset link","sent":"If the account exists, recovery instructions will be sent.","back":"Back to sign in","newPassword":"New password","confirm":"Confirm password","save":"Save password","done":"Password changed. Please sign in again.","mismatch":"Passwords do not match.","error":"Unable to complete the request. Try again or contact support."}};
+for(const [lang,copy] of Object.entries({
+ ru:{invalidLink:'Ссылка недействительна или уже использована. Запросите новую ссылку восстановления.',passwordPolicy:'Пароль должен содержать от 12 до 128 символов.',tooMany:'Слишком много попыток. Повторите через минуту.',unavailable:'Сервис восстановления временно недоступен. Повторите позже.'},
+ kg:{invalidLink:'Шилтеме жараксыз же колдонулган. Жаңы шилтеме сураңыз.',passwordPolicy:'Сырсөз 12–128 белгиден турушу керек.',tooMany:'Аракеттер өтө көп. Бир мүнөттөн кийин кайталаңыз.',unavailable:'Калыбына келтирүү кызматы убактылуу жеткиликсиз.'},
+ en:{invalidLink:'This link is invalid or has already been used. Request a new reset link.',passwordPolicy:'Use a password between 12 and 128 characters.',tooMany:'Too many attempts. Retry in one minute.',unavailable:'Password recovery is temporarily unavailable. Try again later.'}
+}))Object.assign(recoveryCopy[lang],copy);
 const recoveryText=k=>(recoveryCopy[state.lang]||recoveryCopy.ru)[k];
+function recoveryFailure(error,resetting){
+ const code=error?.identityCode;
+ if(error?.status===429)return 'tooMany';
+ if(error?.status>=500)return 'unavailable';
+ if(resetting&&['INVALID_TOKEN','TOKEN_EXPIRED','INVALID_RESET_TOKEN','RESET_PASSWORD_TOKEN_EXPIRED'].includes(code))return 'invalidLink';
+ if(resetting&&['PASSWORD_TOO_SHORT','PASSWORD_TOO_LONG','INVALID_PASSWORD','PASSWORD_VALIDATION_FAILED'].includes(code))return 'passwordPolicy';
+ return 'error';
+}
 let recoveryToken=new URLSearchParams(location.hash.slice(1)).get('reset');
 if(recoveryToken)history.replaceState(null,'',location.pathname+location.search);
 function recoveryPanel(){
@@ -31,10 +44,11 @@ async function submitRecovery(form){
  try{
   if(state.identityStep==='reset'){
    if(form.elements.password.value!==form.elements.confirm.value){state.recoveryMessage='mismatch';render();return;}
+   if(!recoveryToken){state.identityStep='forgot';state.recoveryMessage='invalidLink';return;}
    await identityRequest('reset-password',{token:recoveryToken,newPassword:form.elements.password.value});
    recoveryToken=null;state.identityStep='email';state.recoveryMessage='done';
   }else{await identityRequest('request-password-reset',{email:form.elements.email.value.trim(),redirectTo:location.origin+'/'});state.recoveryMessage='sent';}
- }catch{state.recoveryMessage='error';}finally{btn.disabled=false;render();}
+ }catch(error){state.recoveryMessage=recoveryFailure(error,state.identityStep==='reset');if(state.recoveryMessage==='invalidLink'){recoveryToken=null;state.identityStep='forgot';}}finally{btn.disabled=false;render();}
 }
 function identityText(key){return (identityCopy[state.lang]||identityCopy.ru)[key];}
 async function identityRequest(endpoint,body){
@@ -44,7 +58,12 @@ async function identityRequest(endpoint,body){
    body:JSON.stringify(body)
  });
  const payload=await response.json().catch(()=>({}));
- if(!response.ok)throw Error('IDENTITY_REJECTED');
+ if(!response.ok){
+   const error=Error('IDENTITY_REJECTED');
+   error.status=response.status;
+   error.identityCode=typeof payload.code==='string'?payload.code:'';
+   throw error;
+ }
  return payload;
 }
 async function identitySession(){

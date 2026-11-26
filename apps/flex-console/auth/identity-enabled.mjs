@@ -122,5 +122,17 @@ export async function handleEnabledIdentity(req,res,issueSessionCookie) {
     const origin=new URL(process.env.BETTER_AUTH_URL).origin;
     return toNodeHandler(request=>verifiedLogin(auth,request,origin,issueSessionCookie,passwordMode()))(req,res);
   }
+  if(path==='/api/identity/reset-password' && req.method==='POST'){
+    // Preserve Better Auth behavior; log bounded categories, never credentials.
+    return toNodeHandler(async request=>{
+      const response=await auth.handler(request);
+      if(!response.ok){
+        const body=await response.clone().json().catch(()=>({}));
+        const known=['INVALID_TOKEN','TOKEN_EXPIRED','INVALID_RESET_TOKEN','RESET_PASSWORD_TOKEN_EXPIRED','PASSWORD_TOO_SHORT','PASSWORD_TOO_LONG','INVALID_PASSWORD','PASSWORD_VALIDATION_FAILED','INVALID_ORIGIN','FORBIDDEN'];
+        console.warn('FLEX_RESET_REJECTED',response.status,known.includes(body?.code)?body.code:'OTHER');
+      }
+      return response;
+    })(req,res);
+  }
   return handler(req,res);
 }
