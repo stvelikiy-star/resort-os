@@ -135,4 +135,21 @@ try {
     if(value===undefined)delete process.env[key];else process.env[key]=value;
   }
 }
+// Exercise the new QA-only owner invitation using the existing disposable DB.
+// It must not replace the first administrator or grant commercial roles itself.
+const secondEmail='qa-owner@example.test',secondSubject='qa-owner:'+crypto.randomUUID();
+const secondToken=randomBytes(32).toString('base64url');
+await db.query('INSERT INTO flex_auth.verification(id,identifier,value,"expiresAt","createdAt","updatedAt") VALUES ($1,$2,$3,now()+interval \'10 minutes\',now(),now())',
+  [crypto.randomUUID(),'flex-owner:'+createHash('sha256').update(secondToken).digest('hex'),JSON.stringify({kind:'QA_HOTEL_OWNER',subject:secondSubject,email:secondEmail})]);
+const secondPassword=randomBytes(24).toString('hex');
+assert.equal(await redeemFirstInvite(db,secondToken,secondPassword,hashPassword),false);
+assert.equal(await redeemFirstInvite(db,secondToken,secondPassword,hashPassword,{allowOwnerInvite:true,email:'other@example.test'}),false);
+assert.deepEqual((await Promise.all([1,2].map(()=>redeemFirstInvite(db,secondToken,secondPassword,hashPassword,{allowOwnerInvite:true,email:secondEmail})))).sort(),[false,true]);
+assert.equal((await db.query('SELECT count(*)::int AS n FROM flex_auth."user"')).rows[0].n,2);
+assert.equal((await db.query('SELECT id FROM flex_auth."user" WHERE email=$1',[secondEmail])).rows[0].id,secondSubject);
+assert.equal(await redeemFirstInvite(db,secondToken,secondPassword,hashPassword,{allowOwnerInvite:true,email:secondEmail}),false);
+const ownerLogin=await request('sign-in/email',{email:secondEmail,password:secondPassword});
+assert.equal(ownerLogin.status,200);
+assert.equal((await readSession(cookieHeader(ownerLogin)))?.user?.id,secondSubject);
+console.log('PASS QA owner invite: restricted mode, email binding, concurrency, replay, existing admin retained, password login');
 await db.end(); console.log('PASS invite concurrency, mailbox-bound credentials, TOTP enrollment, login, negative TOTP, Ed25519 JWT');
