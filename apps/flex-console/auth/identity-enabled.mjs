@@ -6,7 +6,7 @@ import {toNodeHandler} from 'better-auth/node';
 import pg from 'pg';
 import {verifiedLogin} from './mfa-bridge.mjs';
 import {hashPassword} from 'better-auth/crypto';
-import {redeemFirstInvite} from './first-invite.mjs';
+import {redeemFirstInvite,resendOwnerInvite} from './first-invite.mjs';
 import {identityReadiness} from './identity-gate.mjs';
 export const passwordMode=()=>process.env.FLEX_ENVIRONMENT==='qa' && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true';
 async function sendAccountMail(to, subject, text) {
@@ -87,7 +87,8 @@ export async function currentIdentitySession(cookie) {
 }
 export async function handleEnabledIdentity(req,res,issueSessionCookie) {
   const {database,handler,auth}=await getHandler();
-  if(new URL(req.url,'http://localhost').pathname==='/api/identity/first-invite'){
+  const identityPath=new URL(req.url,'http://localhost').pathname;
+  if(identityPath==='/api/identity/first-invite' || identityPath==='/api/identity/resend-owner-invite'){
     const respond=(code)=>{res.writeHead(code,{'Cache-Control':'no-store'});return res.end();};
     if(req.method!=='POST') return respond(405);
     if(req.headers.origin!==new URL(process.env.BETTER_AUTH_URL).origin ||
@@ -101,6 +102,19 @@ export async function handleEnabledIdentity(req,res,issueSessionCookie) {
     }
     let body;
     try{body=JSON.parse(Buffer.concat(chunks).toString());}catch{return respond(400);}
+    if(identityPath==='/api/identity/resend-owner-invite'){
+      if(!passwordMode())return respond(404);
+      try{
+        await resendOwnerInvite(database,body?.email,async(email,token)=>{
+          const link=new URL('/enroll',process.env.BETTER_AUTH_URL);
+          link.hash=token;
+          await sendAccountMail(email,'MARINA SMART FLEX · Приглашение / Чакыруу / Invitation',
+            'Создайте пароль для тестового кабинета владельца гостиницы.\nСыноо мейманкана кабинетине сырсөз түзүңүз.\nSet your password for the test hotel-owner account.\n'+link.href+'\n30 минут / 30 мүнөт / 30 minutes');
+        },{allowOwnerInvite:true});
+      }catch{console.error('FLEX_QA_OWNER_INVITE_DELIVERY_FAILED');}
+      // Same response for absent, exhausted, activated or eligible invitation.
+      return respond(204);
+    }
     return respond(await redeemFirstInvite(database,body?.token,body?.password,hashPassword,{allowOwnerInvite:passwordMode(),email:body?.email})?204:403);
   }
   const path=req.url.split('?')[0];
