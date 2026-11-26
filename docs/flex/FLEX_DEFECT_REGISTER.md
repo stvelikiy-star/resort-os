@@ -30,3 +30,7 @@ No defect closed merely because code exists. No unrelated repo or active cloud c
 - FLEX-020/021 remain IN PROGRESS: source comparison identified canonical recovery and exact session binding as successors of obsolete alternate implementations; added regression in d46f286 (CI pending). Legacy read-only catalog flag-off behavior and remaining UX differences need verification; preserve old heads.
 - Historical Console translation/helper failures, browser PLAN_ONLY assertion and stale 25-row migration expectation: corrected in dcde564/e35066a/dc9c72d, TEST PASS at dc9c72d (45748453830, 45748453586, 45748453456). No cloud acceptance claimed.
 - FLEX-010: disposable restore PASS, active cloud independent restore NOT RUN.
+
+## 2026-11-26 — residual legacy review
+- FLEX-020/021: canonical password recovery and prior-session revocation TEST PASS at a875e5f (Console 45751953090). Password-only invite return present in current source. Read-only catalogue compatibility restored in 1bcfa4a, dedicated regression tests pending. Legacy CSS not copied over approved design; full UX matrix remains Stage 8. Preserve both old PR heads.
+- Unrelated shared repository CI: AK BERMET run 45751953084 failed provider-mapping persistence on a875e5f. Native retry requested; no changes outside FLEX. Do not bypass required checks.

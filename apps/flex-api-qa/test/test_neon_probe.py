@@ -140,6 +140,35 @@ for route in app.routes:
                                 "FLEX_ENABLE_QA_CATALOG_DRAFTS": "false",
                                 "FLEX_ENABLE_QA_ONBOARDING": "false"})
 
+    def test_catalog_reader_never_assumes_writer_and_password_exception_is_preview_only(self):
+        import asyncio
+        from unittest.mock import AsyncMock
+        from fastapi import HTTPException
+        from app.flex_catalog_admin import as_catalog_reader, require_admin
+        from app.flex_foundation import PlatformPrincipal
+
+        admin = PlatformPrincipal("ci-admin", "SUPER_ADMIN", mfa_verified=False)
+        owner = PlatformPrincipal("ci-owner", "HOTEL_OWNER", mfa_verified=True)
+        preview = {"FLEX_ENVIRONMENT": "qa", "VERCEL_ENV": "preview",
+                   "FLEX_QA_PASSWORD_LOGIN": "true", "FLEX_ENABLE_QA_CATALOG_DRAFTS": "false"}
+        with patch.dict(os.environ, preview):
+            conn = AsyncMock()
+            asyncio.run(as_catalog_reader(conn, admin))
+            self.assertEqual(conn.execute.await_count, 2)
+            self.assertEqual(conn.execute.await_args_list[-1].args,
+                             ("SET LOCAL ROLE flex_platform_admin_reader",))
+            with self.assertRaises(HTTPException):
+                require_admin(admin)
+            with self.assertRaises(HTTPException):
+                asyncio.run(as_catalog_reader(conn, owner))
+            self.assertEqual(conn.execute.await_count, 2)
+        for override in ({"FLEX_ENVIRONMENT": "production"},
+                         {"VERCEL_ENV": "production"},
+                         {"FLEX_QA_PASSWORD_LOGIN": "false"}):
+            with patch.dict(os.environ, {**preview, **override}):
+                with self.assertRaises(HTTPException):
+                    asyncio.run(as_catalog_reader(AsyncMock(), admin))
+
     def test_core_identity_without_token_fails_closed(self):
         r = TestClient(app).get("/v1/me")
         self.assertEqual(r.status_code, 401)
