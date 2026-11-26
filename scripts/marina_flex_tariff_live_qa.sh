@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 test "$GITHUB_ACTIONS" = true
+# Preserve the original TOTP regression and repeat with the deployed QA's
+# password-only gate. Both children own independent disposable databases.
+if [[ -z "${FLEX_CI_LOGIN_MODE:-}" ]]; then
+  FLEX_CI_LOGIN_MODE=totp bash "$0"
+  FLEX_CI_LOGIN_MODE=password bash "$0"
+  exit 0
+fi
+case "$FLEX_CI_LOGIN_MODE" in totp|password) ;; *) exit 2;; esac
+unset VERCEL_ENV FLEX_QA_PASSWORD_LOGIN
 umask 077
 qa_dir=$(mktemp -d)
-qa_pg="flex-tariff-qa-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+qa_pg="flex-tariff-qa-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$FLEX_CI_LOGIN_MODE"
 cleanup() {
   for pid in $(jobs -p); do kill "$pid" 2>/dev/null || true; done
   docker rm -f "$qa_pg" >/dev/null 2>&1 || true
@@ -113,6 +122,12 @@ try {
 } finally { await db.end(); }
 JS
 )
+# Set preview-only gates after provisioning the canonical auth schema. The
+# fixture endpoints and database remain runner-local, with no cloud credentials.
+if [[ "$FLEX_CI_LOGIN_MODE" = password ]]; then
+  export VERCEL_ENV=preview FLEX_QA_PASSWORD_LOGIN=true
+fi
+echo "FLEX isolated commercial browser authentication mode: $FLEX_CI_LOGIN_MODE"
 # Runtime processes receive only their own DB credential.
 (
  unset PGPASSWORD PGUSER QA_PASSWORD QA_OWNER_PASSWORD FLEX_AUTH_DATABASE_URL FLEX_MFA_PRIVATE_KEY FLEX_SESSION_KEY BETTER_AUTH_SECRET
