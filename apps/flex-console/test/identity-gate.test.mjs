@@ -98,3 +98,15 @@ test('password-only QA never loops a verified identity back to a second password
   assert.match(src,/if\(state\.me\)/);
   assert.doesNotMatch(src,/state\.me\s*=\s*state\.identitySession/);
 });
+
+test('recovery feedback distinguishes safe error categories without rendering raw backend text',()=>{
+ const src=readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
+ const begin=src.indexOf('function recoveryFailure('),end=src.indexOf('\nlet recoveryToken=',begin);
+ const classify=vm.runInNewContext('('+src.slice(begin,end)+')');
+ assert.equal(classify({identityCode:'INVALID_TOKEN',status:400},true),'invalidLink');
+ assert.equal(classify({identityCode:'PASSWORD_TOO_SHORT',status:400},true),'passwordPolicy');
+ assert.equal(classify({status:429},true),'tooMany');
+ assert.equal(classify({status:503},true),'unavailable');
+ assert.equal(classify({identityCode:'arbitrary backend detail',status:400},true),'error');
+ assert.equal(classify({identityCode:'INVALID_TOKEN',status:400},false),'error');
+});
