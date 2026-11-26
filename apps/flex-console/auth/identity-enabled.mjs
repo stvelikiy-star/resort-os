@@ -101,7 +101,7 @@ export async function handleEnabledIdentity(req,res,issueSessionCookie) {
     }
     let body;
     try{body=JSON.parse(Buffer.concat(chunks).toString());}catch{return respond(400);}
-    return respond(await redeemFirstInvite(database,body?.token,body?.password,hashPassword)?204:403);
+    return respond(await redeemFirstInvite(database,body?.token,body?.password,hashPassword,{allowOwnerInvite:passwordMode(),email:body?.email})?204:403);
   }
   const path=req.url.split('?')[0];
   if(issueSessionCookie && (path==='/api/identity/two-factor/verify-totp' || (passwordMode() && path==='/api/identity/sign-in/email'))){
