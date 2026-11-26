@@ -49,6 +49,9 @@ APPROVED_NATIVE_QA_BLOBS = {
 }
 
 APPROVED_P0_BLOBS = {
+    # Stage 1 ASKA TASH: migrate legacy AI test to the existing real PostgreSQL verifier.
+    "scripts/verify_public_ai_trusted_proxy.py": "bbbaab766be55e879db258c7a9d31ad5a1cd9a9e",
+    ".github/workflows/ai-administrator-ci.yml": "041a2265c01495325121fb76a315b6c5512c2490",
     # Preserve #497 public endpoint abuse protection; CI must verify isolated PostgreSQL.
     "services/api/app/public_ai_admin.py": "7f8831aab2dea3788a7878d98181f8552c7fa809",
     "scripts/verify_public_ai_rate_limit_e2e.py": "5a943a680a218dbbb8fc3b7c3aba5cf231f7ec9a",

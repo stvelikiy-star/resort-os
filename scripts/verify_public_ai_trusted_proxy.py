@@ -1,48 +1,37 @@
 #!/usr/bin/env python3
-"""Regression: spoofed X-Forwarded-For must not bypass public AI throttling."""
+"""Legacy CI entry point: verify trusted forwarding and PostgreSQL throttling."""
+import asyncio
 import sys
-from unittest.mock import patch
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "services/api"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from fastapi import HTTPException, Request
-from app import auth, public_ai_admin as ai
-
-
-def request(forwarded="", direct="198.51.100.8"):
-    headers = []
-    if forwarded:
-        headers.append((b"x-forwarded-for", forwarded.encode("ascii")))
-    scope = {
-        "type": "http", "http_version": "1.1", "method": "POST",
-        "path": "/api/v1/public/ai-admin/chat", "query_string": b"",
-        "headers": headers, "client": (direct, 12345),
-        "server": ("example.test", 443), "scheme": "https",
-    }
-    return Request(scope)
+from services.api.app import auth, public_ai_admin as ai
+from verify_public_ai_rate_limit_e2e import main, request
 
 
-# Untrusted proxy headers must not partition a single attacker's IP bucket.
-with patch.object(auth, "AUTH_TRUST_PROXY_HEADERS", False), patch.object(ai, "AI_ADMIN_RATE_LIMIT_PER_MINUTE", 2):
-    ai._rate_windows.clear()
-    assert ai._client_key(request("203.0.113.10")) == "198.51.100.8"
-    ai._enforce_rate_limit(request("203.0.113.10"))
-    ai._enforce_rate_limit(request("203.0.113.11"))
-    try:
-        ai._enforce_rate_limit(request("203.0.113.12"))
-    except HTTPException as exc:
-        assert exc.status_code == 429
-    else:
-        raise AssertionError("Spoofed forwarded header bypassed public AI rate limit")
-    # Different genuine direct peers keep independent buckets.
-    ai._enforce_rate_limit(request("203.0.113.12", direct="198.51.100.9"))
+def verify_forwarding():
+    app = SimpleNamespace()
+    with patch.object(ai, "AI_ADMIN_TRUSTED_PROXY_CIDRS", "127.0.0.1/32,::1/128"):
+        with patch.object(auth, "AUTH_TRUST_PROXY_HEADERS", False):
+            for forwarded in ("203.0.113.10", "203.0.113.11", "203.0.113.12"):
+                assert ai._client_key(request(app, "198.51.100.8", forwarded)) == "198.51.100.8"
+            assert ai._client_key(request(app, "198.51.100.9", "203.0.113.12")) == "198.51.100.9"
+            assert ai._client_key(request(app, "127.0.0.1", "203.0.113.42")) == "127.0.0.1"
+        with patch.object(auth, "AUTH_TRUST_PROXY_HEADERS", True):
+            assert ai._client_key(request(app, "198.51.100.8", "203.0.113.42, 10.0.0.1")) == "198.51.100.8"
+            assert ai._client_key(request(app, "198.51.100.10", "203.0.113.42")) == "198.51.100.10"
+            assert ai._client_key(request(app, "127.0.0.1", "203.0.113.42, 10.0.0.1")) == "203.0.113.42"
+            assert ai._client_key(request(app, "127.0.0.1", "spoofed-by-client")) == "127.0.0.1"
+            assert ai._client_key(request(app, "127.0.0.1")) == "127.0.0.1"
+            assert ai._client_key(request(app, "::1", "2001:db8::42")) == "2001:db8::42"
 
-# Proxy trust only after infrastructure explicitly enables the existing auth flag.
-with patch.object(auth, "AUTH_TRUST_PROXY_HEADERS", True):
-    assert ai._client_key(request("203.0.113.42, 10.0.0.1")) == "203.0.113.42"
-    assert ai._client_key(request("spoofed-by-client")) == "198.51.100.8"
-    assert ai._client_key(request("203.0.113.42", direct="198.51.100.10")) == "203.0.113.42"
 
-ai._rate_windows.clear()
-print("PUBLIC_AI_TRUSTED_PROXY_NEGATIVE_RATE_LIMIT_PASS")
+if __name__ == "__main__":
+    verify_forwarding()
+    # The existing verifier uses real disposable PostgreSQL, including
+    # concurrent requests, independent IPs, daily budget and hashed audit.
+    asyncio.run(main())
+    print("PUBLIC_AI_TRUSTED_PROXY_NEGATIVE_RATE_LIMIT_PASS")
