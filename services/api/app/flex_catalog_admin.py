@@ -25,6 +25,7 @@ from .flex_control_plane import (
     lifespan as core_lifespan,
     resolve_platform_principal,
     qa_password_reads,
+    _switch_to_reader,
 )
 from .flex_foundation import PlatformPrincipal
 
@@ -68,6 +69,16 @@ def require_admin(principal: PlatformPrincipal) -> None:
     allow_qa_password = qa_password_reads() and os.environ.get("FLEX_ENABLE_QA_CATALOG_DRAFTS") == "true"
     if principal.role != "SUPER_ADMIN" or not (principal.mfa_verified or allow_qa_password):
         raise HTTPException(403, detail="Verified FLEX SUPER_ADMIN with MFA required")
+
+
+def require_catalog_reader(principal: PlatformPrincipal) -> None:
+    if principal.role != "SUPER_ADMIN" or not (principal.mfa_verified or qa_password_reads()):
+        raise HTTPException(403, detail="Verified FLEX SUPER_ADMIN required")
+
+
+async def as_catalog_reader(conn, principal: PlatformPrincipal) -> None:
+    require_catalog_reader(principal)
+    await _switch_to_reader(conn, "flex_platform_admin_reader", "flex.unused", "1")
 
 
 async def as_writer(conn, principal: PlatformPrincipal) -> None:
@@ -377,10 +388,10 @@ async def catalog(
     request: Request,
     principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    require_admin(principal)
+    require_catalog_reader(principal)
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            await as_writer(conn, principal)
+            await as_catalog_reader(conn, principal)
             rows = await conn.fetch(
                 "SELECT s.sku,s.title,s.capability_key,s.product_status,s.is_core,"
                 " p.version,p.monthly_price,p.currency,p.valid_from,p.valid_to "
@@ -406,12 +417,12 @@ async def price_versions(
     sku: str, request: Request,
     principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    require_admin(principal)
+    require_catalog_reader(principal)
     if not SKU_RE.fullmatch(sku):
         raise HTTPException(404, detail="Unknown SKU")
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            await as_writer(conn, principal)
+            await as_catalog_reader(conn, principal)
             found = await conn.fetchval("SELECT true FROM flex_skus WHERE sku=$1", sku)
             if not found:
                 raise HTTPException(404, detail="Unknown SKU")
@@ -737,10 +748,10 @@ async def drafts(
     hotel_id: uuid.UUID | None = Query(None),
     principal: PlatformPrincipal = Depends(resolve_platform_principal),
 ):
-    require_admin(principal)
+    require_catalog_reader(principal)
     async with request.app.state.flex_pool.acquire() as conn:
         async with conn.transaction(readonly=True):
-            await as_writer(conn, principal)
+            await as_catalog_reader(conn, principal)
             rows = await conn.fetch(
                 "SELECT id,hotel_id,version,title,period_start,period_end,enforcement,state,"
                 " currency,items,proposed_monthly_total,created_by,created_at "

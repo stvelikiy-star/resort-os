@@ -89,13 +89,21 @@ _ROUTES = [
 ]
 if _ENABLE_ONBOARDING:
     _ROUTES.append(flex_onboarding.app)
-if _ENABLE_CATALOG:
+_CATALOG_READ_ONLY = {
+    "/v1/platform/catalog",
+    "/v1/platform/catalog/skus/{sku}/versions",
+    "/v1/platform/subscription-drafts",
+}
+if os.environ.get("FLEX_ENVIRONMENT") == "qa":
     _ROUTES.append(flex_catalog_admin.app)
 _seen = set()
 for source in _ROUTES:
     for route in source.routes:
         if not isinstance(route, APIRoute) or not route.path.startswith("/v1/"):
             continue
+        if source is flex_catalog_admin.app and not _ENABLE_CATALOG:
+            if route.path not in _CATALOG_READ_ONLY or route.methods != {"GET"}:
+                continue
         route_keys = {(method, route.path) for method in route.methods}
         if _seen.intersection(route_keys):
             raise RuntimeError("FLEX_ROUTE_COLLISION: " + route.path)
@@ -176,6 +184,7 @@ async def health() -> dict:
             "payouts_enabled": False,
             "onboarding_enabled": _ENABLE_ONBOARDING,
             "catalog_drafts_enabled": _ENABLE_CATALOG,
+            "catalog_read_only_enabled": True,
             "real_user_auth_enabled": bool(os.environ.get("FLEX_AUTH_PUBLIC_KEYS_JSON")),
             "read_routes_registered": True,
         }

@@ -494,8 +494,9 @@ async function proxy(req,res,url) {
   const path=url.pathname.replace(/^\/api\/data/,'');
   const target=routeAllowed(path,url.searchParams);
   if(!target) return json(res,404,{error:'READ_ONLY_ENDPOINT_NOT_AVAILABLE'});
-  if(target==='catalog_admin'&&!qaCatalogAdmin)return json(res,503,{error:'QA_CATALOG_ADMIN_NOT_ENABLED'});
-  const backend=(target==='partner'?partnerApiOrigin:target==='catalog_admin'?catalogAdminApiOrigin:apiOrigin)+path+url.search;
+  const readOnlyCatalog=qaEnvironment&&(catalogReadOnly.has(path)||catalogVersionsRead.test(path));
+  if(target==='catalog_admin'&&!qaCatalogAdmin&&!readOnlyCatalog)return json(res,503,{error:'QA_CATALOG_ADMIN_NOT_ENABLED'});
+  const backend=(target==='partner'?partnerApiOrigin:target==='catalog_admin'&&qaCatalogAdmin?catalogAdminApiOrigin:apiOrigin)+path+url.search;
   const headers={Authorization:'Bearer '+session.token,Accept:'application/json'};
   if(qaEnvironment && process.env.VERCEL_ENV==='preview' && new URL(backend).origin===apiOrigin && process.env.FLEX_QA_API_SERVICE_SECRET)
     headers['x-vercel-protection-bypass']=process.env.FLEX_QA_API_SERVICE_SECRET;
@@ -526,7 +527,7 @@ export async function handler(req,res) {
       return cookie(cookies.session,seal(session),lifetimeSeconds);
     }:null);
     if(req.method!=='GET' && !(req.method==='POST'&&(url.pathname==='/api/actions/hotels'||hotelNameRoute.test(url.pathname)||linkHotelRoute.test(url.pathname)||linkConfirmRoute.test(url.pathname)||catalogSkuAction.test(url.pathname)||catalogPriceAction.test(url.pathname)||configurationDraftAction.test(url.pathname)||tariffPackageAction.test(url.pathname)||url.pathname===tariffTemplatePath||url.pathname===commercialPolicyPath||url.pathname===installationTrialPath||customerActions.has(url.pathname)))) return json(res,405,{error:'ACTION_NOT_ALLOWED'});
-    if(url.pathname==='/api/status') return json(res,200,{build_sha:/^[0-9a-f]{40}$/.test(process.env.VERCEL_GIT_COMMIT_SHA||'')?process.env.VERCEL_GIT_COMMIT_SHA:null,configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,password_login:bridgeConfigured && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true',identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
+    if(url.pathname==='/api/status') return json(res,200,{build_sha:/^[0-9a-f]{40}$/.test(process.env.VERCEL_GIT_COMMIT_SHA||'')?process.env.VERCEL_GIT_COMMIT_SHA:null,configured,mode:'SAFE_QA',qa_onboarding_enabled:configured&&qaOnboarding,qa_linking_enabled:configured&&qaLinking,qa_catalog_admin_enabled:configured&&qaCatalogAdmin,qa_catalog_read_only_enabled:configured&&qaEnvironment,password_login:bridgeConfigured && process.env.VERCEL_ENV==='preview' && process.env.FLEX_QA_PASSWORD_LOGIN==='true',identity_ready:identityReadiness(process.env).ready,payments_enabled:false,payouts_enabled:false});
     if(url.pathname==='/api/session') { const s=await commercialSession(req);return s?json(res,200,{authenticated:true,csrf:s.csrf||null,qa_onboarding_enabled:qaOnboarding}):json(res,401,{error:'LOGIN_REQUIRED'}); }
     if(url.pathname==='/api/actions/hotels' && req.method==='POST')return await registration(req,res);
     if(req.method==='POST'&&hotelNameRoute.test(url.pathname))return await hotelNameAction(req,res,url);

@@ -117,6 +117,29 @@ assert not any(p.startswith(('/v1/payments', '/v1/payouts', '/v1/settlement')) f
                                     "FLEX_ENABLE_QA_CATALOG_DRAFTS": flag,
                                     "FLEX_ENABLE_QA_ONBOARDING": "false"})
 
+    def test_legacy_catalog_reads_survive_disabled_writer_gate(self):
+        import subprocess
+        check = """from index import app
+from fastapi.testclient import TestClient
+import os
+client = TestClient(app)
+paths = ("/v1/platform/catalog", "/v1/platform/catalog/skus/BASE/versions",
+         "/v1/platform/subscription-drafts")
+qa = os.environ["FLEX_ENVIRONMENT"] == "qa"
+for path in paths:
+    assert client.get(path).status_code == (401 if qa else 404)
+    assert client.post(path, json={}).status_code == (405 if qa else 404)
+for route in app.routes:
+    if route.path.startswith("/v1/platform/"):
+        assert "POST" not in getattr(route, "methods", ())
+"""
+        for environment in ("qa", "production"):
+            subprocess.run([sys.executable, "-c", check], check=True,
+                           cwd=Path(__file__).resolve().parents[1],
+                           env={**os.environ, "FLEX_ENVIRONMENT": environment,
+                                "FLEX_ENABLE_QA_CATALOG_DRAFTS": "false",
+                                "FLEX_ENABLE_QA_ONBOARDING": "false"})
+
     def test_core_identity_without_token_fails_closed(self):
         r = TestClient(app).get("/v1/me")
         self.assertEqual(r.status_code, 401)
