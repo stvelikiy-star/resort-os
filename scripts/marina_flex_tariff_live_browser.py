@@ -14,6 +14,7 @@ from playwright.sync_api import expect, sync_playwright
 ORIGIN = "https://127.0.0.1:3443"
 HOTEL_A = "00000000-0000-0000-0000-00000000000a"
 HOTEL_B = "00000000-0000-0000-0000-00000000000b"
+PASSWORD_MODE = os.environ.get("FLEX_CI_LOGIN_MODE") == "password"
 
 
 def totp(secret):
@@ -100,21 +101,30 @@ def run():
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(executable_path=which("google-chrome") or which("chromium"),
             args=["--ignore-certificate-errors-spki-list=" + os.environ["QA_TLS_PIN"]])
-        secret = enroll(browser)
+        secret = None if PASSWORD_MODE else enroll(browser)
         context = browser.new_context()
         page = context.new_page()
         page.goto(ORIGIN)
         signin = page.locator("#flex-identity-signin")
         signin.locator('[name="email"]').fill(os.environ["QA_EMAIL"])
         signin.locator('[name="password"]').fill(os.environ["QA_PASSWORD"])
-        signin.locator('button[type="submit"]').click()
-        challenge = page.locator("#flex-identity-totp")
-        challenge.locator('[name="code"]').fill(totp(secret))
-        with page.expect_response(ORIGIN + "/api/identity/two-factor/verify-totp") as verified:
-            challenge.locator('button[type="submit"]').click()
+        if PASSWORD_MODE:
+            status = page.request.get(ORIGIN + "/api/status", ignore_https_errors=True)
+            assert status.status == 200 and status.json()["password_login"] is True
+            with page.expect_response(ORIGIN + "/api/identity/sign-in/email") as verified:
+                signin.locator('button[type="submit"]').click()
+        else:
+            signin.locator('button[type="submit"]').click()
+            challenge = page.locator("#flex-identity-totp")
+            challenge.locator('[name="code"]').fill(totp(secret))
+            with page.expect_response(ORIGIN + "/api/identity/two-factor/verify-totp") as verified:
+                challenge.locator('button[type="submit"]').click()
         # Successful login immediately navigates away. Check the cookie and server-side
         # role in the new document instead of reading the discarded response body.
         assert verified.value.status == 200, ("login challenge", verified.value.status)
+        expect(page.locator(f'[data-hotel="{HOTEL_A}"]')).to_be_visible(timeout=15000)
+        if PASSWORD_MODE:
+            expect(page.locator("#flex-identity-totp")).to_have_count(0)
         assert any(c["name"] == "flex_session" for c in context.cookies()), "Missing platform session cookie"
         for path in ["/api/data/v1/me", "/api/data/v1/hotels"]:
             status = page.request.get(ORIGIN + path, ignore_https_errors=True)
@@ -149,7 +159,7 @@ def run():
             assert (row["id"],row["hotel_id"],row["version"],row["discount_pct"],row["total"],
                     row["source_template_id"],row["template_revision"],row["sku"],row["state"],row["enforcement"]) == (
                     ident,hotel,1,pct,total,source,1 if source else None,"TARIFF_E2E","DRAFT","OFF")
-        print("PASS real SUPER_ADMIN password/TOTP login, catalog and shared template revision 1")
+        print("PASS real SUPER_ADMIN " + ("QA password-only" if PASSWORD_MODE else "password/TOTP") + " login, catalog and shared template revision 1")
         print("PASS reopened hotel A v1 10% = 3600.00 KGS; hotel B v1 25% = 3000.00 KGS; both match PostgreSQL")
         open_card(page, HOTEL_A)
         form=page.locator("#hotel-commercial-offer")
@@ -277,11 +287,12 @@ def run():
         # Real invitation-backed owner session; no forged identity or admin impersonation.
         owner_email=os.environ["QA_OWNER_EMAIL"]
         owner_password=os.environ["QA_OWNER_PASSWORD"]
-        owner_secret=enroll(browser,owner_email,owner_password)
+        owner_secret=None if PASSWORD_MODE else enroll(browser,owner_email,owner_password)
         # Better Auth shares a database-backed 60-second rate window on the
         # local runner IP. Enrollment and the second fresh login must not
         # consume each other's allowance. Keep the production limiter intact.
-        time.sleep(65)
+        if not PASSWORD_MODE:
+            time.sleep(65)
         owner_context=browser.new_context()
         owner=owner_context.new_page()
         owner.goto(ORIGIN)
@@ -292,13 +303,17 @@ def run():
             signin.locator('button[type="submit"]').click()
         reply=signed_in.value
         assert reply.status==200,("owner sign-in HTTP",reply.status)
-        assert reply.json().get("twoFactorRedirect") is True, "Owner fresh password login did not request TOTP"
-        challenge=owner.locator("#flex-identity-totp")
-        expect(challenge).to_be_visible(timeout=15000)
-        challenge.locator('[name="code"]').fill(totp(owner_secret))
-        with owner.expect_response(ORIGIN+"/api/identity/two-factor/verify-totp") as verified:
-            challenge.locator('button[type="submit"]').click()
-        assert verified.value.status==200
+        if PASSWORD_MODE:
+            expect(owner.locator('[data-hotel-tab="subscription"]')).to_be_visible(timeout=15000)
+            expect(owner.locator("#flex-identity-totp")).to_have_count(0)
+        else:
+            assert reply.json().get("twoFactorRedirect") is True, "Owner fresh password login did not request TOTP"
+            challenge=owner.locator("#flex-identity-totp")
+            expect(challenge).to_be_visible(timeout=15000)
+            challenge.locator('[name="code"]').fill(totp(owner_secret))
+            with owner.expect_response(ORIGIN+"/api/identity/two-factor/verify-totp") as verified:
+                challenge.locator('button[type="submit"]').click()
+            assert verified.value.status==200
         me=owner.request.get(ORIGIN+"/api/data/v1/me",ignore_https_errors=True)
         assert me.status==200 and me.json()["role"]=="HOTEL_OWNER"
         assert me.json()["hotels"]==[HOTEL_A]
@@ -328,7 +343,7 @@ def run():
         evidence=json.loads(subprocess.check_output(["psql","-XAt","-v","ON_ERROR_STOP=1","-c",query],text=True))
         assert evidence=={"acceptances":1,"signed":0,"payments":0,"subscriptions":2},evidence
         owner_context.close()
-        print("PASS browser real hotel owner accepted exact terms; other hotel denied; administrator sees evidence; PostgreSQL matches")
+        print("PASS browser real hotel owner (" + ("QA password-only" if PASSWORD_MODE else "TOTP") + ") accepted exact terms; other hotel denied; administrator sees evidence; PostgreSQL matches")
         page.locator('[data-hotel-tab="finance"]').click()
         form=page.locator("#finance-simulation-form")
         expect(form).to_be_visible()
