@@ -1,0 +1,13 @@
+# TEMPLATE ONLY: replace the four .invalid names with owner-approved DNS names.
+# This example UUID is a placeholder, NOT a provisioned tunnel.
+tunnel: 00000000-0000-0000-0000-000000000001
+ingress:
+  - hostname: guest.aska-tash.invalid
+    service: http://127.0.0.1:16606
+  - hostname: admin.aska-tash.invalid
+    service: http://127.0.0.1:16602
+  - hostname: staff.aska-tash.invalid
+    service: http://127.0.0.1:16603
+  - hostname: api.aska-tash.invalid
+    service: http://127.0.0.1:16601
+  - service: http_status:404
