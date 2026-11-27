@@ -97,12 +97,53 @@ def _webhook_bindings() -> tuple[dict[str, str], ...]:
         raise HTTPException(503, detail="GREEN-API webhook bindings are not configured") from None
 
 
+def _single_property_identity(token: str) -> dict[str, str]:
+    """Explicit one-property opt-in, independent of the shared RC7 registry."""
+    from .whatsapp_connection import _configuration
+
+    code = os.environ.get("PROPERTY_CODE", "")
+    if (code == "MARINA_DEMO" or not code
+            or code != os.environ.get("GREEN_API_PROPERTY_CODE")
+            or any(os.environ.get(flag, "").lower() in {"true", "1", "yes", "on"}
+                   for flag in ("MARINA_TENANT_CONTEXT_ENABLED",
+                                "MARINA_SHARED_AUTH_PREVIEW_ENABLED",
+                                "MARINA_SHARED_GREEN_RC7_ENABLED",
+                                "MARINA_SHARED_GREEN_RC8_ENABLED"))):
+        raise HTTPException(503, detail="Single-hotel GREEN-API binding unavailable")
+    secret = os.environ.get("GREEN_API_WEBHOOK_TOKEN", "")
+    if not SECRET.fullmatch(secret):
+        raise HTTPException(503, detail="Single-hotel GREEN-API webhook not configured")
+    config = _configuration({"property_code": code})
+    if config is None:
+        raise HTTPException(503, detail="Single-hotel GREEN-API connection disabled")
+    _, instance, provider_token = config
+    automation_key = os.environ.get("AUTOMATION_SERVICE_KEY", "")
+    if (not SERVICE_INSTANCE.fullmatch(instance)
+            or hmac.compare_digest(secret, provider_token)
+            or hmac.compare_digest(secret.encode(), automation_key.encode())):
+        raise HTTPException(503, detail="Single-hotel GREEN-API credentials must be independent")
+    try:
+        property_id = str(uuid.UUID(os.environ.get("GREEN_API_PROPERTY_ID", "")))
+    except ValueError:
+        raise HTTPException(503, detail="Single-hotel GREEN-API property ID missing") from None
+    if not hmac.compare_digest(secret, token):
+        raise HTTPException(401, detail="Invalid GREEN-API webhook credential")
+    return {
+        "actor_type": "SERVICE", "actor_id": "green-webhook:" + code,
+        "property_code": code, "channel_code": "GREEN_" + instance,
+        "external_account_id": instance, "bound_property_id": property_id,
+        "single_property": "true",
+    }
+
+
 def _bearer_identity(authorization: str | None) -> dict[str, str]:
     if (not isinstance(authorization, str)
             or not authorization.startswith("Bearer ")
             or not SECRET.fullmatch(authorization[7:])):
         raise HTTPException(401, detail="Invalid GREEN-API webhook credential")
     token = authorization[7:]
+    if os.environ.get("ENABLE_GREEN_API_SINGLE_WEBHOOK") == "true":
+        return _single_property_identity(token)
     rows = _webhook_bindings()
     matching = [
         r for r in rows if hmac.compare_digest(r["webhook_token"], token)
@@ -128,6 +169,15 @@ async def _verify_active_provider_hotel(request: Request, service: dict[str, str
     This is a read-only check. It fails closed for a stale/misbound tenant or
     instance, before any customer conversation, message or status is written.
     """
+    if service.get("single_property") == "true":
+        async with request.app.state.db.acquire() as conn:
+            pid = await conn.fetchval(
+                "SELECT id FROM properties WHERE code=$1",
+                service["property_code"],
+            )
+        if str(pid) != service["bound_property_id"]:
+            raise HTTPException(503, detail="GREEN-API hotel/provider configuration is not active")
+        return
     async with request.app.state.db.acquire() as conn:
         row = await conn.fetchrow(
             '''SELECT p.id,p."tenantId" FROM properties p
