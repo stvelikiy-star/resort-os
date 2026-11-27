@@ -1,4 +1,4 @@
-"""Opt-in single-property WhatsApp AI draft worker. Never sends messages.
+"""Opt-in single-property WhatsApp AI worker. Draft-only unless explicitly activated for verified quotes.
 
 The existing event ledger provides at-most-once model invocation per inbound
 message. Claimed events are not retried after an uncertain process failure.
@@ -142,6 +142,16 @@ async def run_once(app) -> str:
                         return "superseded"
                 search = AvailabilitySearch.model_validate(intent["search"]) if intent["search"] else None
                 context["current_availability"] = await _verified_availability(SimpleNamespace(app=app), pid, context, search)
+                from .whatsapp_auto_dispatch import dispatch_quote
+                dispatched = await dispatch_quote(app, lane, binding, pid, cid, mid, context, intent, _still_current)
+                if dispatched is not None:
+                    await _finish(lane, pid, job, {
+                        "auto_queued": "AiQuoteQueued",
+                        "auto_review_required": "AiDraftReviewRequired",
+                        "superseded": "AiDraftSuperseded",
+                        "duplicate": "AiDraftSuperseded",
+                    }[dispatched])
+                    return dispatched
                 provider = await _openai_draft(_draft_prompt(context))
                 async with lane.transaction():
                     await lane.execute('SELECT id FROM conversations WHERE id=$1 AND "propertyId"=$2 FOR UPDATE', cid, pid)
