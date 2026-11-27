@@ -32,7 +32,7 @@ def _webhook_bindings() -> tuple[dict[str, str], ...]:
     """Parse a distinct credential per provider instance, with full RC5 match."""
     try:
         values = json.loads(os.environ.get("MARINA_SHARED_GREEN_RC7_WEBHOOKS_JSON", ""))
-        if not isinstance(values, list) or not 2 <= len(values) <= 100:
+        if not isinstance(values, list) or not 1 <= len(values) <= 100:
             raise ValueError("Missing per-property webhook bindings")
         adapters = configured_channel_adapters()
         provider_bindings = json.loads(os.environ.get("MARINA_SHARED_GREEN_RC6_CONFIG_JSON", ""))
