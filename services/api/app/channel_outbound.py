@@ -89,6 +89,13 @@ async def outbound_capabilities(
     # Legacy Telegram remains OWNER/MANAGER only and the send-text route
     # independently enforces the RECEPTION claim/adapter restriction.
     reception = user.get("role") == "RECEPTION"
+    configured = False
+    try:
+        from .green_outbound import single_outbound_binding
+        single_outbound_binding(user)
+        configured = True
+    except HTTPException:
+        pass
     return {
         "telegram": {
             "channel_code": TELEGRAM_SALES_CHANNEL_CODE,
@@ -97,13 +104,13 @@ async def outbound_capabilities(
             "max_text_length": 4096,
         },
         "whatsapp": {
-            "configured": False,
-            "configured_in_core": False,
+            "configured": configured,
+            "configured_in_core": configured,
             "human_only": True,
             "queued_only": True,
             "max_text_length": 4096,
-            "delivery_owner": "n8n/provider adapter",
-            "evidence_endpoint": "/api/v1/automation/inbox/messages",
+            "delivery_owner": "GREEN-API" if configured else "not configured",
+            "evidence_endpoint": "/api/v1/automation/green-api/webhook",
         },
         "instagram": {
             "configured": False,
@@ -124,7 +131,8 @@ async def send_text_message(
     user: dict[str, Any] = Depends(send_access),
 ):
     idempotency_key = _validate_idempotency_key(idempotency_key_header)
-    if os.environ.get("MARINA_SHARED_GREEN_RC8_ENABLED") == "true":
+    if (os.environ.get("MARINA_SHARED_GREEN_RC8_ENABLED") == "true"
+            or os.environ.get("ENABLE_GREEN_API_SINGLE_OUTBOUND") == "true"):
         # Keep ONE canonical send-text route. Stage RC8 accepts WhatsApp
         # only, with separate hotel credentials and reviewed human action.
         from .green_outbound import send_green_text
