@@ -88,12 +88,6 @@ async def dispatch_quote(app, lane, binding, pid, cid, mid, context, intent, sti
             await lane.execute(
                 '''UPDATE automation_inbound_events SET "resultResource"='ConversationMessage',
                    "resultResourceId"=$1,"updatedAt"=now() WHERE id=$2''', result["id"], dispatch_id)
-            await lane.execute(
-                '''UPDATE conversations SET status='WAITING_GUEST',"updatedAt"=now()
-                   WHERE id=$1 AND "propertyId"=$2 AND status='OPEN' AND "assignedToId" IS NULL
-                     AND NOT EXISTS (SELECT 1 FROM conversation_messages newer, conversation_messages original
-                         WHERE original.id=$3 AND newer."conversationId"=$1 AND newer.direction='INBOUND'
-                           AND newer."createdAt">original."createdAt")''', cid, pid, mid)
         return "auto_queued"
     except Exception:
         async with lane.transaction():
