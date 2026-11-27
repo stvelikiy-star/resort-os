@@ -82,6 +82,15 @@ class ConnectionTests(unittest.TestCase):
             self.assertNotIn(TOKEN, result.text)
             self.assertIn("/getStateInstance/", seen[0].url.path)
 
+    def test_suspended_state_is_restriction_not_authorization(self):
+        result, seen = self.call({"stateInstance": "suspended"})
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(result.json()["state"], "suspended")
+        self.assertFalse(result.json()["account_authorized"])
+        self.assertFalse(result.json()["messaging_verified"])
+        self.assertFalse(result.json()["ai_auto_send"])
+        self.assertEqual(len(seen), 1)
+
     def test_qr_png_only_and_already_authorized(self):
         result, seen = self.call({"type": "qrCode", "message": PNG}, "/qr")
         self.assertEqual(result.status_code, 200)

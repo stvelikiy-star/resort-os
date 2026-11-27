@@ -17,7 +17,7 @@ from .runtime_capabilities import env_flag
 router = APIRouter(prefix="/api/v1/admin/whatsapp", tags=["whatsapp-connection"])
 owner_access = require_roles("OWNER", module_grant=False)
 _windows: dict[str, deque[float]] = defaultdict(deque)
-STATES = {"notAuthorized", "authorized", "blocked", "sleepMode", "starting", "yellowCard"}
+STATES = {"notAuthorized", "authorized", "blocked", "sleepMode", "starting", "yellowCard", "suspended"}
 
 
 class _ProviderLogFilter(logging.Filter):

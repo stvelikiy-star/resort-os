@@ -14,6 +14,7 @@ const LABELS: Record<string, string> = {
   qrWaiting: "Ожидаем QR-код от GREEN-API",
   passkeyRequired: "Подтвердите привязку устройства в WhatsApp на телефоне, затем запросите QR снова",
   yellowCard: "GreenAPI сообщает об ограничении номера",
+  suspended: "На номере действуют временные ограничения GreenAPI. Проверьте состояние у провайдера.",
 };
 
 export default function WhatsAppConnection() {
@@ -25,7 +26,24 @@ export default function WhatsAppConnection() {
   const pairingDeadline = useRef(0);
   const pending = useRef<AbortController | null>(null);
 
-  useEffect(() => () => pending.current?.abort(), []);
+  useEffect(() => {
+    // Opening the owner cabinet also supports the first pairing done directly
+    // in GREEN-API. Never create a QR or disconnect a phone automatically.
+    void check();
+    function hidePairing() {
+      if (document.visibilityState === "hidden") {
+        pending.current?.abort(); pending.current = null;
+        setPairing(false); setQr(""); setBusy(false);
+      }
+    }
+    document.addEventListener("visibilitychange", hidePairing);
+    return () => {
+      document.removeEventListener("visibilitychange", hidePairing);
+      pending.current?.abort(); pending.current = null;
+    };
+    // The initial check is read-only; subsequent checks are explicit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (!qr) return;
     const timer = window.setTimeout(() => setQr(""), 20_000);
@@ -43,7 +61,7 @@ export default function WhatsAppConnection() {
       } else {
         void check(true, true);
       }
-    }, 3_000);
+    }, 5_000);
     return () => window.clearTimeout(timer);
   }, [pairing, busy]);
 
@@ -60,6 +78,7 @@ export default function WhatsAppConnection() {
       setQr(""); setPairing(getQr);
       if (getQr) pairingDeadline.current = Date.now() + 90_000;
     }
+    if (getQr) setQr(""); // Never display a prior QR during a new provider request.
     setBusy(true); setError("");
     try {
       const response = await fetch(`/core/api/v1/admin/whatsapp/connection${getQr ? "/qr" : ""}`, {
@@ -111,7 +130,7 @@ export default function WhatsAppConnection() {
       : "Состояние номера ещё не проверено"}</p>
     <div className={styles.actions}>
       <button type="button" className="btn" disabled={busy} onClick={() => void check()}>Проверить подключение</button>
-      <button type="button" className="btn primary" disabled={busy || pairing || connection?.account_authorized === true}
+      <button type="button" className="btn primary" disabled={busy || pairing || connection?.account_authorized === true || (connection !== null && ["disabled", "blocked", "suspended", "yellowCard", "starting", "sleepMode"].includes(connection.state))}
         onClick={() => void check(true)}>Получить QR-код</button>
       {pairing && <button type="button" className="btn" onClick={stopPairing}>Остановить подключение</button>}
     </div>
@@ -122,6 +141,6 @@ export default function WhatsAppConnection() {
       <img src={qr} width={260} height={260} alt="QR-код подключения WhatsApp гостиницы" />
       <figcaption>WhatsApp → Связанные устройства → Привязать устройство. QR скрывается через 20 секунд. Подключение проверяется автоматически; ожидание — до 90 секунд.</figcaption>
     </figure>}
-    <p className={styles.small}>Авторизация номера не подтверждает приём и доставку сообщений. Автоответы ИИ включаются отдельно после проверки переписки.</p>
+    <p className={styles.small}>Если номер уже привязан в GREEN-API, достаточно проверить подключение. Повторное сканирование нужно только при потере авторизации. Авторизация номера не подтверждает приём и доставку сообщений. Автоответы ИИ включаются отдельно после проверки переписки.</p>
   </section>;
 }
