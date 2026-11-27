@@ -75,6 +75,11 @@ const statusLabels: Record<string, string> = {
   ARCHIVED: "Архив",
 };
 
+const deliveryLabels: Record<string, string> = {
+  QUEUED: "В очереди", SENT: "Отправлено", DELIVERED: "Доставлено",
+  FAILED: "Ошибка доставки", UNKNOWN: "Не подтверждено", RECEIVED: "Получено",
+};
+
 const channelLabels: Record<string, string> = {
   WEBSITE: "Сайт",
   TELEGRAM: "Telegram",
@@ -162,6 +167,7 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
       }
     } catch {
       // Missing capabilities keep optional actions safely disabled.
+      setCapabilities(null); setAiCapabilities(null); setMyStaffId(null);
     }
   }, []);
 
@@ -204,6 +210,8 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
     setError(null);
     if (detail?.conversation.id !== id) {
       setSendInfo(null);
+      setReply("");
+      setNote("");
       setPendingSendKey(null);
       setManualReconciliation(false);
     }
@@ -326,7 +334,7 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
 
   async function sendReply(event: FormEvent) {
     event.preventDefault();
-    if (!detail || !replyEnabled || !reply.trim() || manualReconciliation) return;
+    if (!detail || !replyEnabled || !reply.trim() || manualReconciliation || sendBusy || aiBusy || detailBusy) return;
     setSendBusy(true);
     setError(null);
     setSendInfo(null);
@@ -358,6 +366,7 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
         : body.delivery_status === "SENT" ? "Telegram подтвердил отправку." : `Статус: ${body.delivery_status}`);
       await load();
     } catch (e) {
+      if (whatsappReplyEnabled && e instanceof TypeError) setManualReconciliation(true);
       const reason = e instanceof Error ? e.message : "Ошибка отправки";
       await openConversation(detail.conversation.id);
       await load();
@@ -371,7 +380,7 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
 
   return <main className="work-shell inbox-shell">
     <div className="work-head">
-      <div><p className="eyebrow">Коммуникации</p><h1>{channelKind === "WHATSAPP" ? "Диалоги WhatsApp" : "Единый Inbox"}</h1><p className="subtitle">{channelKind === "WHATSAPP" ? "Здесь появятся обращения номера вашей гостиницы после подтверждённого подключения. Пока отправка WhatsApp отключена." : "Входящие, фактическое время ожидания, AI-черновики и реальные статусы доставки. AI сам сообщения не отправляет."}</p></div>
+      <div><p className="eyebrow">Коммуникации</p><h1>{channelKind === "WHATSAPP" ? "Диалоги WhatsApp" : "Единый Inbox"}</h1><p className="subtitle">{channelKind === "WHATSAPP" ? (capabilities?.whatsapp.configured ? "Ответы сотрудников доступны. Статус доставки подтверждается GREEN-API." : "Отправка WhatsApp недоступна до настройки и проверки подключения.") : "Входящие, фактическое время ожидания, AI-черновики и реальные статусы доставки. AI сам сообщения не отправляет."}</p></div>
       <button className="btn" onClick={() => { load(); loadCapabilities(); }}>Обновить</button>
     </div>
 
@@ -385,7 +394,7 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
     {error && <div className="error-box">{error}</div>}
     {loading ? <div className="loading">Загрузка диалогов…</div> : <section className="inbox-list">
       {visible.length === 0 && <div className="empty">Диалогов по этому фильтру пока нет.</div>}
-      {visible.map((item) => <button className={`inbox-row ${item.needs_reply ? "needs-reply" : ""}`} key={item.id} onClick={() => openConversation(item.id)} disabled={detailBusy}>
+      {visible.map((item) => <button className={`inbox-row ${item.needs_reply ? "needs-reply" : ""}`} key={item.id} onClick={() => openConversation(item.id)} disabled={detailBusy || sendBusy || aiBusy || noteBusy}>
         <div className="inbox-contact"><strong>{item.contact_name || item.contact_phone || item.contact_username || "Без имени"}</strong><span>{channelLabels[item.channel_kind] || item.channel_name}</span></div>
         <div className="inbox-preview"><strong>{item.last_message_direction === "INBOUND" ? "Гость" : item.last_message_direction === "INTERNAL" ? "Внутреннее" : "Ответ"}</strong><span>{item.last_message_text || "Сообщение без текста"}</span></div>
         <div><span className={`inbox-reply-pill ${item.needs_reply ? "waiting" : ""}`}>{item.needs_reply ? "Нужен ответ" : statusLabels[item.status] || item.status}</span><small>{item.needs_reply ? `ожидает ${waitingLabel(item.waiting_seconds)}` : dateTime(item.last_message_at)}</small></div>
@@ -393,11 +402,11 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
       </button>)}
     </section>}
 
-    {detail && <div className="detail-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setDetail(null); }}>
+    {detail && <div className="detail-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !sendBusy && !aiBusy && !noteBusy && !detailBusy) setDetail(null); }}>
       <section className="inbox-detail" role="dialog" aria-modal="true">
         <header>
           <div><p className="eyebrow">{channelLabels[detail.conversation.channel_kind] || detail.conversation.channel_name}</p><h2>{detail.conversation.contact_name || detail.conversation.contact_phone || detail.conversation.contact_username || "Диалог"}</h2><div className="inbox-header-meta"><span>{statusLabels[detail.conversation.status] || detail.conversation.status}</span>{detail.conversation.needs_reply && <b>Нужен ответ · {waitingLabel(detail.conversation.waiting_seconds)}</b>}</div></div>
-          <button className="btn" onClick={() => setDetail(null)}>Закрыть</button>
+          <div><button className="btn" disabled={detailBusy || sendBusy || aiBusy || noteBusy} onClick={() => { void openConversation(detail.conversation.id); void loadCapabilities(); }}>Обновить диалог</button> <button className="btn" disabled={detailBusy || sendBusy || aiBusy || noteBusy} onClick={() => setDetail(null)}>Закрыть</button></div>
         </header>
 
         <div className="inbox-management">
@@ -411,7 +420,7 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
           {detail.messages.map((message) => <article className={`message-bubble ${message.direction.toLowerCase()} ${message.sender_type === "AI_DRAFT" ? "ai-draft" : ""}`} key={message.id}>
             <div><strong>{messageAuthor(message)}</strong><time>{dateTime(message.sent_at || message.created_at)}</time></div>
             <p>{message.text || `[${message.content_type}]`}</p>
-            {message.direction === "OUTBOUND" && <small>Доставка: {message.delivery_status}</small>}
+            {message.direction === "OUTBOUND" && <small>Доставка: {deliveryLabels[message.delivery_status] || "Не подтверждено"}</small>}
           </article>)}
         </div>
 
@@ -419,7 +428,7 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
           <label><span>{whatsappReplyEnabled ? "Ручной ответ гостиницы (без автоотправки ИИ)" : "Черновик ответа менеджера"}</span><textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={4} maxLength={whatsappReplyEnabled ? capabilities?.whatsapp.max_text_length || 4096 : capabilities?.telegram.max_text_length || 4096} placeholder="Напишите ответ или создайте AI-черновик…" /></label>
           <div className="reply-actions">
             {aiDraftEnabled && <button type="button" className="btn" onClick={generateAiDraft} disabled={aiBusy || sendBusy}>{aiBusy ? "Готовлю…" : "AI-черновик"}</button>}
-            {replyEnabled ? <button className="btn primary" disabled={sendBusy || aiBusy || !reply.trim() || manualReconciliation}>{sendBusy ? "Обрабатываю…" : whatsappReplyEnabled ? "Передать в очередь WhatsApp" : "Отправить в Telegram"}</button> : <small>{role === "RECEPTION" && detail.conversation.channel_kind === "WHATSAPP" ? "Сначала возьмите диалог, затем отвечайте." : "Отправка наружу выключена, пока реальный адаптер канала не настроен."}</small>}
+            {replyEnabled ? <button className="btn primary" disabled={sendBusy || aiBusy || detailBusy || !reply.trim() || manualReconciliation}>{sendBusy ? "Обрабатываю…" : whatsappReplyEnabled ? "Передать в очередь WhatsApp" : "Отправить в Telegram"}</button> : <small>{role === "RECEPTION" && detail.conversation.channel_kind === "WHATSAPP" ? "Сначала возьмите диалог, затем отвечайте." : "Отправка наружу выключена, пока реальный адаптер канала не настроен."}</small>}
           </div>
           {sendInfo && <p className="send-info">{sendInfo}</p>}
           {manualReconciliation && <p className="send-info" role="alert">Отправка требует сверки с оператором. Автоматический повтор выключен, чтобы не отправить дубликат.</p>}
