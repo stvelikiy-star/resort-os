@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./WhatsAppWorkspace.module.css";
 
-type Connection = { configured: boolean; state: string; account_authorized: boolean };
+type Connection = { configured: boolean; state: string; account_authorized: boolean; messaging_verified?: boolean; ai_auto_send?: boolean };
 const LABELS: Record<string, string> = {
   disabled: "Подключение GreenAPI не настроено",
   notAuthorized: "Номер ожидает сканирования QR",
@@ -34,6 +34,8 @@ export default function WhatsAppConnection() {
       if (document.visibilityState === "hidden") {
         pending.current?.abort(); pending.current = null;
         setPairing(false); setQr(""); setBusy(false);
+      } else if (document.visibilityState === "visible") {
+        void check();
       }
     }
     document.addEventListener("visibilitychange", hidePairing);
@@ -111,6 +113,11 @@ export default function WhatsAppConnection() {
           setError("GreenAPI не вернул действительный QR-код. Повторите проверку.");
         }
       } else {
+        if (typeof body.configured !== "boolean" || typeof body.state !== "string" || typeof body.account_authorized !== "boolean") {
+          setConnection(null);
+          setError("Сервер вернул неизвестное состояние подключения.");
+          return;
+        }
         setConnection(body as Connection);
       }
     } catch {
@@ -130,11 +137,16 @@ export default function WhatsAppConnection() {
       : "Состояние номера ещё не проверено"}</p>
     <div className={styles.actions}>
       <button type="button" className="btn" disabled={busy} onClick={() => void check()}>Проверить подключение</button>
-      <button type="button" className="btn primary" disabled={busy || pairing || connection?.account_authorized === true || (connection !== null && ["disabled", "blocked", "suspended", "yellowCard", "starting", "sleepMode"].includes(connection.state))}
+      <button type="button" className="btn primary" disabled={busy || pairing || !connection?.configured || connection.account_authorized || !["notAuthorized", "qrWaiting", "passkeyRequired"].includes(connection.state)}
         onClick={() => void check(true)}>Получить QR-код</button>
       {pairing && <button type="button" className="btn" onClick={stopPairing}>Остановить подключение</button>}
     </div>
     {pairing && <p role="status">QR обновляется автоматически. Отсканируйте его в WhatsApp Business → Связанные устройства → Привязать устройство.</p>}
+    {connection && <div className={styles.tiles} aria-label="Готовность WhatsApp">
+      <article><strong>Номер</strong><span>{connection.account_authorized ? "Авторизован" : "Не авторизован"}</span></article>
+      <article><strong>Переписка</strong><span>{connection.messaging_verified === true ? "Проверена" : "Приём и доставка ещё не подтверждены"}</span></article>
+      <article><strong>MARINA AI</strong><span>{connection.ai_auto_send === true ? "Автоответы включены" : "Автоответы выключены"}</span></article>
+    </div>}
     {error && <p role="alert">{error}</p>}
     {qr && <figure className={styles.qr}>
       {/* A short-lived PNG returned by our authenticated server; no provider URL or key. */}
