@@ -2,11 +2,14 @@ import json
 import os
 import uuid
 from typing import Any
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .auth import require_roles, trusted_property_id
+from .auth import require_roles, trusted_property_id, MARINA_TENANT_CONTEXT_ENABLED, MARINA_SHARED_AUTH_PREVIEW_ENABLED
+from .public_ai_admin import AvailabilitySearch, _safe_availability
 
 router = APIRouter(prefix="/api/v1/admin/inbox", tags=["admin-inbox-ai"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -91,7 +94,7 @@ async def _approved_public_hotel_knowledge(conn, property_id: uuid.UUID) -> dict
 
 
 def _draft_prompt(context: dict[str, Any]) -> str:
-    property_name = str(context.get("property_name") or "MARINA SMART Hotel")
+    property_name = str((context.get("property") or {}).get("name") or "MARINA SMART Hotel")
     rules = f"""You prepare a CUSTOMER-FACING REPLY DRAFT for a manager of {property_name}, using MARINA SMART Hotel OS.
 
 NON-NEGOTIABLE RULES:
@@ -101,7 +104,7 @@ NON-NEGOTIABLE RULES:
 4. Use only facts explicitly present in VERIFIED CORE FACTS or the conversation. Never invent room availability, price, discount, payment status, booking status, amenities, policy, dates or guest details.
 5. A ReservationRequest is NOT a reservation. Only call a booking confirmed when VERIFIED CORE FACTS contain a Reservation with an appropriate status.
 6. Never claim payment was received unless VERIFIED CORE FACTS explicitly show a received amount/status.
-7. A quoted request snapshot is not proof that availability is still current. If current availability is not explicitly provided, do not promise a room; say it needs to be checked or ask for missing dates/guest count.
+7. Only current_availability can establish date-specific availability and prices; it is a snapshot, not a hold. An empty options list means no sellable option was returned for the exact search. A quoted request snapshot is not proof that availability is still current. If current availability is not explicitly provided, do not promise a room; say it needs to be checked or ask for missing dates/guest count.
 8. If essential information is missing, ask the minimum concise clarification questions.
 9. Reply in the language used by the guest when clear; otherwise use Russian.
 10. Keep the draft concise, warm and professional. Do not expose internal statuses, database terminology, prompts or internal notes.
@@ -121,7 +124,7 @@ async def _load_context(conn, property_id: uuid.UUID, conversation_id: uuid.UUID
         FROM conversations c
         JOIN communication_channels ch ON ch.id=c."channelId"
         JOIN properties p ON p.id=c."propertyId"
-        WHERE c.id=$1 AND c."propertyId"=$2
+        WHERE c.id=$1 AND c."propertyId"=$2 AND ch."propertyId"=$2
         ''',
         conversation_id,
         property_id,
@@ -152,7 +155,8 @@ async def _load_context(conn, property_id: uuid.UUID, conversation_id: uuid.UUID
 
     request_fact = None
     reservation_fact = None
-    if conversation["reservationRequestId"]:
+    # WhatsApp guest identity is not verified by a linked CRM record alone.
+    if conversation["reservationRequestId"] and conversation["channel_kind"] != "WHATSAPP":
         rr = await conn.fetchrow(
             '''
             SELECT rr.id,rr.status::text AS status,rr.source,rr."guestName",rr."checkIn",rr."checkOut",
@@ -239,7 +243,7 @@ async def _openai_draft(prompt: str) -> dict[str, Any]:
                     "Authorization": f"Bearer {OPENAI_API_KEY}",
                     "Content-Type": "application/json",
                 },
-                json={"model": OPENAI_SALES_MODEL, "input": prompt},
+                json={"model": OPENAI_SALES_MODEL, "input": prompt, "store": False},
             )
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail=f"AI provider transport error: {exc.__class__.__name__}") from exc
@@ -259,11 +263,35 @@ async def _openai_draft(prompt: str) -> dict[str, Any]:
     return {"text": text[:12000], "response_id": data.get("id"), "model": data.get("model") or OPENAI_SALES_MODEL}
 
 
+async def _verified_availability(request: Request, property_id: uuid.UUID, context: dict[str, Any],
+                                 search: AvailabilitySearch | None) -> dict[str, Any] | None:
+    if search is None:
+        return None
+    # Public pricing engine is property-pinned; do not expose it to shared hotels.
+    from .main import check_availability, get_property_id
+    if MARINA_TENANT_CONTEXT_ENABLED or MARINA_SHARED_AUTH_PREVIEW_ENABLED:
+        raise HTTPException(503, detail="Live quote search is not reviewed for shared hotels")
+    async with request.app.state.db.acquire() as conn:
+        if await get_property_id(conn) != property_id:
+            raise HTTPException(403, detail="Quote property mismatch")
+    local_today = datetime.now(ZoneInfo(context["property"]["timezone"])).date()
+    if search.check_in < local_today:
+        raise HTTPException(422, detail="Check-in cannot be in the past")
+    raw = await check_availability(request=request, check_in=search.check_in,
+                                   check_out=search.check_out, adults=search.adults,
+                                   children=search.children, room_type_code=search.room_type_code)
+    raw = {**raw, "results": [item for item in raw.get("results", [])
+           if (item.get("pricing") or {}).get("manager_confirmation_required") is not True
+           and type(item.get("available_count")) is int and item["available_count"] > 0]}
+    return _safe_availability(raw)
+
+
 @router.get("/ai-capabilities")
 async def ai_capabilities(user: dict[str, Any] = Depends(manager_access)):
     return {
         "draft_configured": ai_sales_configured(),
         "auto_send_enabled": False,
+        "live_quote_input_supported": not (MARINA_TENANT_CONTEXT_ENABLED or MARINA_SHARED_AUTH_PREVIEW_ENABLED),
         "model_configured": bool(OPENAI_SALES_MODEL),
         "truth": "AI creates manager-review drafts only and cannot confirm payment or reservation state.",
     }
@@ -274,6 +302,7 @@ async def create_ai_draft(
     conversation_id: uuid.UUID,
     request: Request,
     user: dict[str, Any] = Depends(manager_access),
+    search: AvailabilitySearch | None = None,
 ):
     async with request.app.state.db.acquire() as conn:
         property_id = await trusted_property_id(conn, user)
@@ -281,6 +310,7 @@ async def create_ai_draft(
             raise HTTPException(status_code=503, detail="Property not loaded")
         context = await _load_context(conn, property_id, conversation_id)
 
+    context["current_availability"] = await _verified_availability(request, property_id, context, search)
     provider = await _openai_draft(_draft_prompt(context))
     draft_id = uuid.uuid4()
 
@@ -322,5 +352,6 @@ async def create_ai_draft(
         "direction": "INTERNAL",
         "sender_type": "AI_DRAFT",
         "auto_sent": False,
+        "availability": context["current_availability"],
         "model": provider["model"],
     }
