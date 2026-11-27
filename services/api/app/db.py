@@ -97,13 +97,14 @@ async def lifespan(app: FastAPI):
                 logging.getLogger(__name__).exception("HOLD expiration worker failed")
             await asyncio.sleep(30)
 
-    worker = asyncio.create_task(hold_expiration_worker())
+    workers = [asyncio.create_task(hold_expiration_worker())]
+    if os.environ.get("ENABLE_GREEN_API_AI_DRAFT_WORKER") == "true":
+        from .whatsapp_ai_worker import run_worker
+        workers.append(asyncio.create_task(run_worker(app)))
     try:
         yield
     finally:
-        worker.cancel()
-        try:
-            await worker
-        except asyncio.CancelledError:
-            pass
+        for worker in workers:
+            worker.cancel()
+        await asyncio.gather(*workers, return_exceptions=True)
         await app.state.db.close()
