@@ -97,12 +97,13 @@ def _webhook_bindings() -> tuple[dict[str, str], ...]:
         raise HTTPException(503, detail="GREEN-API webhook bindings are not configured") from None
 
 
-def _single_property_identity(token: str) -> dict[str, str]:
+def single_property_binding() -> dict[str, str]:
     """Explicit one-property opt-in, independent of the shared RC7 registry."""
     from .whatsapp_connection import _configuration
 
     code = os.environ.get("PROPERTY_CODE", "")
-    if (code == "MARINA_DEMO" or not code
+    if (os.environ.get("ENABLE_GREEN_API_SINGLE_WEBHOOK") != "true"
+            or code == "MARINA_DEMO" or not code
             or code != os.environ.get("GREEN_API_PROPERTY_CODE")
             or any(os.environ.get(flag, "").lower() in {"true", "1", "yes", "on"}
                    for flag in ("MARINA_TENANT_CONTEXT_ENABLED",
@@ -126,8 +127,6 @@ def _single_property_identity(token: str) -> dict[str, str]:
         property_id = str(uuid.UUID(os.environ.get("GREEN_API_PROPERTY_ID", "")))
     except ValueError:
         raise HTTPException(503, detail="Single-hotel GREEN-API property ID missing") from None
-    if not hmac.compare_digest(secret, token):
-        raise HTTPException(401, detail="Invalid GREEN-API webhook credential")
     return {
         "actor_type": "SERVICE", "actor_id": "green-webhook:" + code,
         "property_code": code, "channel_code": "GREEN_" + instance,
@@ -143,7 +142,10 @@ def _bearer_identity(authorization: str | None) -> dict[str, str]:
         raise HTTPException(401, detail="Invalid GREEN-API webhook credential")
     token = authorization[7:]
     if os.environ.get("ENABLE_GREEN_API_SINGLE_WEBHOOK") == "true":
-        return _single_property_identity(token)
+        binding = single_property_binding()
+        if not hmac.compare_digest(os.environ["GREEN_API_WEBHOOK_TOKEN"], token):
+            raise HTTPException(401, detail="Invalid GREEN-API webhook credential")
+        return binding
     rows = _webhook_bindings()
     matching = [
         r for r in rows if hmac.compare_digest(r["webhook_token"], token)
