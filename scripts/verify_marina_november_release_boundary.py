@@ -49,6 +49,15 @@ APPROVED_NATIVE_QA_BLOBS = {
 }
 
 APPROVED_P0_BLOBS = {
+    # Merged PR #622: 37 successful checks, 35 successful workflows.
+    # One enrolled WhatsApp instance; retain all tenant, credential and staging guards.
+    ".github/workflows/marina-shared-green-rc7-webhook-ci.yml": "3710edf4b153685f100c37fb648b9adb2271f180",
+    "scripts/marina_shared_green_rc6_db_ci.py": "6c623c61024a76b933fb91856c07a3b5d8bbc86c",
+    "scripts/test_marina_first_green_enrollment.py": "3a646d7930c9923dcec9b659dba9f78db392b06f",
+    "scripts/test_marina_shared_inbox_rc5.py": "d2533b8a05799f789718fa80d7d059a5c304941f",
+    "services/api/app/green_api_webhook.py": "31421991199ffe9db68b66b3b9ea809c5d61f40f",
+    "services/api/app/shared_green_rc6_config.py": "17184ea193c11a29d9f61f12c5f6cd0d5fcf40a9",
+    "services/api/app/shared_inbox_rc5_identity.py": "b3d00be0893b04b1f34172e13c072a36e718224c",
     # Stage 1 ASKA TASH: migrate legacy AI test to the existing real PostgreSQL verifier.
     "scripts/verify_public_ai_trusted_proxy.py": "bbbaab766be55e879db258c7a9d31ad5a1cd9a9e",
     ".github/workflows/ai-administrator-ci.yml": "041a2265c01495325121fb76a315b6c5512c2490",
