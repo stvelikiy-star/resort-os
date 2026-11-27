@@ -117,9 +117,17 @@ class SharedInboxRc5Tests(unittest.TestCase):
                     asyncio.run(require_hotel_channel_service(key))
                 self.assertEqual(ctx.exception.status_code, 401)
 
+    def test_first_hotel_only(self):
+        with self.config(MARINA_SHARED_INBOX_RC5_ADAPTERS_JSON=json.dumps(CONFIGS[:1])):
+            self.assertEqual(len(configured_channel_adapters()), 1)
+            self.assertEqual(asyncio.run(require_hotel_channel_service(A))["property_code"], "HOTEL_A")
+            with self.assertRaises(HTTPException) as ctx:
+                asyncio.run(require_hotel_channel_service(B))
+            self.assertEqual(ctx.exception.status_code, 401)
+
     def test_bad_config_does_not_select_arbitrary_tenant(self):
         configs = [
-            CONFIGS[:1],
+            [],
             [{**CONFIGS[0], "service_key": B}, CONFIGS[1]],
             [{**CONFIGS[0], "external_account_id": "20000002"}, CONFIGS[1]],
             [{**CONFIGS[0], "property_code": "HOTEL_B"}, CONFIGS[1]],

@@ -28,8 +28,8 @@ def configured_channel_adapters() -> tuple[dict[str, str], ...]:
     raw = os.environ.get("MARINA_SHARED_INBOX_RC5_ADAPTERS_JSON", "")
     try:
         value = json.loads(raw)
-        if not isinstance(value, list) or len(value) < 2 or len(value) > 100:
-            raise ValueError("Expected at least two independently bound adapters")
+        if not isinstance(value, list) or len(value) < 1 or len(value) > 100:
+            raise ValueError("Expected at least one independently bound adapter")
         result = []
         for entry in value:
             if not isinstance(entry, dict) or set(entry) != {

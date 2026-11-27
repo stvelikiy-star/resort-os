@@ -27,7 +27,7 @@ def shared_green_rc6_config(user: dict) -> tuple[str, str, str]:
 
     try:
         rows = json.loads(os.environ.get("MARINA_SHARED_GREEN_RC6_CONFIG_JSON", ""))
-        if not isinstance(rows, list) or not 2 <= len(rows) <= 100:
+        if not isinstance(rows, list) or not 1 <= len(rows) <= 100:
             raise ValueError("Not a reviewed multi-hotel provider map")
         validated = []
         for row in rows:
