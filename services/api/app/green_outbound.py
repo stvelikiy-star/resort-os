@@ -163,6 +163,17 @@ async def send_green_text(
     }
     async with request.app.state.db.acquire() as conn:
         async with conn.transaction():
+            if single:
+                await conn.execute('SELECT id FROM conversations WHERE id=$1 AND "propertyId"=$2 FOR UPDATE', conversation_id, pid)
+                auto_pending = await conn.fetchval(
+                    '''SELECT EXISTS(SELECT 1 FROM automation_inbound_events
+                       WHERE "propertyId"=$1 AND source=$2 AND "eventType"='COMMUNICATION_OUTBOUND_DISPATCH'
+                         AND "payloadJson"->>'conversation_id'=$3 AND "payloadJson"->>'auto_send'='true'
+                         AND ("resultResource" IS NULL OR "resultResource"='OutboundReconciliationRequired'))''',
+                    pid, source, str(conversation_id),
+                )
+                if auto_pending:
+                    raise HTTPException(409, detail={"code":"AI_OUTBOUND_RECONCILIATION_REQUIRED","automatic_retry_safe":False})
             inserted = await conn.fetchval(
                 '''INSERT INTO automation_inbound_events
                    (id,"propertyId",source,"idempotencyKey","eventType",
