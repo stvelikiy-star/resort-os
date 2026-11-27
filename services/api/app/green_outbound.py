@@ -15,7 +15,7 @@ from fastapi import HTTPException, Request
 
 from .auth import trusted_property_id
 from .communication_ingest import NormalizedChannelMessage, ingest_normalized_channel_message
-from .green_api_webhook import DIRECT_CHAT, MESSAGE_ID
+from .green_api_webhook import DIRECT_CHAT, MESSAGE_ID, single_property_binding
 from .shared_green_rc8 import rc8_guard
 from .shared_inbox_rc5_identity import configured_channel_adapters
 from .whatsapp_connection import _configuration
@@ -40,6 +40,15 @@ async def _provider_send(config, chat_id: str, text: str) -> str:
     except (httpx.HTTPError, ValueError):
         # Never log or return the provider URL because it contains credentials.
         raise HTTPException(502, detail="GREEN-API queue acceptance is unconfirmed") from None
+
+
+def single_outbound_binding(user: dict[str, Any]) -> dict[str, str]:
+    if os.environ.get("ENABLE_GREEN_API_SINGLE_OUTBOUND") != "true":
+        raise HTTPException(503, detail="Single-hotel outbound is disabled")
+    binding = single_property_binding()
+    if user.get("property_code") != binding["property_code"]:
+        raise HTTPException(403, detail="Hotel WhatsApp account mismatch")
+    return binding
 
 
 def _service_identity(user: dict[str, Any], channel_code: str, instance: str) -> dict[str, str]:
@@ -107,7 +116,12 @@ async def send_green_text(
     if conversation["channel_kind"] != "WHATSAPP":
         return None
 
-    rc8_guard()
+    if user.get("role") not in {"OWNER", "MANAGER", "RECEPTION"}:
+        raise HTTPException(403, detail="Staff WhatsApp reply not permitted")
+    single = os.environ.get("ENABLE_GREEN_API_SINGLE_OUTBOUND") == "true"
+    binding = single_outbound_binding(user) if single else None
+    if not single:
+        rc8_guard()
     if user.get("role") == "RECEPTION" and str(conversation["assignedToId"]) != str(user["id"]):
         raise HTTPException(403, detail="Reception must claim this hotel conversation before reply")
     chat_id = conversation["externalConversationId"]
@@ -119,19 +133,26 @@ async def send_green_text(
     _, instance, _ = config
     if conversation["external_account_id"] != instance:
         raise HTTPException(409, detail="Conversation is not bound to the paired WhatsApp account")
-    service = _service_identity(user, conversation["channel_code"], instance)
-    # Ensure the selected adapter's tenant code refers to the authenticated
-    # property's actual tenant UUID, not just a reused display code.
-    async with request.app.state.db.acquire() as conn:
-        valid = await conn.fetchval(
-            '''SELECT 1 FROM properties p JOIN tenants t ON t.id=p."tenantId"
-               WHERE p.id=$1 AND p.code=$2 AND t.id=$3 AND t.code=$4
-                 AND t.status='ACTIVE' ''',
-            pid, user["property_code"], uuid.UUID(str(user["tenant_id"])),
-            service["tenant_code"],
-        )
-    if valid != 1:
-        raise HTTPException(503, detail="Authenticated hotel adapter boundary unavailable")
+    if single:
+        if (str(pid) != binding["bound_property_id"]
+                or instance != binding["external_account_id"]
+                or conversation["channel_code"] != binding["channel_code"]):
+            raise HTTPException(409, detail="Conversation does not match the hotel WhatsApp binding")
+        service = {**binding, "actor_id": "staff-whatsapp:" + str(user["id"])}
+    else:
+        service = _service_identity(user, conversation["channel_code"], instance)
+        # Ensure the selected adapter's tenant code refers to the authenticated
+        # property's actual tenant UUID, not just a reused display code.
+        async with request.app.state.db.acquire() as conn:
+            valid = await conn.fetchval(
+                '''SELECT 1 FROM properties p JOIN tenants t ON t.id=p."tenantId"
+                   WHERE p.id=$1 AND p.code=$2 AND t.id=$3 AND t.code=$4
+                     AND t.status='ACTIVE' ''',
+                pid, user["property_code"], uuid.UUID(str(user["tenant_id"])),
+                service["tenant_code"],
+            )
+        if valid != 1:
+            raise HTTPException(503, detail="Authenticated hotel adapter boundary unavailable")
 
     source = f"OUTBOX_{service['channel_code']}"[:60]
     dispatch = {
