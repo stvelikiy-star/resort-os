@@ -81,7 +81,7 @@ async def _still_current(conn, pid, cid, mid):
                    SELECT 1 FROM automation_inbound_events e
                    WHERE e."propertyId"=$2 AND e."eventType"='COMMUNICATION_OUTBOUND_DISPATCH'
                      AND e."payloadJson"->>'conversation_id'=c.id::text
-                     AND e."resultResource" IS NULL)
+                     AND (e."resultResource" IS NULL OR e."resultResource"='OutboundReconciliationRequired'))
            )''', cid, pid, mid,
     )
 
@@ -160,7 +160,11 @@ async def run_once(app) -> str:
                     await _finish(lane, pid, job, "ConversationMessage", str(draft))
                 return "draft_created"
             except Exception:
-                await _finish(lane, pid, job, "AiDraftReviewRequired")
+                async with lane.transaction():
+                    await lane.execute('SELECT id FROM conversations WHERE id=$1 AND "propertyId"=$2 FOR UPDATE', cid, pid)
+                    if await _still_current(lane, pid, cid, mid):
+                        await lane.execute("UPDATE conversations SET status='WAITING_STAFF',\"updatedAt\"=now() WHERE id=$1 AND \"propertyId\"=$2", cid, pid)
+                    await _finish(lane, pid, job, "AiDraftReviewRequired")
                 # Log no chat content, provider URL, exception or credentials.
                 logging.getLogger(__name__).warning("WhatsApp AI draft job requires staff review")
                 return "review_required"
