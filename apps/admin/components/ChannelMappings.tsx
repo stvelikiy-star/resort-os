@@ -22,7 +22,8 @@ export default function ChannelMappings({ locale }: { locale: keyof typeof copy 
    const response = await fetch("/core/api/v1/admin/channels/mappings", { cache: "no-store", signal });
    if (!response.ok) throw new Error("load");
    setData(await response.json() as Data);
-  } catch { if (!signal?.aborted) setNotice("error"); }
+   return true;
+  } catch { if (!signal?.aborted) setNotice("error"); return false; }
  }, []);
  useEffect(() => { const controller = new AbortController(); void load(controller.signal); return () => controller.abort(); }, [load]);
  async function save(event: FormEvent) {
@@ -31,7 +32,8 @@ export default function ChannelMappings({ locale }: { locale: keyof typeof copy 
    const response = await fetch("/core/api/v1/admin/channels/mappings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, currency: "KGS" }) });
    const result = await response.json();
    if (!response.ok) { setNotice(result.detail?.code === "CHANNEL_MAPPING_STALE" ? "stale" : "error"); return; }
-   setNotice("saved"); setForm(initial); await load();
+   setForm(initial);
+   if (await load()) setNotice("saved");
   } catch { setNotice("error"); } finally { setBusy(false); }
  }
  return <section className={styles.form} aria-label={t[0]}>

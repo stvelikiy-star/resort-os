@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'services/api/app/green_api_webhook.py'
+      - 'services/api/app/shared_green_rc6_config.py'
+      - 'services/api/app/shared_inbox_rc5_identity.py'
+      - 'scripts/test_marina_first_green_enrollment.py'
       - 'services/api/app/shared_green_rc7.py'
       - 'services/api/app/main.py'
       - 'services/api/app/app_entry.py'
@@ -89,6 +92,8 @@ jobs:
             services/api/app/main.py \
             services/api/app/app_entry.py \
             scripts/marina_shared_green_rc7_webhook_ci.py
+      - name: Verify first real enrollment with synthetic credentials only
+        run: python scripts/test_marina_first_green_enrollment.py -v
       - name: Seed unrelated hotels, authenticated owners and distinct rates
         run: python scripts/marina_shared_live_browser_db.py seed
       - name: Verify two-hotel authenticated GREEN-API callbacks and delivery reconciliation

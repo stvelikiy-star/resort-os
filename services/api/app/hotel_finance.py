@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from .auth import require_roles, trusted_property_id
+from .payment_refund_read_model import refund_compatible_sql
 from .owner_kitchen_reconciliation import owner_inventory_reconciliation
 from .owner_accrual_readiness import accrual_source_snapshot
+from .owner_accounting_postings import posting_enabled, period_coverage
 
 router = APIRouter(prefix="/api/v1/admin/finance", tags=["admin-hotel-finance"])
 manager_access = require_roles("OWNER", "MANAGER")
@@ -240,11 +242,11 @@ async def finance_summary(
         )
 
         active_reservations = await conn.fetchrow(
-            '''
+            await refund_compatible_sql(conn, '''
             WITH received AS (
-              SELECT "reservationId",COALESCE(SUM("amountKgs"),0)::bigint AS received_kgs
-              FROM payments
-              WHERE status='RECEIVED' AND "reservationId" IS NOT NULL
+              SELECT "reservationId",COALESCE(SUM("remainingReceivedKgs"),0)::bigint AS received_kgs
+              FROM owner_reservation_payment_balances
+              WHERE "reservationId" IS NOT NULL
               GROUP BY "reservationId"
             ), extras AS (
               SELECT "reservationId",COALESCE(SUM("amountKgs"),0)::bigint AS extras_kgs
@@ -260,7 +262,7 @@ async def finance_summary(
             LEFT JOIN received x ON x."reservationId"=r.id
             LEFT JOIN extras e ON e."reservationId"=r.id
             WHERE r."propertyId"=$1 AND r.status IN ('GUARANTEED','CHECKED_IN')
-            ''',
+            '''),
             pid,
         )
 
@@ -284,28 +286,38 @@ async def finance_summary(
         )
 
         refund_snapshot = await conn.fetchrow(
-            '''
-            SELECT COALESCE(SUM(p."amountKgs"),0)::bigint AS amount_kgs,COUNT(*)::int AS payment_count
+            await refund_compatible_sql(conn, '''
+            SELECT COALESCE(SUM(CASE WHEN p.status='REFUNDED' THEN p."amountKgs" ELSE COALESCE(b."refundedKgs",0) END),0)::bigint AS amount_kgs,
+                   COUNT(*)::int AS payment_count
             FROM payments p
             LEFT JOIN reservation_requests rr ON rr.id=p."requestId"
             LEFT JOIN reservations r ON r.id=p."reservationId"
-            WHERE COALESCE(rr."propertyId",r."propertyId")=$1 AND p.status='REFUNDED'
-            ''',
+            LEFT JOIN owner_reservation_payment_balances b ON b."paymentId"=p.id
+            WHERE COALESCE(rr."propertyId",r."propertyId")=$1 AND (p.status='REFUNDED' OR b."refundedKgs">0)
+            '''),
             pid,
         )
+
+        partial_refund_period = await conn.fetchrow(
+            await refund_compatible_sql(conn, """SELECT COALESCE(sum("amountKgs"),0)::bigint AS amount_kgs,
+                      count(*)::int AS event_count
+               FROM owner_partial_refund_events WHERE "propertyId"=$1
+                 AND "refundedAt">=($2::timestamp AT TIME ZONE 'UTC')
+                 AND "refundedAt"<($3::timestamp AT TIME ZONE 'UTC')"""),
+            pid,from_ts,to_ts)
 
         # IMPORTANT: no SQL row limit is applied before receivable/exception calculation.
         # Operational snapshots must be complete even after years of reservation history.
         ledger_rows = await conn.fetch(
-            '''
+            await refund_compatible_sql(conn, '''
             WITH payment_stats AS (
-              SELECT "reservationId",
-                     COALESCE(SUM("amountKgs") FILTER (WHERE status='RECEIVED'),0)::bigint AS received_kgs,
-                     COUNT(*) FILTER (WHERE status='RECEIVED')::int AS received_count,
-                     MAX(COALESCE("paidAt","createdAt")) FILTER (WHERE status='RECEIVED') AS last_received_at
-              FROM payments
-              WHERE "reservationId" IS NOT NULL
-              GROUP BY "reservationId"
+              SELECT p."reservationId",
+                     COALESCE(SUM(b."remainingReceivedKgs"),0)::bigint AS received_kgs,
+                     COUNT(*) FILTER (WHERE b."remainingReceivedKgs">0)::int AS received_count,
+                     MAX(COALESCE(p."paidAt",p."createdAt")) FILTER (WHERE b."remainingReceivedKgs">0) AS last_received_at
+              FROM payments p JOIN owner_reservation_payment_balances b ON b."paymentId"=p.id
+              WHERE p."reservationId" IS NOT NULL
+              GROUP BY p."reservationId"
             ), extras AS (
               SELECT "reservationId",COALESCE(SUM("amountKgs"),0)::bigint AS extras_kgs
               FROM guest_folio_charges
@@ -343,7 +355,7 @@ async def finance_summary(
             WHERE r."propertyId"=$1
               AND r.status IN ('GUARANTEED','CHECKED_IN','CHECKED_OUT','CANCELLED')
             ORDER BY r."checkOut" DESC,r."createdAt" DESC
-            ''',
+            '''),
             pid,
         )
         reservation_ledger = [reservation_ledger_item(row) for row in ledger_rows]
@@ -453,10 +465,13 @@ async def finance_summary(
         # OWNER receives supplier liabilities and movement-valued inventory
         # in the same report as manual expense obligations. MANAGER never does.
         owner_supplier_stock_snapshot = None
+        owner_ledger_period_coverage = None
         if user["role"] == "OWNER":
             async with conn.transaction(isolation="repeatable_read", readonly=True):
                 owner_supplier_stock_snapshot = await owner_inventory_reconciliation(conn, pid)
                 owner_accrual_readiness_snapshot = await accrual_source_snapshot(conn, pid, from_date, to_date, prop["timezone"])
+                if posting_enabled():
+                    owner_ledger_period_coverage = await period_coverage(conn, pid, from_date, to_date, prop["timezone"])
 
     def reservation_guest(row):
         name = " ".join(part for part in [row["firstName"], row["lastName"]] if part)
@@ -488,6 +503,7 @@ async def finance_summary(
         **({"owner_expense_snapshot": owner_expense_snapshot} if owner_expense_snapshot is not None else {}),
         **({"owner_supplier_stock_snapshot": owner_supplier_stock_snapshot} if owner_supplier_stock_snapshot is not None else {}),
         **({"owner_accrual_readiness_snapshot": owner_accrual_readiness_snapshot} if owner_supplier_stock_snapshot is not None else {}),
+        **({"owner_ledger_period_coverage": owner_ledger_period_coverage} if owner_ledger_period_coverage is not None else {}),
         "period_payments": dict(period),
         "received_by_method": [dict(row) for row in by_method],
         "received_by_day": [dict(row) for row in daily],
@@ -503,6 +519,7 @@ async def finance_summary(
         },
         "awaiting_prepayment_snapshot": dict(awaiting_requests),
         "refunded_snapshot_all_time": dict(refund_snapshot),
+        "partial_refund_period": dict(partial_refund_period),
         "recent_payments": [
             {
                 "id": str(row["id"]),
@@ -525,11 +542,11 @@ async def finance_summary(
         "truth": {
             "received": "Period received totals include only stored Payment.status=RECEIVED facts. Property-local calendar boundaries are converted to UTC-naive timestamps because the committed PostgreSQL baseline stores Prisma DateTime values as TIMESTAMP(3) without timezone.",
             "pending": "Pending total is an internal payment-record snapshot; it is not recognized revenue and does not mean automation is collecting payment.",
-            "active_reservations": "Active reservation totals include accommodation and non-waived/non-void folio extras, less stored RECEIVED payment facts; they are not an accounting revenue-recognition report.",
+            "active_reservations": "Active reservation totals include accommodation and non-waived/non-void folio extras, less retained received amounts after documented refunds; they are not an accounting revenue-recognition report.",
             "receivables": "Debtor counts and amounts are calculated over the complete GUARANTEED/CHECKED_IN/CHECKED_OUT reservation ledger. A CHECKED_OUT balance remains visible for operational follow-up regardless of historical ledger size.",
             "ledger": "The reservation_ledger response is a newest-first preview capped for payload size; reservation_ledger_meta declares truncation. Receivable and exception snapshots are calculated before that preview cap.",
             "exceptions": "Overpayment and cancelled-reservation-with-received-payment flags are complete operational reconciliation exceptions, not automatic refund decisions.",
-            "refunds": "Current Payment model has REFUNDED status but no normalized refund timestamp, so refunded amount is shown only as an all-time snapshot, not attributed to the selected period.",
+            "refunds": "Legacy full refunds have no normalized refund timestamp. The all-time snapshot includes both full and partial refunds; partial_refund_period separately uses actual documented refund timestamps. Gross received receipts are not a net cash-flow report.",
             "collection": "Prepayment amount and payment method remain manager-owned. Setting a requirement does not create a Payment or Reservation; AI/n8n have no payment-confirmation authority.",
         },
     }

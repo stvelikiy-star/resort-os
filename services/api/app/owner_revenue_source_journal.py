@@ -25,7 +25,7 @@ owner_only = require_roles("OWNER", module_grant=False)
 
 class SourceApproval(BaseModel):
     id: uuid.UUID
-    source_type: Literal["ROOM_NIGHT", "DINING_ORDER"]
+    source_type: Literal["ROOM_NIGHT", "DINING_ORDER", "OTHER_SERVICE"]
     source_id: uuid.UUID
     service_date: date
     reason: str = Field(min_length=8, max_length=500)
@@ -119,7 +119,7 @@ async def qualified_source(conn, property_id, tz, body):
             "night_allocation":"EVEN_BOOKING_FACE_VALUE_WITH_INTEGER_REMAINDER",
             "rate_and_tax_accounting_approved":False,
         }
-    else:
+    elif body.source_type == "DINING_ORDER":
         row=await conn.fetchrow(
             '''SELECT o.id,o.status,o."totalKgs",
                       (o."completedAt" AT TIME ZONE $3)::date AS served_local_date,
@@ -147,6 +147,20 @@ async def qualified_source(conn, property_id, tz, body):
             "served_date":row["served_local_date"].isoformat(),
             "tax_discount_refund_accounting_approved":False,
         }
+    else:
+        row=await conn.fetchrow(
+            """SELECT f.id AS folio_id,
+                      owner_guest_service_revenue_proof($1,$2,$3) AS amount
+               FROM guest_folio_charges f
+               WHERE f."propertyId"=$1 AND f."sourceType"='GUEST_SERVICE'
+                 AND f."sourceId"=$2 AND f.status IN ('OPEN','PAID')""",
+            property_id,body.source_id,body.service_date)
+        if not row or row["amount"] is None:
+            raise HTTPException(409,detail={"code":"REVENUE_GUEST_SERVICE_NOT_QUALIFIED"})
+        amount=Decimal(row["amount"])
+        snapshot={"qualification":"COMPLETED_GUEST_SERVICE_WITH_MATCHED_FOLIO",
+                  "folio_charge_id":str(row["folio_id"]),
+                  "tax_discount_refund_accounting_approved":False}
     return amount,snapshot
 
 
@@ -236,6 +250,13 @@ async def reverse_source(approval_id:uuid.UUID,body:SourceReversal,
                      AND action='REVERSE_SOURCE' ''',pid,approval_id)
             if duplicate:
                 raise HTTPException(409,detail={"code":"REVENUE_ALREADY_REVERSED"})
+            # Same tenant/source serialization as the database posting triggers.
+            # Older databases can still run legacy code; staging with the new
+            # accounting tables must fail closed if the guard is not installed.
+            if await conn.fetchval("SELECT to_regclass('owner_accounting_postings') IS NOT NULL"):
+                await conn.execute("SELECT owner_lock_revenue_posting($1,$2)",pid,approval_id)
+                if await conn.fetchval("SELECT owner_revenue_has_active_posting($1,$2)",pid,approval_id):
+                    raise HTTPException(409,detail={"code":"OWNER_REVENUE_ACTIVE_POSTING_REQUIRES_REVERSAL"})
             row=await conn.fetchrow(
                 '''INSERT INTO owner_revenue_source_events
                    (id,"propertyId","sourceType","sourceId","serviceDate",action,

@@ -16,6 +16,29 @@ on:
       - 'scripts/test_owner_served_kitchen_cost_trace.py'
       - 'scripts/marina_shared_served_cost_trace_ci.py'
       - 'scripts/marina_shared_batch_allocation_ci.py'
+      - 'scripts/marina_owner_accounting_decision_ci.py'
+      - 'scripts/test_owner_accounting_decision_evidence.py'
+      - 'services/api/app/owner_accounting_journal.py'
+      - 'services/api/app/owner_accounting_postings.py'
+      - 'services/api/app/owner_ledger_policy.py'
+      - 'scripts/test_owner_ledger_policy.py'
+      - 'scripts/marina_owner_posting_api_ci.py'
+      - 'scripts/marina_owner_expense_posting_ci.py'
+      - 'scripts/marina_owner_served_cogs_posting_ci.py'
+      - 'packages/database/prisma/migrations/zz129_marina_owner_accounting_postings_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz130_marina_owner_revenue_accounting_certification_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz131_marina_owner_source_reversal_integrity_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz132_marina_owner_revenue_period_integrity_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz133_marina_owner_guest_service_revenue_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz134_marina_owner_guest_service_posting_lifecycle_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz135_marina_owner_certified_tax_correction_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz136_marina_owner_certified_revenue_reductions_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz137_marina_owner_certified_refund_cash_evidence_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz138_marina_owner_full_cancellation_certificate_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz139_marina_partial_refund_evidence_foundation_20261125/migration.sql'
+      - 'packages/database/prisma/migrations/zz140_marina_owner_finance_property_calendar_20261126/migration.sql'
+      - 'services/api/app/owner_revenue_source_journal.py'
+      - 'packages/database/prisma/migrations/zz128_marina_owner_accounting_decision_evidence_20261124/migration.sql'
       - 'services/api/app/kitchen_batch_allocation.py'
       - 'services/api/app/owner_served_kitchen_cost_trace.py'
       - 'packages/database/prisma/migrations/zz127_marina_served_batch_allocation_20261124/migration.sql'
@@ -113,3 +136,34 @@ jobs:
         env:
           MARINA_BATCH_ALLOCATION_CI_CONFIRM: ISOLATED_BATCH_ALLOCATION_ONLY
         run: python scripts/marina_shared_batch_allocation_ci.py
+      - name: Verify accounting approval feature is fail-closed by default
+        run: python -m unittest scripts.test_owner_accounting_decision_evidence -v
+      - name: Verify independent OWNER accounting decisions without posting P&L
+        env:
+          MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'false'
+          PROPERTY_CODE: HOTEL_A
+          MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED: 'true'
+        run: python scripts/marina_owner_accounting_decision_ci.py
+      - name: Verify fail-closed posted journal policy and reversal math
+        run: python -m unittest scripts.test_owner_ledger_policy -v
+      - name: Verify exact OWNER posting and reversal against both hotels
+        env:
+          MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'false'
+          PROPERTY_CODE: HOTEL_A
+          MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED: 'true'
+          MARINA_ACCOUNTING_POSTING_ENABLED: 'true'
+        run: python scripts/marina_owner_posting_api_ci.py
+      - name: Verify documented utility expenses and exact reversal, no stock double count
+        env:
+          MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'false'
+          PROPERTY_CODE: HOTEL_A
+          MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED: 'true'
+          MARINA_ACCOUNTING_POSTING_ENABLED: 'true'
+        run: python scripts/marina_owner_expense_posting_ci.py
+      - name: Verify exact served COGS requires matched folio and fully allocated batches
+        env:
+          MARINA_SHARED_AUTH_PREVIEW_ENABLED: 'false'
+          PROPERTY_CODE: HOTEL_A
+          MARINA_ACCOUNTING_DECISION_EVIDENCE_ENABLED: 'true'
+          MARINA_ACCOUNTING_POSTING_ENABLED: 'true'
+        run: python scripts/marina_owner_served_cogs_posting_ci.py

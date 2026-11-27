@@ -155,3 +155,32 @@ test('fail closed: fabricated recognized profit, double-counting, invalid blocke
  ];
  bad.forEach(v=>expect(()=>verifyOwnerAccrualReadiness(v)).toThrow());
 });
+
+const ledger={
+ scope:'PROPERTY_SCOPED_READ_ONLY_PERIOD_DIAGNOSTIC',
+ period:{from:summary.range.from,to:summary.range.to},
+ counts:{lodging_expected:2,lodging_verified:1,dining_expected:1,dining_verified:1,
+  other_service_expected:1,other_service_verified:1,expense_expected:1,expense_verified:1,
+  cogs_expected:1,cogs_verified:0,refund_payment_expected:1,refund_payment_verified:0,
+  package_entitlement_count:1,package_portions_count:2,refund_undated_count:0,
+  active_corrections:0,unmatched_approved_sources:0},
+ blockers:['FULL_PERIOD_POLICY_AND_CLOSE_NOT_VERIFIED'],
+ posted_ledger_subtotals:{posting_line_count:3,revenue_kgs:'550.0000',expense_cogs_kgs:'700.0000',contribution_kgs:'-150.0000'},
+ period_completeness_verified:false,recognized_profit_kgs:null,currency:'KGS',
+};
+test('mobile uses the same guarded OWNER ledger and preserves exact negative subtotal',()=>{
+ expect(financeSummaryResponse({...summary,owner_ledger_period_coverage:ledger})
+  .owner_ledger_period_coverage?.posted_ledger_subtotals.contribution_kgs).toBe('-150.0000');
+});
+test('mobile rejects stale period, fabricated final profit and impossible coverage',()=>{
+ for(const bad of [
+  {...ledger,period:{...ledger.period,to:'2026-11-17'}},
+  {...ledger,recognized_profit_kgs:'150.0000'},
+  {...ledger,period_completeness_verified:true},
+  {...ledger,counts:{...ledger.counts,refund_payment_verified:2}},
+  {...ledger,posted_ledger_subtotals:{...ledger.posted_ledger_subtotals,revenue_kgs:'NaN'}},
+  {...ledger,blockers:[]},
+ ]) expect(()=>financeSummaryResponse({...summary,owner_ledger_period_coverage:bad})).toThrow();
+ const {owner_accrual_readiness_snapshot:_,...manager}=summary;
+ expect(()=>financeSummaryResponse({...manager,owner_ledger_period_coverage:ledger})).toThrow();
+});

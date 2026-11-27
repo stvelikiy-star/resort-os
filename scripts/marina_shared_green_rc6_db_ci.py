@@ -176,8 +176,18 @@ def main():
             # Negative tests must also reject cross-hotel identity confusion,
             # malformed credentials and unsafe provider origins without
             # contacting the synthetic provider at all.
+            # A single enrolled hotel is valid; the other hotel remains unconfigured.
+            with patch.dict(os.environ, {
+                "MARINA_SHARED_GREEN_RC6_CONFIG_JSON": json.dumps([accounts[0]]),
+            }):
+                status = expect(owner_a.get(path), 200, "first enrolled owner")
+                assert status["account_authorized"] is True
+                assert requested[-1][0][1:] == (accounts[0]["instance"], A_TOKEN)
+                expect(owner_b.get(path), 503, "unenrolled owner denied")
+                assert len(requested) == count + 1
+            count = len(requested)
             malformed = [
-                [accounts[0]],
+                [],
                 [{**accounts[0], "property_id": accounts[1]["property_id"]}, accounts[1]],
                 [{**accounts[0], "tenant_id": accounts[1]["tenant_id"]}, accounts[1]],
                 [{**accounts[0], "property_code": "HOTEL_B"}, accounts[1]],

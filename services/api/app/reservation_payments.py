@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from .auth import require_roles, trusted_property_id
+from .payment_refund_read_model import refund_compatible_sql
 from .auth import MARINA_SHARED_AUTH_PREVIEW_ENABLED
 from . import auth as auth_module
 from .section_permissions import user_has_section
@@ -85,14 +86,14 @@ def public_timestamp(value: datetime | None) -> datetime | None:
 
 async def _totals(conn, reservation_id: uuid.UUID):
     row = await conn.fetchrow(
-        '''
+        await refund_compatible_sql(conn, '''
         SELECT r."totalKgs",
-               COALESCE(sum(p."amountKgs") FILTER (WHERE p.status='RECEIVED'),0)::int AS paid_kgs
+               COALESCE(sum(p."remainingReceivedKgs"),0)::int AS paid_kgs
         FROM reservations r
-        LEFT JOIN payments p ON p."reservationId"=r.id
+        LEFT JOIN owner_reservation_payment_balances p ON p."reservationId"=r.id
         WHERE r.id=$1
         GROUP BY r.id,r."totalKgs"
-        ''',
+        '''),
         reservation_id,
     )
     if not row:
@@ -167,8 +168,10 @@ async def cancellation_finance_review(
         if not reservation:
             raise HTTPException(status_code=404, detail="Reservation not found")
         rows = await conn.fetch(
-            """SELECT status::text AS status,"amountKgs",provider,method
-               FROM payments WHERE "reservationId"=$1""", reservation_id,
+            await refund_compatible_sql(conn, """SELECT p.status::text AS status,p."amountKgs",p.provider,p.method,
+                      b."remainingReceivedKgs",b."refundedKgs"
+               FROM payments p JOIN owner_reservation_payment_balances b ON b."paymentId"=p.id
+               WHERE p."reservationId"=$1"""), reservation_id,
         )
         stays = await conn.fetchval(
             'SELECT count(*) FROM stays WHERE "reservationId"=$1', reservation_id,
@@ -179,8 +182,8 @@ async def cancellation_finance_review(
                FROM guest_folio_charges WHERE "propertyId"=$1 AND "reservationId"=$2""",
             pid, reservation_id,
         )
-    received = sum(int(p["amountKgs"]) for p in rows if p["status"] == "RECEIVED")
-    refunded = sum(int(p["amountKgs"]) for p in rows if p["status"] == "REFUNDED")
+    received = sum(int(p["remainingReceivedKgs"]) for p in rows)
+    refunded = sum(int(p["refundedKgs"]) for p in rows)
     pending = sum(int(p["amountKgs"]) for p in rows if p["status"] == "PENDING")
     has_payment_history = bool(rows)
     has_stay = bool(stays)
@@ -304,7 +307,7 @@ async def record_reservation_payment(
                 # Enforce the actual outstanding balance while the reservation row is locked.
                 # Charge totals and previously received payments are read in one transaction.
                 balance = await conn.fetchrow(
-                    """
+                    await refund_compatible_sql(conn, """
                     SELECT
                         r."totalKgs"::bigint
                           + COALESCE((
@@ -315,13 +318,13 @@ async def record_reservation_payment(
                               AND c.status NOT IN ('WAIVED', 'VOID')
                           ), 0)::bigint AS due_kgs,
                         COALESCE((
-                            SELECT SUM(p."amountKgs")
-                            FROM payments p
-                            WHERE p."reservationId" = r.id AND p.status = 'RECEIVED'
+                            SELECT SUM(p."remainingReceivedKgs")
+                            FROM owner_reservation_payment_balances p
+                            WHERE p."reservationId" = r.id
                         ), 0)::bigint AS paid_kgs
                     FROM reservations r
                     WHERE r.id = $1 AND r."propertyId" = $2
-                    """,
+                    """),
                     reservation_id, pid,
                 )
                 outstanding = max(0, int(balance["due_kgs"]) - int(balance["paid_kgs"]))
@@ -521,6 +524,10 @@ async def confirm_manual_full_refund(
                 raise HTTPException(status_code=409, detail={"code": "REFUND_ALREADY_RECORDED"})
             if row["status"] != "RECEIVED":
                 raise HTTPException(status_code=409, detail={"code": "PAYMENT_NOT_RECEIVED"})
+            if await conn.fetchval(await refund_compatible_sql(conn, 'SELECT EXISTS(SELECT 1 FROM owner_partial_refund_events WHERE "paymentId"=$1)'),payment_id):
+                raise HTTPException(status_code=409, detail={"code":"PARTIAL_REFUND_REQUIRES_REMAINING_BALANCE_REVIEW"})
+            if await conn.fetchval(await refund_compatible_sql(conn, 'SELECT EXISTS(SELECT 1 FROM owner_partial_refund_events WHERE "evidenceReference"=$1)'),reference):
+                raise HTTPException(status_code=409, detail={"code":"REFUND_EVIDENCE_REFERENCE_REUSED"})
             reused = await conn.fetchval(
                 '''SELECT id FROM audit_logs
                    WHERE action='CONFIRM_MANUAL_FULL_REFUND'

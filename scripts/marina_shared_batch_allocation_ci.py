@@ -6,7 +6,8 @@ idempotency, audit trail and absence of payment/accounting postings.
 """
 import asyncio
 import os
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from urllib.parse import urlparse
 from uuid import uuid4
@@ -158,7 +159,8 @@ with TestClient(app,base_url="https://batch-isolated.invalid") as client:
         client.post("/api/v1/auth/logout")
         login(hotel,"OWNER")
         period=client.get("/api/v1/admin/finance/owner/accrual-readiness",params={
-            "from_date": date.today().isoformat(), "to_date":date.today().isoformat()})
+            "from_date": datetime.now(ZoneInfo("Asia/Bishkek")).date().isoformat(),
+            "to_date": datetime.now(ZoneInfo("Asia/Bishkek")).date().isoformat()})
         assert period.status_code==200,period.text
         evidence=period.json()["served_kitchen_cost_trace"]["operator_attested_batch_links"]
         assert evidence["attributed_portions"]==7,evidence

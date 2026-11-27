@@ -2,7 +2,7 @@
 """Source gate for a NEW additive release without rewriting immutable RC3 evidence.
 
 RC2/RC3 manifests remain 39-migration history. The current release must
-preserve all 39 original SQL hashes and include pinned zz115 through zz127 SQL.
+preserve all 39 original SQL hashes and include pinned zz115 through zz140 SQL.
 """
 from __future__ import annotations
 import hashlib
@@ -25,7 +25,20 @@ NEW_MIGRATIONS = {
     "zz124_marina_owner_revenue_corrections_20261116": "4741659b4f047682b8a87b8b475ec8c395ca0823b24481cac7d3081545b78621",
     "zz125_marina_owner_revenue_evidence_bytes_20261116": "37f7b3e12f8c10e0defcd8acb2fbc3d0cea63f55c008e19622b2bb363e5fd285",
     "zz126_marina_owner_accounting_journal_proposals_20261116": "1368d2ebba7902f1197c6151e97ccc1e7a4ed6d32070b0b6e6dffef1a1d13f42",
-    "zz127_marina_served_batch_allocation_20261124": "95bac1119041a5eb816977c4824eea719dbb5a95da99c6e5615b5ca1dd771df3"
+    "zz127_marina_served_batch_allocation_20261124": "95bac1119041a5eb816977c4824eea719dbb5a95da99c6e5615b5ca1dd771df3",
+    "zz128_marina_owner_accounting_decision_evidence_20261124": "a2b611bdc28bee0e56c0db084f469fe0ef9a23f3960ed8ca995fcbf9f0735ec6",
+    "zz129_marina_owner_accounting_postings_20261125": "775329b35e5e5128afd6e13a74d9b040fdc102be58c5c79e13640649945d1fdb",
+    "zz130_marina_owner_revenue_accounting_certification_20261125": "1287bb02ba19d1a30fef5dcc53c5ec786b572cb3c5a12bcc588dc469da741c7e",
+    "zz131_marina_owner_source_reversal_integrity_20261125": "6f74b46833e78fbbf02fced5cb0a8564f7a2bdad6eedf74445f4fd9d0d52af11",
+    "zz132_marina_owner_revenue_period_integrity_20261125": "0a6084420b707d8741eaec61141c1a1fa3a03ddac0460b327452c3cc009ad179",
+    "zz133_marina_owner_guest_service_revenue_20261125": "487ff0ccc1b1a46804c5de2b153dd3e95c921002ce27eea49d1840b16fb465d6",
+    "zz134_marina_owner_guest_service_posting_lifecycle_20261125": "bb1e57baa2cac2c4e94c294a229b67fc98e7597486c022c265f8f3cd8c9b4621",
+    "zz135_marina_owner_certified_tax_correction_20261125": "9f3239acbfa138c2c9e63a98e43875d5ad6a127cbe1cb5b43b2247edcedbb152",
+    "zz136_marina_owner_certified_revenue_reductions_20261125": "e9c640033403f30b80be77a7aeede6caec3ce01d034f83bbf171603dd5c14b67",
+    "zz137_marina_owner_certified_refund_cash_evidence_20261125": "0f1b18a74bf2cecea5cecf301dea4dc8835bdc3b20e6d300b95f443aafec2837",
+    "zz138_marina_owner_full_cancellation_certificate_20261125": "4e0a5290a5bd96167bf1db12cf9e436af2fdcb6427b395b6f8a6d593fc6774b4",
+    "zz139_marina_partial_refund_evidence_foundation_20261125": "8fa7d2833def337a09a418a802a0be18df0a61114e85b27d888934f498afc3e8",
+    "zz140_marina_owner_finance_property_calendar_20261126": "fbb37beed614c3f7686e060e340f58c3608a92e3108b20287e366dda9a82e16a"
 }
 # Reviewed tightening: summary is trimmed and whitespace-only reports are rejected.
 # Keep the historical RC3 manifest immutable; pin this additive source exactly.
@@ -41,30 +54,67 @@ REVIEWED_SHARED_STAFF_P0_BLOBS = {
     "apps/staff/components/StoreStaffStock.tsx": "82b87098c1ab1355562551ec76cd8b4eb7b5478c",
     "scripts/marina_shared_owner_finance_p0_ci.py": "71cabedce521c0019a3fd900d075830d51891a13",
     # Reviewed evidence-only full refund: no external transfer, no partial refund.
-    "services/api/app/reservation_payments.py": "f7e533861624cd8a62fd29e81c7b0d73337717f3",
+    "services/api/app/reception_reservations.py": "1d03758e43b49b61b5424d092d20470e3d45b78c",
+    "services/api/app/manager_dashboard.py": "dff1947448f139502ed28ed21024054a7542eea3",
+    "services/api/app/payment_refund_read_model.py": "74327ded78a70f4834b097b40effc34b5ef554ed",
+    "scripts/payment_idempotency_helper_test.py": "83bda70f156a44451865302b1f618f799598b3b2",
+    ".github/workflows/payment-idempotency-ci.yml": "2eb5c186bbad8654dd61da429fe1491366ad6efd",
+    "services/api/app/crm_sync.py": "018ffcc71249dd42fae2d127b09c49b28b108150",
+    "services/api/app/analytics_reports.py": "ce57b5ef996317e97beab13e0f64ccf23c5a00a0",
+    "services/api/app/owner_intelligence.py": "4cc4594b2eb5b0b548740733abdf6a8eb698d3f2",
+    "services/api/app/automation_read.py": "bf8e1b508c4a9415c23958b7a30b7340cb2a6a3e",
+    "services/api/app/owner_pace.py": "c1d8115d91ae8422c2b1713a07d2d53ccae973b7",
+    "services/api/app/pms_control_snapshot.py": "5b7516ef7be557fc1d7ae848a3e34fc7fbd9378e",
+    "services/api/app/group_bookings.py": "8f4e7a1628218a847db989552633944936abbe51",
+    "services/api/app/owner_corrections.py": "057d2cf46e9ad91f3da497bbb6f920e538e87ea0",
+    "apps/admin/components/ChannelMappings.tsx": "13a0405bdea21b98f85b02bf5695eb0e75bbe710",
+    "services/api/app/reservation_payments.py": "b1102d8ddcf22479ed53b1d31022234885b90772",
     "services/api/app/pms_reservation_create.py": "f068836d615409443f1742fc492f27886f9d6aee",
     "scripts/marina_shared_manual_refund_evidence_ci.py": "f52d7947e64e935497617834e17535def9a59042",
     "scripts/test_marina_finance_tenant_boundary.py": "4a4e796b2dc9d96a710d8e52aa087930aacc3045",
-    "scripts/marina_shared_kitchen_cost_truth_ci.py": "e955a3cbd8a12ce76f8dd421bf1c277fe1cbde21",
+    "scripts/marina_shared_kitchen_cost_truth_ci.py": "da7a8f7dc0719fad59482b3312c22aeef22a60f0",
     "services/api/app/owner_served_kitchen_cost_trace.py": "848956bbe269623462b8979381baad86555b2f36",
-    "services/api/app/owner_accrual_readiness.py": "4d018cea0e9ffd3724594995dab4e91a76b5464f",
+    "services/api/app/owner_accrual_readiness.py": "a6484821beaae10aa3f3de3bbf5011e38389872f",
     "scripts/test_owner_served_kitchen_cost_trace.py": "c30f2859bd5769228c7cbcd1a1c6159797369abf",
     "scripts/marina_shared_served_cost_trace_ci.py": "0d8a608004d04fd6b4ad01f548da34fc59627385",
-    "apps/admin/components/HotelFinanceBoard.tsx": "20cdda5d8839fa3c3b9a59bfd686c52a69ae14ab",
+    "apps/admin/components/AdminExperienceRuntime.tsx": "179f09acba2a201ddff2a07ec8f6e6d9778ed67b",
+    "services/api/app/hotel_finance.py": "e8f78bcc467b87702f5d251917405ed0da838468",
+    "apps/mobile/scripts/verify-backend-contract.mjs": "7471f286c2e700c0670c038e0c0c465238c71b07",
+    "apps/mobile/app/finance.tsx": "4434075da2ed4f891d7d238d606e03783dd9b1dc",
+    "apps/mobile/src/api/liveModules.ts": "3b953a3a9caafb85397fe2ea5d8425bc737e9b86",
+    "apps/mobile/src/api/contractValidation.ts": "bb4b0325bac08c6a362181e6e58a4306fd4d7dfc",
+    "apps/mobile/__tests__/owner-accrual-readiness.test.ts": "70f981613d914bf8b9c433ce2b2cbfd771d88059",
+    "apps/admin/components/HotelFinanceBoard.tsx": "68da94a3b0f4b613195ff5905f73a0c7854e24ed",
     "apps/staff/components/CookBatchAssignments.tsx": "884a3290e678f8777167999e5aceaa60d470902b",
     "apps/staff/components/SharedDiningShift.tsx": "193b5a27d698a89914433cffa3a22d798fb2b285",
     # MARINA-specific 52nd migration, exact batch-to-served item ledger.
-    "scripts/release_contract.py": "30a001c5fc1eed727ff600f24d6c22bf2a5d0756",
-    "scripts/release_contract_test.py": "99455c81fd8c275ba1a1d24e86e1008490e05ce6",
-    ".github/workflows/marina-zz113-rollback-ci.yml": "a2d23ca8be3734cd2e7bb8d160f8d582dd61acea",
-    "scripts/marina_disposable_upgrade_acceptance_ci.py": "8fe78f31a4d3ca74baafc6129c6c368dd73d871f",
-    ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "fadfe76cd59a2db944b82f72f5c8abf0dda89b5c",
-    "services/api/app/app_entry.py": "088b69374b5b0e5ee3b86eab6cd59a8cf8f6642f",
+    "scripts/marina_shared_three_hotel_restore_ci.py": "0f00022721637c58d3897f5164496af7173e37dd",
+    "scripts/release_contract.py": "7871d08dee2d4a0ddba216404635fbffd8161be0",
+    "scripts/release_contract_test.py": "b57e90422c8afde12c1b67b2cb5c453d7cafe62d",
+    ".github/workflows/marina-zz113-rollback-ci.yml": "251b0b6f8a8d682bb58761863cecb895cb4c1afe",
+    "scripts/marina_disposable_upgrade_acceptance_ci.py": "b877c5976def9451853953b86ec48b6804ab16b0",
+    ".github/workflows/marina-564-legacy-upgrade-acceptance-ci.yml": "9bf375ac39d02cf78122dbe4544f1d69d3335cb6",
+    "services/api/app/app_entry.py": "8b8e630073ddbe6a8855a5494116c5cac11064ca",
     "services/api/app/shared_auth_preview.py": "22d59980e7bf38531ea887b62e64f08a179f9067",
     "services/api/app/kitchen_batch_allocation.py": "21f71b7bd7d7a6c4aa2b044b4617a4547a16be47",
     "services/api/app/owner_served_kitchen_cost_trace.py": "d051cd2f1962fb4540434b026dec75e8c2afc6a7",
-    "scripts/marina_shared_batch_allocation_ci.py": "ba9ce140bb72bfdb7954cb7081ea4f312bb4a168",
-    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "24e9586d68e90e4292bb5f53f44d7fddeead7849",
+    "scripts/marina_shared_batch_allocation_ci.py": "9db3435b5ac282ba058b49ecd15ee5f0d8a51752",
+    "scripts/marina_owner_accounting_decision_ci.py": "4b84740d89e497f976accaa6da3da082129e349e",
+    "services/api/app/owner_accounting_journal.py": "bfadba59080ec2badb554ee03ed39d964cb04c0e",
+    "services/api/app/owner_recognition_policy.py": "b379a397c079581bdbeef843c76374fa67250209",
+    "services/api/app/owner_ledger_policy.py": "a731aeec650163d590eccc671f950209a9842548",
+    "services/api/app/owner_accounting_postings.py": "7e8de0d7a769b741717826d2566f4080ec1e22a5",
+    "services/api/app/owner_revenue_corrections.py": "10f52e7f916598620c73fa2d3a61f08bed435aaa",
+    "services/api/app/owner_delivered_revenue.py": "1e8881079cd4d4a64f96aaabbb51c1d21e59a035",
+    "scripts/test_owner_ledger_policy.py": "169705fb329563a9599657b98f537ab0cfb403ce",
+    "scripts/marina_owner_posting_api_ci.py": "9028185d6f1bc009f71084a4374551bc54f00fc5",
+    "services/api/app/owner_revenue_source_journal.py": "a748840fcce9904dbb4e52fe20c9ff6163bd9375",
+    "scripts/marina_owner_expense_posting_ci.py": "3c5879734d3bff96269559b1aa08e25adfe937c2",
+    "scripts/marina_owner_served_cogs_posting_ci.py": "75bb2cc1fb85ff6379ec0b8010115a4aad6b290b",
+    "scripts/test_owner_recognition_policy.py": "7a856095b84319c654c9b536f763e1d763cf790a",
+    ".github/workflows/marina-owner-recognition-policy-ci.yml": "7965e38127aaf6a9ffe73f0c0ce755425d36d6e1",
+    "scripts/test_owner_accounting_decision_evidence.py": "fcc8c6f8f9da2496ae39d7d7ffdf960a093f9a89",
+    ".github/workflows/marina-shared-staff-lifecycle-p0-ci.yml": "b07934ef9a5263dcc900192a0c06c10b6963c07f",
 }
 ALLOWED_LEGACY_ERRORS = frozenset({
     "Prisma migrations drift from frozen RC2 (name or content)",
@@ -89,15 +139,15 @@ def validate_additive() -> list[str]:
     pinned = rc2.get("migration_sha256")
     if not isinstance(pinned, dict) or len(pinned) != 39:
         return ["historical RC2 expected 39 pinned migration hashes"]
-    if len(EXPECTED_MIGRATIONS) != 52 or EXPECTED_MIGRATIONS[39:] != tuple(NEW_MIGRATIONS):
-        errors.append("current release must contain exactly 39 historical + zz115 through zz127 migrations")
+    if len(EXPECTED_MIGRATIONS) != 65 or EXPECTED_MIGRATIONS[39:] != tuple(NEW_MIGRATIONS):
+        errors.append("current release must contain exactly 39 historical + zz115 through zz140 migrations")
     expected = set(pinned) | set(NEW_MIGRATIONS)
     actual = {
         p.parent.name: hashlib.sha256(p.read_bytes()).hexdigest()
         for p in (ROOT / "packages/database/prisma/migrations").glob("*/migration.sql")
     }
     if set(actual) != expected or set(EXPECTED_MIGRATIONS) != expected:
-        errors.append("new release migration set is not the approved additive 52")
+        errors.append("new release migration set is not the approved additive 65")
     for name, sha in pinned.items():
         if actual.get(name) != sha:
             errors.append("historical RC2 migration drift: " + name)
@@ -143,4 +193,4 @@ if __name__ == "__main__":
         for message in problems:
             print("MARINA_RC3_ADDITIVE_FAIL:", message)
         raise SystemExit(1)
-    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz127, total=52, original source gate preserved, NO-GO")
+    print("MARINA_RC3_ADDITIVE_PASS: historical=39/39 immutable, new=zz115 through zz140, total=65, original source gate preserved, NO-GO")
