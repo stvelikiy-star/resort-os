@@ -64,6 +64,7 @@ type AiCapabilities = {
   draft_configured: boolean;
   auto_send_enabled: boolean;
   model_configured: boolean;
+  live_quote_input_supported?: boolean;
   truth: string;
 };
 
@@ -130,6 +131,10 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
   const [pendingSendKey, setPendingSendKey] = useState<string | null>(null);
   const [manualReconciliation, setManualReconciliation] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const [quoteIn, setQuoteIn] = useState("");
+  const [quoteOut, setQuoteOut] = useState("");
+  const [quoteAdults, setQuoteAdults] = useState(2);
+  const [quoteChildren, setQuoteChildren] = useState(0);
   const [sendInfo, setSendInfo] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -212,6 +217,7 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
       setSendInfo(null);
       setReply("");
       setNote("");
+      setQuoteIn(""); setQuoteOut(""); setQuoteAdults(2); setQuoteChildren(0);
       setPendingSendKey(null);
       setManualReconciliation(false);
     }
@@ -313,17 +319,26 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
   }
 
   async function generateAiDraft() {
-    if (!detail || !aiDraftEnabled) return;
+    if (!detail || !aiDraftEnabled || aiBusy || sendBusy || detailBusy) return;
+    const quoteEnabled = detail.conversation.channel_kind === "WHATSAPP" && aiCapabilities?.live_quote_input_supported;
+    const hasDates = quoteEnabled && Boolean(quoteIn || quoteOut);
+    if (hasDates && (!quoteIn || !quoteOut || quoteOut <= quoteIn || !Number.isInteger(quoteAdults) || quoteAdults < 1 || quoteAdults > 20 || !Number.isInteger(quoteChildren) || quoteChildren < 0 || quoteChildren > 20)) {
+      setError("Укажите корректные даты и число гостей для расчёта.");
+      return;
+    }
     setAiBusy(true);
     setError(null);
     setSendInfo(null);
     try {
-      const response = await fetch(`/core/api/v1/admin/inbox/conversations/${detail.conversation.id}/ai-draft`, { method: "POST" });
+      const response = await fetch(`/core/api/v1/admin/inbox/conversations/${detail.conversation.id}/ai-draft`, hasDates ? {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ check_in: quoteIn, check_out: quoteOut, adults: quoteAdults, children: quoteChildren }),
+      } : { method: "POST" });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.detail || "Не удалось создать AI-черновик");
       const maxLength = capabilities?.telegram.max_text_length || 4096;
       setReply(String(body.text || "").slice(0, maxLength));
-      setSendInfo("AI создал черновик. Проверьте и отредактируйте его перед отправкой.");
+      setSendInfo(body.availability ? `AI создал черновик по текущей доступности PMS: вариантов ${body.availability.options?.length ?? 0}. Это не бронь. Проверьте текст перед отправкой.` : "AI создал черновик. Проверьте и отредактируйте его перед отправкой.");
       await openConversation(detail.conversation.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка AI-черновика");
@@ -426,6 +441,14 @@ export default function InboxBoard({ channelKind, role = "OWNER" }: { channelKin
 
         {(aiDraftEnabled || replyEnabled) ? <form className="outbound-reply-form" onSubmit={sendReply}>
           <label><span>{whatsappReplyEnabled ? "Ручной ответ гостиницы (без автоотправки ИИ)" : "Черновик ответа менеджера"}</span><textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={4} maxLength={whatsappReplyEnabled ? capabilities?.whatsapp.max_text_length || 4096 : capabilities?.telegram.max_text_length || 4096} placeholder="Напишите ответ или создайте AI-черновик…" /></label>
+          {aiDraftEnabled && detail.conversation.channel_kind === "WHATSAPP" && aiCapabilities?.live_quote_input_supported && <fieldset disabled={aiBusy || sendBusy || detailBusy}>
+            <legend>Расчёт цены и наличия для AI (необязательно)</legend>
+            <label>Заезд<input type="date" value={quoteIn} onChange={(e) => setQuoteIn(e.target.value)} /></label>
+            <label>Выезд<input type="date" value={quoteOut} onChange={(e) => setQuoteOut(e.target.value)} /></label>
+            <label>Взрослые<input type="number" min={1} max={20} value={quoteAdults} onChange={(e) => setQuoteAdults(Number(e.target.value))} /></label>
+            <label>Дети<input type="number" min={0} max={20} value={quoteChildren} onChange={(e) => setQuoteChildren(Number(e.target.value))} /></label>
+            <small>Укажите согласованные с гостем даты и состав. Проверка не резервирует номер.</small>
+          </fieldset>}
           <div className="reply-actions">
             {aiDraftEnabled && <button type="button" className="btn" onClick={generateAiDraft} disabled={aiBusy || sendBusy}>{aiBusy ? "Готовлю…" : "AI-черновик"}</button>}
             {replyEnabled ? <button className="btn primary" disabled={sendBusy || aiBusy || detailBusy || !reply.trim() || manualReconciliation}>{sendBusy ? "Обрабатываю…" : whatsappReplyEnabled ? "Передать в очередь WhatsApp" : "Отправить в Telegram"}</button> : <small>{role === "RECEPTION" && detail.conversation.channel_kind === "WHATSAPP" ? "Сначала возьмите диалог, затем отвечайте." : "Отправка наружу выключена, пока реальный адаптер канала не настроен."}</small>}
